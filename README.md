@@ -76,8 +76,18 @@ src/
   services/
     userService.ts                # identificacao/criacao de cliente
     schedulingService.ts          # orquestra Google Calendar + Supabase
-    aiAgentService.ts             # loop de tool-use com Claude
     reminderService.ts            # rotina de lembretes
+  conversation/                   # maquina de estados do atendimento
+    engine.ts                     # orquestra o loop de tool-use com Claude, uma etapa por vez
+    confirmations.ts              # deteccao deterministica de confirmacao/desistencia
+    prompt.ts                     # regras globais + textos institucionais
+    types.ts                      # StepDefinition, FlowContext, StepResult
+    steps/
+      menu.ts                     # atendimento geral / FAQ / gatilhos dos fluxos
+      scheduling.ts                # agendamento (procedimento -> nome -> data -> horario -> confirmacao)
+      rescheduling.ts              # remarcacao
+      cancellation.ts              # cancelamento
+      index.ts                    # registro central de todas as etapas
   repositories/
     userRepository.ts
     scheduleRepository.ts
@@ -87,6 +97,7 @@ src/
     googleCalendarClient.ts
     anthropicClient.ts
     supabaseClient.ts
+  utils/logger.ts                 # logging estruturado (info/warn/error)
   cron/reminderCron.ts            # agendamento in-process (node-cron)
   jobs/sendReminders.ts           # execucao manual/externa dos lembretes
 scripts/googleAuthSetup.ts        # setup unico do OAuth do Google

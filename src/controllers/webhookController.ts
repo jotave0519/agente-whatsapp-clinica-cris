@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { parseIncomingWebhook, sendWhatsAppMessage } from "../integrations/evolutionApiClient";
 import { getOrCreateUserByPhone } from "../services/userService";
 import * as conversationRepository from "../repositories/conversationRepository";
-import * as aiAgentService from "../services/aiAgentService";
+import * as conversationEngine from "../conversation/engine";
 import { logger } from "../utils/logger";
 
 const SCOPE = "webhookController";
@@ -47,8 +47,8 @@ export async function handleWhatsAppWebhook(req: Request, res: Response): Promis
       return;
     }
 
-    logger.info(SCOPE, "Encaminhando para aiAgentService.handleMessage", { conversationId: conversation.id, state: conversation.state });
-    const { reply, handoffRequested } = await aiAgentService.handleMessage(user, conversation, text);
+    logger.info(SCOPE, "Encaminhando para conversationEngine.runTurn", { conversationId: conversation.id, state: conversation.state });
+    const { reply, handoffRequested } = await conversationEngine.runTurn(user, conversation, text);
     logger.info(SCOPE, "Resposta gerada pelo agente", { conversationId: conversation.id, handoffRequested, reply });
 
     await sendWhatsAppMessage(phone, reply);

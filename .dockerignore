@@ -1,0 +1,8 @@
+node_modules
+dist
+.tmp
+.env
+.git
+credentials.json
+token.json
+npm-debug.log*

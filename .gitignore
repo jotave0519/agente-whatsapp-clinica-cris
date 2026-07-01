@@ -1,0 +1,9 @@
+.env
+evolution-api/.env
+credentials.json
+token.json
+.tmp/
+node_modules/
+dist/
+npm-debug.log*
+.claude/

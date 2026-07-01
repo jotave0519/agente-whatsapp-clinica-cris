@@ -26,10 +26,36 @@ export interface Schedule {
 
 export type ConversationStatus = "ai" | "human" | "closed";
 
+export type ConversationFlowState =
+  | "MENU"
+  | "SCHEDULING_NAME"
+  | "SCHEDULING_DATE"
+  | "SCHEDULING_TIME"
+  | "SCHEDULING_CONFIRM"
+  | "RESCHEDULING_SELECT"
+  | "RESCHEDULING_DATE"
+  | "RESCHEDULING_TIME"
+  | "RESCHEDULING_CONFIRM"
+  | "CANCELING_SELECT"
+  | "CANCELING_CONFIRM";
+
+export interface FlowStateData {
+  name?: string;
+  procedure?: string;
+  durationMinutes?: number;
+  date?: string;
+  availableSlots?: string[];
+  selectedStart?: string;
+  scheduleId?: string;
+  candidates?: { scheduleId: string; procedure: string; date: string; time: string }[];
+}
+
 export interface Conversation {
   id: string;
   user_id: string;
   status: ConversationStatus;
+  state: ConversationFlowState;
+  state_data: FlowStateData;
   last_user_message_at: string | null;
   nudge_sent_at: string | null;
   created_at: string;

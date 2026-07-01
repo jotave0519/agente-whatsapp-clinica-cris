@@ -1,5 +1,5 @@
 import { getSupabaseClient } from "../integrations/supabaseClient";
-import { Conversation, ConversationStatus, Message, MessageRole } from "../types";
+import { Conversation, ConversationFlowState, ConversationStatus, FlowStateData, Message, MessageRole } from "../types";
 
 export async function findActiveConversation(userId: string): Promise<Conversation | null> {
   const { data, error } = await getSupabaseClient()
@@ -38,6 +38,19 @@ export async function updateConversationStatus(
   const { error } = await getSupabaseClient()
     .from("conversations")
     .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", conversationId);
+
+  if (error) throw error;
+}
+
+export async function updateConversationFlow(
+  conversationId: string,
+  state: ConversationFlowState,
+  stateData: FlowStateData
+): Promise<void> {
+  const { error } = await getSupabaseClient()
+    .from("conversations")
+    .update({ state, state_data: stateData, updated_at: new Date().toISOString() })
     .eq("id", conversationId);
 
   if (error) throw error;

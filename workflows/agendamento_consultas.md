@@ -3,68 +3,63 @@
 ## Objetivo
 Marcar, remarcar ou cancelar avaliações/consultas para pacientes via WhatsApp. O Google Calendar é a agenda visual da clínica; o Supabase (tabela `schedules`) é o registro estruturado, vinculado ao paciente (`users`) e ao evento do Google Calendar (`google_event_id`).
 
-## Quando usar
-O paciente demonstrou interesse em agendar uma avaliação ou procedimento (ex: "quero marcar", "tem horário essa semana?", "queria remarcar", "preciso cancelar minha consulta").
+## Como isso é implementado
+Esse fluxo roda sobre uma **máquina de estados** (`src/services/conversationFlowService.ts` + `src/services/aiAgentService.ts`), não sobre instruções livres. Cada conversa tem um `state` salvo no Supabase (`conversations.state`), e enquanto esse estado não for `MENU`, você (o modelo) só recebe as ferramentas daquela etapa específica — é fisicamente impossível voltar ao menu, pular etapas ou confirmar uma ação sem que a ferramenta correspondente tenha sido chamada com sucesso. Isso existe porque depender só de "lembrar o contexto" causava o agente perder o fio da meada e voltar ao menu no meio de um agendamento.
+
+Você não precisa gerenciar o estado manualmente — só chamar a ferramenta certa a cada mensagem, conforme instruído no prompt daquela etapa. As regras abaixo descrevem o comportamento esperado; o código já impede a maioria dos desvios.
 
 ## Configuração da agenda
-- Calendário: definido em `GOOGLE_CALENDAR_ID` no `.env` (padrão: calendário principal da conta autenticada).
-- Horário de atendimento: Segunda a Sexta, 08:00 às 18:00 (não oferecer horários fora disso, nem sábados/domingos/feriados).
-- Duração padrão de slot: 30 minutos para avaliação; procedimentos podem exigir mais tempo — se o paciente já souber o procedimento, usar 60 minutos como padrão para Botox/Preenchimento/Harmonização.
+- Calendário: definido em `GOOGLE_CALENDAR_ID` no `.env`.
+- Horário de atendimento: Segunda a Sexta, 08:00 às 18:00 (não oferecer horários fora disso, nem sábados/domingos/feriados) — já é respeitado automaticamente pela ferramenta de disponibilidade.
+- Duração padrão de slot: 30 minutos.
 
-## Inputs necessários antes de agendar
-1. Nome completo do paciente
-2. Telefone (já disponível — vem do próprio WhatsApp/usuário identificado no Supabase)
-3. Procedimento de interesse (ou "avaliação" se ainda não souber)
-4. Preferência de data/horário
+## Regra obrigatória: uma pergunta por vez
+Nunca combine duas perguntas na mesma mensagem (ex: nunca pergunte nome e data juntos). Cada etapa da máquina de estados já força isso — só peça a informação da etapa atual.
 
-Se faltar alguma informação, pergunte antes de chamar a ferramenta de agendamento — nunca invente dados do paciente. **Regra obrigatória: uma pergunta por vez.** Nunca combine duas perguntas na mesma mensagem (ex: nunca pergunte nome e data juntos) — envie uma, aguarde a resposta do cliente, e só então faça a próxima.
+## Fluxo: nova consulta (`begin_scheduling` → `MENU`)
+1. Cliente demonstra interesse em agendar → chame `begin_scheduling(procedure)`, incluindo `name`/`date` se o cliente já os tiver informado na mesma mensagem.
+2. **Etapa SCHEDULING_NAME**: se faltar o nome, pergunte (só isso) e chame `provide_name(name)` quando o cliente responder.
+3. **Etapa SCHEDULING_DATE**: pergunte a data desejada (só isso). Ao receber, chame `provide_date(date)` — isso consulta o Google Calendar de verdade e retorna os horários livres.
+4. **Etapa SCHEDULING_TIME**: apresente 2-4 horários reais retornados (nunca invente) e pergunte qual o cliente prefere. Ao escolher, chame `select_time(start)`.
+5. **Etapa SCHEDULING_CONFIRM**: repita nome, procedimento, data e horário, e peça confirmação explícita (ex: "Posso confirmar sua avaliação para 02/07 às 14h?"). **Só depois de confirmação explícita do cliente** chame `confirm_scheduling()` — essa ferramenta cria o evento no Google Calendar e o registro em `schedules` no Supabase, nessa ordem, e só reporta sucesso se ambos derem certo.
+6. Se `confirm_scheduling` retornar erro, nunca diga que o agendamento foi feito — informe o problema e ofereça tentar de novo ou falar com um atendente.
+7. Se dado certo, confirme por mensagem (nome do procedimento, data, horário, endereço) e pergunte "Posso ajudar com mais alguma coisa?".
 
-## Passo a passo
+## Fluxo: remarcação (`begin_rescheduling`)
+1. Cliente pede para remarcar → chame `begin_rescheduling()`. A ferramenta já busca os agendamentos ativos do cliente no Supabase.
+   - Se não houver nenhum, você será informado — avise o cliente e volte ao atendimento geral.
+   - Se houver só um, ele já é selecionado automaticamente e você vai direto para a etapa de nova data.
+   - Se houver mais de um, você entra na **etapa RESCHEDULING_SELECT**: liste-os e pergunte qual remarcar; ao responder, chame `select_appointment_to_reschedule(schedule_id)`.
+2. **Etapa RESCHEDULING_DATE**: pergunte a nova data (só isso). Ao receber, chame `provide_reschedule_date(date)` (consulta real ao Google Calendar).
+3. **Etapa RESCHEDULING_TIME**: apresente os horários reais e pergunte qual prefere. Ao escolher, chame `select_reschedule_time(start)`.
+4. **Etapa RESCHEDULING_CONFIRM**: peça confirmação explícita. Só depois chame `confirm_rescheduling()` — atualiza o evento no Google Calendar e o registro no Supabase, nessa ordem.
+5. Erro → nunca afirme sucesso, informe o problema. Sucesso → confirme por mensagem e pergunte se pode ajudar em mais alguma coisa.
 
-### 1. Marcar nova consulta
-Siga esta sequência exata, uma etapa (e uma pergunta) por vez:
+## Fluxo: cancelamento (`begin_cancellation`)
+1. Cliente pede para cancelar → chame `begin_cancellation()`. Mesma lógica de busca automática de `begin_rescheduling` (0 → avisa; 1 → segue direto; 2+ → **etapa CANCELING_SELECT**, chame `select_appointment_to_cancel(schedule_id)` após a escolha).
+2. **Etapa CANCELING_CONFIRM**: confirme com o cliente que ele realmente quer cancelar aquele agendamento específico. Só depois de confirmação explícita chame `confirm_cancellation()`.
+3. Erro → nunca afirme cancelamento. Sucesso → confirme com gentileza, deixe a porta aberta para reagendar, e pergunte se pode ajudar em mais alguma coisa.
 
-1. Pergunte **apenas** o procedimento de interesse (ex: "Para começarmos, poderia me informar seu nome completo?" se ainda não tiver o nome, ou o procedimento — na ordem que fizer sentido na conversa, mas sempre um item por vez). Se ainda não tiver o nome completo do paciente, peça primeiro.
-2. Aguarde a resposta. Em seguida, pergunte **apenas** a data desejada.
-3. Aguarde a resposta. Chame a ferramenta `check_availability(date)` para aquele dia (ou os próximos dias úteis se o paciente não tiver preferência exata).
-4. Apresente 2-4 horários reais retornados pela ferramenta (nunca invente horários) e pergunte qual ele prefere.
-5. Aguarde a resposta. Repita de volta data, horário, nome e procedimento, e peça confirmação explícita (ex: "Posso confirmar sua avaliação para 02/07 às 14h?").
-6. **Só depois que o cliente confirmar explicitamente** (ex: "sim", "pode ser", "confirmo") você segue para a criação. Nunca chame `create_appointment` sem essa confirmação explícita.
-7. Chame `create_appointment(name, service, start, duration_minutes)`. Essa ferramenta cria o evento no Google Calendar primeiro e só então salva o registro em `schedules` no Supabase — nessa ordem, de forma atômica no backend.
-8. **Se a ferramenta retornar erro**: nunca diga ao paciente que o agendamento foi realizado. Informe que houve um problema técnico, peça para tentar novamente em instantes ou ofereça encaminhar para um atendente (`request_human_handoff`).
-9. **Se a ferramenta tiver sucesso**: confirme o agendamento por mensagem, repetindo data, horário, procedimento e endereço da clínica. Em seguida pergunte "Posso ajudar com mais alguma coisa?" (ver regras de encerramento em [atendimento_faq.md](atendimento_faq.md)).
+## Confirmações
+Enquanto o estado for uma etapa `*_CONFIRM`, respostas como "sim", "pode", "confirmado", "confirma", "ok", "beleza", "certo", "isso mesmo" são tratadas como confirmação. Boa parte disso já é interceptado automaticamente pelo código antes mesmo de chegar até você (fast-path determinístico) — mas se a mensagem for ambígua (ex: "sim mas pode mudar o horário?"), você decide com calma se deve chamar a ferramenta de confirmação ou esclarecer antes.
 
-### 2. Remarcar consulta existente
-1. Chame `list_appointments()` para ver os agendamentos ativos do paciente atual.
-2. Se houver mais de um agendamento futuro, pergunte **apenas** qual deles o paciente quer remarcar (uma pergunta).
-3. Aguarde a resposta, depois pergunte **apenas** a nova data desejada.
-4. Aguarde a resposta, chame `check_availability` para aquele dia e apresente os horários reais disponíveis.
-5. Aguarde a escolha do horário, repita os dados e peça confirmação explícita antes de prosseguir.
-6. Só após confirmação explícita, chame `reschedule_appointment(schedule_id, start, duration_minutes)`.
-7. Se der erro, siga a mesma regra do passo 8 acima (nunca afirmar sucesso). Se der certo, confirme por mensagem e pergunte se pode ajudar em mais alguma coisa.
+## Desistência do fluxo
+Se o cliente pedir claramente para parar ("deixa pra lá", "esquece isso", "mudei de ideia"), chame `abandon_flow()` para voltar ao atendimento geral. Não faça isso por conta própria sem um pedido claro do cliente — é proibido voltar ao menu no meio do fluxo por iniciativa sua.
 
-### 3. Cancelar consulta
-1. Chame `list_appointments()` para localizar o agendamento.
-2. Confirme com o paciente que deseja realmente cancelar antes de executar (pergunta única, aguardar confirmação explícita).
-3. Só após confirmação explícita, chame `cancel_appointment(schedule_id)`.
-4. Se der erro, nunca afirme que foi cancelado — informe o problema. Se der certo, confirme o cancelamento e, com gentileza, deixe a porta aberta para reagendar quando quiser, perguntando se pode ajudar em mais alguma coisa.
-
-### 4. Confirmar presença (resposta a lembrete)
-Quando o paciente responder confirmando presença após um lembrete (ver [lembretes_confirmacoes.md](lembretes_confirmacoes.md)):
-1. Chame `list_appointments()` para identificar o agendamento correspondente.
-2. Chame `confirm_appointment(schedule_id)`.
-3. Agradeça a confirmação.
+## Confirmar presença (resposta a lembrete)
+Quando o paciente responder confirmando presença após um lembrete automático (ver [lembretes_confirmacoes.md](lembretes_confirmacoes.md)), e isso não fizer parte de um fluxo de agendamento em andamento (ou seja, o estado é `MENU`): identifique o agendamento e chame `confirm_appointment(schedule_id)`.
 
 ## Casos excepcionais
-- **Nenhum horário disponível na preferência do paciente**: ofereça o próximo horário disponível mais próximo, sem pressionar.
-- **Paciente pede horário fora do funcionamento (noite, fim de semana)**: informe educadamente o horário de funcionamento (Seg-Sex, 08h-18h) e ofereça alternativas dentro dele.
-- **Paciente novo x paciente recorrente**: o registro em `users` é criado automaticamente na primeira mensagem (nome vindo do WhatsApp); não é necessário diferenciar no agendamento.
-- **Erro ao acessar o Google Calendar ou o Supabase**: não invente disponibilidade nem confirme agendamento sem sucesso da ferramenta. Informe ao paciente que a equipe confirmará o horário em breve e considere chamar `request_human_handoff`.
-- **Procedimento não listado no FAQ**: aceite o agendamento normalmente como "avaliação" e deixe a definição do procedimento para a consulta presencial.
+- **Nenhum horário disponível na data pedida**: a ferramenta de data já informa isso; peça outra data ao cliente, sem pressionar.
+- **Paciente pede horário fora do funcionamento**: informe o horário de funcionamento (Seg-Sex, 08h-18h) e ofereça alternativas dentro dele.
+- **Paciente novo x recorrente**: o registro em `users` é criado automaticamente na primeira mensagem; não precisa diferenciar.
+- **Erro em qualquer ferramenta**: nunca invente sucesso. Informe o problema e considere `request_human_handoff` (esse continua disponível fora de qualquer fluxo, no atendimento geral).
+- **Procedimento não listado no FAQ**: aceite como "avaliação" e deixe a definição para a consulta presencial.
 
 ## Ferramentas usadas
-- `check_availability`, `create_appointment`, `list_appointments`, `reschedule_appointment`, `cancel_appointment`, `confirm_appointment` — implementadas em `src/services/schedulingService.ts`, que coordena o Google Calendar (`src/integrations/googleCalendarClient.ts`) e o Supabase (`src/repositories/scheduleRepository.ts`).
+Implementadas em `src/services/conversationFlowService.ts` (lógica determinística de estado) e expostas ao modelo via `src/services/aiAgentService.ts`, que só libera as ferramentas da etapa atual:
+`begin_scheduling`, `provide_name`, `provide_date`, `select_time`, `confirm_scheduling`, `begin_rescheduling`, `select_appointment_to_reschedule`, `provide_reschedule_date`, `select_reschedule_time`, `confirm_rescheduling`, `begin_cancellation`, `select_appointment_to_cancel`, `confirm_cancellation`, `abandon_flow`, `confirm_appointment`.
 
 ## Encaminhamento
-- Dúvidas sobre tratamentos, valores ou a clínica antes de agendar → ver [atendimento_faq.md](atendimento_faq.md).
-- Após agendar, o lembrete automático é responsabilidade do workflow [lembretes_confirmacoes.md](lembretes_confirmacoes.md) — não é necessário agendar lembrete manualmente aqui.
+- Dúvidas sobre tratamentos, valores ou a clínica → ver [atendimento_faq.md](atendimento_faq.md) (só se aplica quando o estado é `MENU`).
+- Após agendar, o lembrete automático é responsabilidade do workflow [lembretes_confirmacoes.md](lembretes_confirmacoes.md) — não precisa agendar lembrete manualmente aqui.

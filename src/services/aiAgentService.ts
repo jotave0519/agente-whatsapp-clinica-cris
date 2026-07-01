@@ -3,101 +3,141 @@ import path from "path";
 import { createMessage } from "../integrations/anthropicClient";
 import { env } from "../config/env";
 import * as schedulingService from "./schedulingService";
+import * as flow from "./conversationFlowService";
 import * as conversationRepository from "../repositories/conversationRepository";
-import { Conversation, User } from "../types";
+import { Conversation, ConversationFlowState, User } from "../types";
 
 const WORKFLOWS_DIR = path.join(__dirname, "..", "..", "workflows");
 
-function loadSystemPrompt(isFirstMessage: boolean): string {
+function loadWorkflowsText(): string {
   const files = ["atendimento_faq.md", "agendamento_consultas.md"];
-  const parts = files.map((file) => fs.readFileSync(path.join(WORKFLOWS_DIR, file), "utf-8"));
-
-  const today = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
-  const header =
-    `Voce e o assistente de WhatsApp da clinica da Dra. Cristiane Zangelmi. ` +
-    `Data e hora atual: ${today} (America/Sao_Paulo).\n` +
-    `Siga rigorosamente os workflows abaixo. Responda sempre em portugues do Brasil, ` +
-    `em mensagens curtas e naturais de WhatsApp (evite paredes de texto). ` +
-    `Use as ferramentas disponiveis para checar disponibilidade e criar/remarcar/cancelar ` +
-    `agendamentos - nunca invente horarios ou confirme agendamentos sem chamar a ferramenta. ` +
-    `Se o cliente pedir para falar com um atendente humano, ou voce nao conseguir ajudar, ` +
-    `chame a ferramenta request_human_handoff.\n` +
-    `REGRA CRITICA: faca apenas UMA pergunta por mensagem, nunca duas ou mais juntas. Aguarde ` +
-    `a resposta do cliente antes de pedir a proxima informacao.\n` +
-    `REGRA CRITICA: antes de chamar create_appointment, reschedule_appointment ou cancel_appointment, ` +
-    `voce precisa ter uma confirmacao explicita do cliente (ex: "sim", "confirmo", "pode ser") sobre ` +
-    `o horario/acao exata. Nunca chame essas ferramentas sem essa confirmacao explicita previa. Se a ` +
-    `ferramenta retornar erro, nunca diga ao cliente que a acao foi concluida - informe o problema.\n` +
-    `Apos concluir uma solicitacao (agendar, remarcar ou cancelar), pergunte se pode ajudar em mais ` +
-    `alguma coisa antes de encerrar a conversa.\n` +
-    (isFirstMessage
-      ? `Esta e a primeira mensagem deste cliente na conversa: cumprimente-o pelo nome (se souber) ` +
-        `e apresente as opcoes principais (1. Agendar avaliacao, 2. Remarcar agendamento, ` +
-        `3. Cancelar agendamento, 4. Conhecer nossos tratamentos, 5. Falar com um atendente), ` +
-        `mas tambem entenda linguagem natural livremente.\n`
-      : "");
-
-  return header + "\n\n---\n\n" + parts.join("\n\n---\n\n");
+  return files.map((file) => fs.readFileSync(path.join(WORKFLOWS_DIR, file), "utf-8")).join("\n\n---\n\n");
 }
 
-const TOOLS: any[] = [
+const WORKFLOWS_TEXT = loadWorkflowsText();
+
+const BASE_RULES =
+  "Voce e o assistente de WhatsApp da clinica da Dra. Cristiane Zangelmi. " +
+  "Responda sempre em portugues do Brasil, em mensagens curtas e naturais de WhatsApp (evite paredes de texto).\n" +
+  "REGRA CRITICA: faca APENAS UMA pergunta por mensagem, nunca duas ou mais juntas.\n" +
+  "REGRA CRITICA: nunca invente horarios - use somente os que vierem do resultado de uma ferramenta.\n" +
+  "REGRA CRITICA: nunca diga que agendar/remarcar/cancelar foi concluido sem que a ferramenta correspondente tenha retornado sucesso.\n";
+
+function buildSystemPrompt(conversation: Conversation, isFirstMessage: boolean): string {
+  const { state, state_data: stateData } = conversation;
+  const today = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  let header = BASE_RULES + `Data e hora atual: ${today} (America/Sao_Paulo).\n`;
+
+  if (state === "MENU") {
+    header +=
+      "Voce esta no atendimento geral. Use os workflows abaixo para tirar duvidas sobre a clinica. " +
+      "Quando o cliente quiser agendar, remarcar ou cancelar, chame begin_scheduling, begin_rescheduling ou begin_cancellation.\n";
+    if (isFirstMessage) {
+      header +=
+        "Esta e a primeira mensagem deste cliente na conversa: cumprimente-o pelo nome (se souber) e apresente " +
+        "as opcoes principais (1. Agendar avaliacao, 2. Remarcar agendamento, 3. Cancelar agendamento, " +
+        "4. Conhecer nossos tratamentos, 5. Falar com um atendente), mas tambem entenda linguagem natural livremente.\n";
+    }
+    return header + "\n\n---\n\n" + WORKFLOWS_TEXT;
+  }
+
+  header +=
+    "\nVoce esta no meio de um atendimento de agendamento/remarcacao/cancelamento EM ANDAMENTO. " +
+    "E PROIBIDO voltar ao menu principal, listar as opcoes novamente, ou mudar de assunto antes de concluir esta operacao. " +
+    "Se o cliente pedir claramente para parar ou desistir deste fluxo, chame abandon_flow. Fora isso, siga apenas a etapa atual abaixo:\n\n";
+
+  switch (state) {
+    case "SCHEDULING_NAME":
+      header +=
+        "Etapa: falta o nome completo do paciente. Se a ultima mensagem do cliente ja contem o nome, chame provide_name. " +
+        "Caso contrario, pergunte (apenas) o nome completo.";
+      break;
+    case "SCHEDULING_DATE":
+      header +=
+        `Etapa: falta a data desejada (procedimento: ${stateData.procedure || "avaliacao"}` +
+        `${stateData.name ? `, paciente: ${stateData.name}` : ""}). Se a ultima mensagem ja contem uma data, ` +
+        "chame provide_date com a data no formato YYYY-MM-DD (resolva termos relativos como \"amanha\"/\"segunda\" usando a data atual acima). " +
+        "Caso contrario, pergunte (apenas) a data desejada.";
+      break;
+    case "SCHEDULING_TIME":
+      header +=
+        `Etapa: falta escolher o horario. Horarios disponiveis (ja consultados no Google Calendar): ${JSON.stringify(stateData.availableSlots)}. ` +
+        "Apresente 2-4 desses horarios de forma amigavel (HH:MM) e pergunte qual o cliente prefere. " +
+        "Se o cliente ja escolheu um horario da lista, chame select_time com o valor ISO exato correspondente.";
+      break;
+    case "SCHEDULING_CONFIRM":
+      header +=
+        `Etapa: aguardando confirmacao final. Dados: nome=${stateData.name}, procedimento=${stateData.procedure}, horario=${stateData.selectedStart}. ` +
+        "Repita esses dados e peca confirmacao explicita. Se o cliente ja confirmou claramente, chame confirm_scheduling. Nunca chame sem confirmacao explicita.";
+      break;
+    case "RESCHEDULING_SELECT":
+      header +=
+        `Etapa: o cliente tem varios agendamentos ativos: ${JSON.stringify(stateData.candidates)}. ` +
+        "Liste-os e pergunte qual ele quer remarcar. Se ja escolheu, chame select_appointment_to_reschedule com o schedule_id correspondente.";
+      break;
+    case "RESCHEDULING_DATE":
+      header +=
+        `Etapa: falta a nova data desejada para remarcar (procedimento: ${stateData.procedure}). Se a mensagem ja contem uma data, ` +
+        "chame provide_reschedule_date com a data no formato YYYY-MM-DD. Caso contrario, pergunte (apenas) a nova data.";
+      break;
+    case "RESCHEDULING_TIME":
+      header +=
+        `Etapa: falta escolher o novo horario. Horarios disponiveis: ${JSON.stringify(stateData.availableSlots)}. ` +
+        "Apresente-os e pergunte qual prefere. Se ja escolheu, chame select_reschedule_time.";
+      break;
+    case "RESCHEDULING_CONFIRM":
+      header +=
+        `Etapa: aguardando confirmacao final da remarcacao para ${stateData.selectedStart}. Peca confirmacao explicita. ` +
+        "Se ja confirmou, chame confirm_rescheduling.";
+      break;
+    case "CANCELING_SELECT":
+      header +=
+        `Etapa: o cliente tem varios agendamentos ativos: ${JSON.stringify(stateData.candidates)}. ` +
+        "Liste-os e pergunte qual ele quer cancelar. Se ja escolheu, chame select_appointment_to_cancel.";
+      break;
+    case "CANCELING_CONFIRM":
+      header +=
+        `Etapa: aguardando confirmacao final do cancelamento de ${stateData.procedure} em ${stateData.date}. ` +
+        "Peca confirmacao explicita. Se ja confirmou, chame confirm_cancellation.";
+      break;
+  }
+
+  return header;
+}
+
+const ABANDON_TOOL = {
+  name: "abandon_flow",
+  description: "Aborta o fluxo atual de agendamento/remarcacao/cancelamento e volta ao atendimento geral, a pedido explicito do cliente.",
+  input_schema: { type: "object", properties: {} },
+};
+
+const MENU_TOOLS: any[] = [
   {
-    name: "check_availability",
-    description:
-      "Lista horarios livres em um dia especifico, dentro do horario de funcionamento (Seg-Sex, 08h-18h).",
+    name: "begin_scheduling",
+    description: "Inicia o fluxo de agendamento de uma nova avaliacao/procedimento.",
     input_schema: {
       type: "object",
       properties: {
-        date: { type: "string", description: "Data no formato YYYY-MM-DD" },
-        duration_minutes: { type: "integer", description: "Duracao em minutos", default: 30 },
+        procedure: { type: "string", description: "Procedimento de interesse, ou 'avaliacao' se nao souber" },
+        name: { type: "string", description: "Nome completo do paciente, se ja informado nesta mensagem" },
+        date: { type: "string", description: "Data desejada (YYYY-MM-DD), se ja informada nesta mensagem" },
       },
-      required: ["date"],
+      required: ["procedure"],
     },
   },
   {
-    name: "create_appointment",
-    description: "Cria um novo agendamento de consulta/procedimento.",
-    input_schema: {
-      type: "object",
-      properties: {
-        name: { type: "string", description: "Nome completo do paciente" },
-        service: { type: "string", description: "Procedimento de interesse" },
-        start: { type: "string", description: "Data/hora ISO, ex: 2026-07-02T10:00:00" },
-        duration_minutes: { type: "integer", default: 30 },
-      },
-      required: ["name", "service", "start"],
-    },
-  },
-  {
-    name: "list_appointments",
-    description: "Lista os agendamentos ativos do cliente atual.",
+    name: "begin_rescheduling",
+    description: "Inicia o fluxo de remarcacao de um agendamento existente do cliente atual.",
     input_schema: { type: "object", properties: {} },
   },
   {
-    name: "reschedule_appointment",
-    description: "Remarca um agendamento existente do cliente atual para um novo horario.",
-    input_schema: {
-      type: "object",
-      properties: {
-        schedule_id: { type: "string", description: "ID do agendamento (obtido via list_appointments)" },
-        start: { type: "string", description: "Novo horario em formato ISO" },
-        duration_minutes: { type: "integer", default: 30 },
-      },
-      required: ["schedule_id", "start"],
-    },
-  },
-  {
-    name: "cancel_appointment",
-    description: "Cancela um agendamento existente do cliente atual.",
-    input_schema: {
-      type: "object",
-      properties: { schedule_id: { type: "string" } },
-      required: ["schedule_id"],
-    },
+    name: "begin_cancellation",
+    description: "Inicia o fluxo de cancelamento de um agendamento existente do cliente atual.",
+    input_schema: { type: "object", properties: {} },
   },
   {
     name: "confirm_appointment",
-    description: "Marca um agendamento como confirmado pelo paciente (ex: apos lembrete de consulta).",
+    description: "Marca um agendamento como confirmado pelo paciente (ex: em resposta a um lembrete de consulta).",
     input_schema: {
       type: "object",
       properties: { schedule_id: { type: "string" } },
@@ -106,8 +146,7 @@ const TOOLS: any[] = [
   },
   {
     name: "request_human_handoff",
-    description:
-      "Encerra o atendimento automatico e sinaliza que um atendente humano deve continuar a conversa.",
+    description: "Encerra o atendimento automatico e sinaliza que um atendente humano deve continuar a conversa.",
     input_schema: {
       type: "object",
       properties: { reason: { type: "string", description: "Motivo do encaminhamento" } },
@@ -116,53 +155,182 @@ const TOOLS: any[] = [
   },
 ];
 
-async function executeTool(name: string, input: any, user: User): Promise<string> {
+const STATE_TOOLS: Partial<Record<ConversationFlowState, any[]>> = {
+  SCHEDULING_NAME: [
+    {
+      name: "provide_name",
+      description: "Registra o nome completo do paciente informado pelo cliente.",
+      input_schema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
+    },
+    ABANDON_TOOL,
+  ],
+  SCHEDULING_DATE: [
+    {
+      name: "provide_date",
+      description: "Registra a data desejada e consulta a disponibilidade real no Google Calendar.",
+      input_schema: { type: "object", properties: { date: { type: "string", description: "YYYY-MM-DD" } }, required: ["date"] },
+    },
+    ABANDON_TOOL,
+  ],
+  SCHEDULING_TIME: [
+    {
+      name: "select_time",
+      description: "Registra o horario escolhido pelo cliente (deve ser um dos horarios disponiveis apresentados).",
+      input_schema: { type: "object", properties: { start: { type: "string", description: "Horario ISO exato escolhido" } }, required: ["start"] },
+    },
+    ABANDON_TOOL,
+  ],
+  SCHEDULING_CONFIRM: [
+    {
+      name: "confirm_scheduling",
+      description: "Confirma e cria o agendamento (Google Calendar + Supabase). Só chamar apos confirmacao explicita do cliente.",
+      input_schema: { type: "object", properties: {} },
+    },
+    ABANDON_TOOL,
+  ],
+  RESCHEDULING_SELECT: [
+    {
+      name: "select_appointment_to_reschedule",
+      description: "Seleciona qual agendamento existente o cliente quer remarcar.",
+      input_schema: { type: "object", properties: { schedule_id: { type: "string" } }, required: ["schedule_id"] },
+    },
+    ABANDON_TOOL,
+  ],
+  RESCHEDULING_DATE: [
+    {
+      name: "provide_reschedule_date",
+      description: "Registra a nova data desejada e consulta a disponibilidade real no Google Calendar.",
+      input_schema: { type: "object", properties: { date: { type: "string", description: "YYYY-MM-DD" } }, required: ["date"] },
+    },
+    ABANDON_TOOL,
+  ],
+  RESCHEDULING_TIME: [
+    {
+      name: "select_reschedule_time",
+      description: "Registra o novo horario escolhido pelo cliente (deve ser um dos horarios disponiveis apresentados).",
+      input_schema: { type: "object", properties: { start: { type: "string", description: "Horario ISO exato escolhido" } }, required: ["start"] },
+    },
+    ABANDON_TOOL,
+  ],
+  RESCHEDULING_CONFIRM: [
+    {
+      name: "confirm_rescheduling",
+      description: "Confirma e aplica a remarcacao (Google Calendar + Supabase). Só chamar apos confirmacao explicita do cliente.",
+      input_schema: { type: "object", properties: {} },
+    },
+    ABANDON_TOOL,
+  ],
+  CANCELING_SELECT: [
+    {
+      name: "select_appointment_to_cancel",
+      description: "Seleciona qual agendamento existente o cliente quer cancelar.",
+      input_schema: { type: "object", properties: { schedule_id: { type: "string" } }, required: ["schedule_id"] },
+    },
+    ABANDON_TOOL,
+  ],
+  CANCELING_CONFIRM: [
+    {
+      name: "confirm_cancellation",
+      description: "Confirma e executa o cancelamento (Google Calendar + Supabase). Só chamar apos confirmacao explicita do cliente.",
+      input_schema: { type: "object", properties: {} },
+    },
+    ABANDON_TOOL,
+  ],
+};
+
+function buildToolsForState(state: ConversationFlowState): any[] {
+  return state === "MENU" ? MENU_TOOLS : STATE_TOOLS[state] || [ABANDON_TOOL];
+}
+
+async function executeTool(
+  name: string,
+  input: any,
+  user: User,
+  conversation: Conversation
+): Promise<{ output: string; conversation: Conversation; handoffRequested?: boolean }> {
   try {
     switch (name) {
-      case "check_availability": {
-        const slots = await schedulingService.checkAvailability(input.date, input.duration_minutes);
-        return JSON.stringify(slots);
+      case "begin_scheduling": {
+        const result = await flow.beginScheduling(conversation, input);
+        return applyResult(result, conversation);
       }
-      case "create_appointment": {
-        const schedule = await schedulingService.createAppointment({
-          userId: user.id,
-          name: input.name,
-          phone: user.phone,
-          service: input.service,
-          start: input.start,
-          durationMinutes: input.duration_minutes,
-        });
-        return JSON.stringify(schedule);
+      case "provide_name": {
+        const result = await flow.provideName(conversation, input.name);
+        return applyResult(result, conversation);
       }
-      case "list_appointments": {
-        const schedules = await schedulingService.findAppointmentsForUser(user.id);
-        return JSON.stringify(schedules);
+      case "provide_date": {
+        const result = await flow.provideDate(conversation, input.date);
+        return applyResult(result, conversation);
       }
-      case "reschedule_appointment": {
-        const schedule = await schedulingService.rescheduleAppointment(
-          input.schedule_id,
-          input.start,
-          input.duration_minutes
-        );
-        return JSON.stringify(schedule);
+      case "select_time": {
+        const result = await flow.selectTime(conversation, input.start);
+        return applyResult(result, conversation);
       }
-      case "cancel_appointment": {
-        const schedule = await schedulingService.cancelAppointment(input.schedule_id);
-        return JSON.stringify(schedule);
+      case "confirm_scheduling": {
+        const result = await flow.confirmScheduling(user, conversation);
+        return applyResult(result, conversation);
+      }
+      case "begin_rescheduling": {
+        const result = await flow.beginRescheduling(user, conversation);
+        return applyResult(result, conversation);
+      }
+      case "select_appointment_to_reschedule": {
+        const result = await flow.selectAppointmentToReschedule(conversation, input.schedule_id);
+        return applyResult(result, conversation);
+      }
+      case "provide_reschedule_date": {
+        const result = await flow.provideRescheduleDate(conversation, input.date);
+        return applyResult(result, conversation);
+      }
+      case "select_reschedule_time": {
+        const result = await flow.selectTime(conversation, input.start);
+        return applyResult(result, conversation);
+      }
+      case "confirm_rescheduling": {
+        const result = await flow.confirmRescheduling(conversation);
+        return applyResult(result, conversation);
+      }
+      case "begin_cancellation": {
+        const result = await flow.beginCancellation(user, conversation);
+        return applyResult(result, conversation);
+      }
+      case "select_appointment_to_cancel": {
+        const result = await flow.selectAppointmentToCancel(conversation, input.schedule_id);
+        return applyResult(result, conversation);
+      }
+      case "confirm_cancellation": {
+        const result = await flow.confirmCancellation(conversation);
+        return applyResult(result, conversation);
+      }
+      case "abandon_flow": {
+        const result = await flow.abandonFlow(conversation);
+        return applyResult(result, conversation);
       }
       case "confirm_appointment": {
         await schedulingService.confirmAppointment(input.schedule_id);
-        return JSON.stringify({ status: "confirmed" });
+        return { output: JSON.stringify({ status: "confirmed" }), conversation };
       }
       case "request_human_handoff": {
-        return JSON.stringify({ status: "handoff_requested", reason: input.reason });
+        return {
+          output: JSON.stringify({ status: "handoff_requested", reason: input.reason }),
+          conversation,
+          handoffRequested: true,
+        };
       }
       default:
-        return JSON.stringify({ error: `Ferramenta desconhecida: ${name}` });
+        return { output: JSON.stringify({ error: `Ferramenta desconhecida: ${name}` }), conversation };
     }
   } catch (err: any) {
-    return JSON.stringify({ error: `Erro ao executar ${name}: ${err.message}` });
+    return { output: `Erro ao executar ${name}: ${err.message}`, conversation };
   }
+}
+
+function applyResult(
+  result: flow.FlowResult,
+  conversation: Conversation
+): { output: string; conversation: Conversation } {
+  const updated: Conversation = { ...conversation, state: result.state, state_data: result.stateData };
+  return { output: result.message, conversation: updated };
 }
 
 export interface AgentResult {
@@ -170,28 +338,41 @@ export interface AgentResult {
   handoffRequested: boolean;
 }
 
-export async function handleMessage(
-  user: User,
-  conversation: Conversation,
-  userMessage: string
-): Promise<AgentResult> {
+export async function handleMessage(user: User, conversation: Conversation, userMessage: string): Promise<AgentResult> {
   const priorMessages = await conversationRepository.listMessages(conversation.id);
   const isFirstMessage = priorMessages.length === 0;
 
   await conversationRepository.addMessage(conversation.id, "user", userMessage);
 
+  // Fast-path deterministico: se o estado atual e uma confirmacao pendente e o texto
+  // do cliente e uma afirmacao clara, executa a acao direto, sem passar pelo LLM.
+  if (flow.isConfirmState(conversation.state) && flow.isConfirmationText(userMessage)) {
+    const result = await flow.executePendingConfirmation(user, conversation);
+    await conversationRepository.addMessage(conversation.id, "assistant", result.message);
+    return { reply: result.message, handoffRequested: false };
+  }
+
+  if (conversation.state !== "MENU" && flow.isAbandonText(userMessage)) {
+    const result = await flow.abandonFlow(conversation);
+    await conversationRepository.addMessage(conversation.id, "assistant", result.message);
+    return { reply: result.message, handoffRequested: false };
+  }
+
+  let currentConversation = conversation;
   const history: any[] = priorMessages.map((m) => ({ role: m.role, content: m.content }));
   history.push({ role: "user", content: userMessage });
 
-  const systemPrompt = loadSystemPrompt(isFirstMessage);
   let handoffRequested = false;
 
   while (true) {
+    const systemPrompt = buildSystemPrompt(currentConversation, isFirstMessage);
+    const tools = buildToolsForState(currentConversation.state);
+
     const response = await createMessage({
       model: env.anthropicModel,
       max_tokens: 1024,
       system: systemPrompt,
-      tools: TOOLS,
+      tools,
       messages: history,
     });
 
@@ -201,10 +382,14 @@ export async function handleMessage(
       const toolResults = [];
       for (const block of response.content) {
         if (block.type === "tool_use") {
-          if (block.name === "request_human_handoff") {
-            handoffRequested = true;
-          }
-          const output = await executeTool(block.name!, block.input, user);
+          const { output, conversation: updatedConversation, handoffRequested: handoff } = await executeTool(
+            block.name!,
+            block.input,
+            user,
+            currentConversation
+          );
+          currentConversation = updatedConversation;
+          if (handoff) handoffRequested = true;
           toolResults.push({ type: "tool_result", tool_use_id: block.id, content: output });
         }
       }
@@ -213,8 +398,8 @@ export async function handleMessage(
     }
 
     const finalText = response.content
-      .filter((block: any) => block.type === "text")
-      .map((block: any) => block.text)
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
       .join("");
 
     await conversationRepository.addMessage(conversation.id, "assistant", finalText);

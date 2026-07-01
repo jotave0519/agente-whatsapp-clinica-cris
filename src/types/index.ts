@@ -24,12 +24,14 @@ export interface Schedule {
   updated_at: string;
 }
 
-export type ConversationStatus = "ai" | "human";
+export type ConversationStatus = "ai" | "human" | "closed";
 
 export interface Conversation {
   id: string;
   user_id: string;
   status: ConversationStatus;
+  last_user_message_at: string | null;
+  nudge_sent_at: string | null;
   created_at: string;
   updated_at: string;
 }

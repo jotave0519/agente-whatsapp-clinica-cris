@@ -22,6 +22,14 @@ function loadSystemPrompt(isFirstMessage: boolean): string {
     `agendamentos - nunca invente horarios ou confirme agendamentos sem chamar a ferramenta. ` +
     `Se o cliente pedir para falar com um atendente humano, ou voce nao conseguir ajudar, ` +
     `chame a ferramenta request_human_handoff.\n` +
+    `REGRA CRITICA: faca apenas UMA pergunta por mensagem, nunca duas ou mais juntas. Aguarde ` +
+    `a resposta do cliente antes de pedir a proxima informacao.\n` +
+    `REGRA CRITICA: antes de chamar create_appointment, reschedule_appointment ou cancel_appointment, ` +
+    `voce precisa ter uma confirmacao explicita do cliente (ex: "sim", "confirmo", "pode ser") sobre ` +
+    `o horario/acao exata. Nunca chame essas ferramentas sem essa confirmacao explicita previa. Se a ` +
+    `ferramenta retornar erro, nunca diga ao cliente que a acao foi concluida - informe o problema.\n` +
+    `Apos concluir uma solicitacao (agendar, remarcar ou cancelar), pergunte se pode ajudar em mais ` +
+    `alguma coisa antes de encerrar a conversa.\n` +
     (isFirstMessage
       ? `Esta e a primeira mensagem deste cliente na conversa: cumprimente-o pelo nome (se souber) ` +
         `e apresente as opcoes principais (1. Agendar avaliacao, 2. Remarcar agendamento, ` +

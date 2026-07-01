@@ -19,6 +19,10 @@ export async function handleWhatsAppWebhook(req: Request, res: Response): Promis
     const user = await getOrCreateUserByPhone(phone, pushName);
     const conversation = await conversationRepository.findOrCreateActiveConversation(user.id);
 
+    const wasClosed = conversation.status === "closed";
+    await conversationRepository.touchUserActivity(conversation.id, wasClosed);
+    if (wasClosed) conversation.status = "ai";
+
     if (conversation.status === "human") {
       await conversationRepository.addMessage(conversation.id, "user", text);
       res.status(200).json({ status: "ok", handled_by: "human" });

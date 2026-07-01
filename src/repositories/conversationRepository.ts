@@ -43,6 +43,62 @@ export async function updateConversationStatus(
   if (error) throw error;
 }
 
+/**
+ * Registra atividade do cliente: reinicia o timer de inatividade e, se a
+ * conversa estava encerrada por inatividade, reabre para "ai".
+ */
+export async function touchUserActivity(conversationId: string, reopenIfClosed: boolean): Promise<void> {
+  const update: Record<string, unknown> = {
+    last_user_message_at: new Date().toISOString(),
+    nudge_sent_at: null,
+    updated_at: new Date().toISOString(),
+  };
+  if (reopenIfClosed) update.status = "ai";
+
+  const { error } = await getSupabaseClient().from("conversations").update(update).eq("id", conversationId);
+  if (error) throw error;
+}
+
+export interface ConversationWithPhone extends Conversation {
+  phone: string;
+}
+
+export async function findConversationsNeedingNudge(thresholdMinutes: number): Promise<ConversationWithPhone[]> {
+  const cutoff = new Date(Date.now() - thresholdMinutes * 60 * 1000).toISOString();
+  const { data, error } = await getSupabaseClient()
+    .from("conversations")
+    .select("*, users(phone)")
+    .eq("status", "ai")
+    .is("nudge_sent_at", null)
+    .not("last_user_message_at", "is", null)
+    .lte("last_user_message_at", cutoff);
+
+  if (error) throw error;
+  return (data || []).map((row: any) => ({ ...row, phone: row.users?.phone }));
+}
+
+export async function findConversationsNeedingClose(thresholdMinutes: number): Promise<ConversationWithPhone[]> {
+  const cutoff = new Date(Date.now() - thresholdMinutes * 60 * 1000).toISOString();
+  const { data, error } = await getSupabaseClient()
+    .from("conversations")
+    .select("*, users(phone)")
+    .eq("status", "ai")
+    .not("nudge_sent_at", "is", null)
+    .lte("nudge_sent_at", cutoff);
+
+  if (error) throw error;
+  return (data || []).map((row: any) => ({ ...row, phone: row.users?.phone }));
+}
+
+export async function markNudgeSent(conversationId: string): Promise<void> {
+  const { error } = await getSupabaseClient()
+    .from("conversations")
+    .update({ nudge_sent_at: new Date().toISOString() })
+    .eq("id", conversationId);
+
+  if (error) throw error;
+}
+
 export async function addMessage(
   conversationId: string,
   role: MessageRole,

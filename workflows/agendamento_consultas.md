@@ -17,30 +17,37 @@ O paciente demonstrou interesse em agendar uma avaliação ou procedimento (ex: 
 3. Procedimento de interesse (ou "avaliação" se ainda não souber)
 4. Preferência de data/horário
 
-Se faltar alguma informação, pergunte antes de chamar a ferramenta de agendamento — nunca invente dados do paciente.
+Se faltar alguma informação, pergunte antes de chamar a ferramenta de agendamento — nunca invente dados do paciente. **Regra obrigatória: uma pergunta por vez.** Nunca combine duas perguntas na mesma mensagem (ex: nunca pergunte nome e data juntos) — envie uma, aguarde a resposta do cliente, e só então faça a próxima.
 
 ## Passo a passo
 
 ### 1. Marcar nova consulta
-1. Pergunte o procedimento de interesse e a preferência de data/dia da semana.
-2. Chame a ferramenta `check_availability(date)` para listar horários livres no dia (ou nos próximos dias úteis se o paciente não tiver preferência de data).
-3. Apresente 2-3 opções de horário ao paciente (não a lista inteira).
-4. Confirme com o paciente o horário escolhido, nome completo e procedimento.
-5. Chame `create_appointment(name, service, start, duration_minutes)` — isso cria o evento no Google Calendar e o registro em `schedules` no Supabase automaticamente.
-6. Confirme o agendamento por mensagem, repetindo data, horário, procedimento e endereço da clínica.
+Siga esta sequência exata, uma etapa (e uma pergunta) por vez:
+
+1. Pergunte **apenas** o procedimento de interesse (ex: "Para começarmos, poderia me informar seu nome completo?" se ainda não tiver o nome, ou o procedimento — na ordem que fizer sentido na conversa, mas sempre um item por vez). Se ainda não tiver o nome completo do paciente, peça primeiro.
+2. Aguarde a resposta. Em seguida, pergunte **apenas** a data desejada.
+3. Aguarde a resposta. Chame a ferramenta `check_availability(date)` para aquele dia (ou os próximos dias úteis se o paciente não tiver preferência exata).
+4. Apresente 2-4 horários reais retornados pela ferramenta (nunca invente horários) e pergunte qual ele prefere.
+5. Aguarde a resposta. Repita de volta data, horário, nome e procedimento, e peça confirmação explícita (ex: "Posso confirmar sua avaliação para 02/07 às 14h?").
+6. **Só depois que o cliente confirmar explicitamente** (ex: "sim", "pode ser", "confirmo") você segue para a criação. Nunca chame `create_appointment` sem essa confirmação explícita.
+7. Chame `create_appointment(name, service, start, duration_minutes)`. Essa ferramenta cria o evento no Google Calendar primeiro e só então salva o registro em `schedules` no Supabase — nessa ordem, de forma atômica no backend.
+8. **Se a ferramenta retornar erro**: nunca diga ao paciente que o agendamento foi realizado. Informe que houve um problema técnico, peça para tentar novamente em instantes ou ofereça encaminhar para um atendente (`request_human_handoff`).
+9. **Se a ferramenta tiver sucesso**: confirme o agendamento por mensagem, repetindo data, horário, procedimento e endereço da clínica. Em seguida pergunte "Posso ajudar com mais alguma coisa?" (ver regras de encerramento em [atendimento_faq.md](atendimento_faq.md)).
 
 ### 2. Remarcar consulta existente
 1. Chame `list_appointments()` para ver os agendamentos ativos do paciente atual.
-2. Se houver mais de um agendamento futuro, pergunte qual deles o paciente quer remarcar.
-3. Verifique disponibilidade (`check_availability`) e confirme o novo horário com o paciente.
-4. Chame `reschedule_appointment(schedule_id, start, duration_minutes)`.
-5. Confirme a remarcação por mensagem.
+2. Se houver mais de um agendamento futuro, pergunte **apenas** qual deles o paciente quer remarcar (uma pergunta).
+3. Aguarde a resposta, depois pergunte **apenas** a nova data desejada.
+4. Aguarde a resposta, chame `check_availability` para aquele dia e apresente os horários reais disponíveis.
+5. Aguarde a escolha do horário, repita os dados e peça confirmação explícita antes de prosseguir.
+6. Só após confirmação explícita, chame `reschedule_appointment(schedule_id, start, duration_minutes)`.
+7. Se der erro, siga a mesma regra do passo 8 acima (nunca afirmar sucesso). Se der certo, confirme por mensagem e pergunte se pode ajudar em mais alguma coisa.
 
 ### 3. Cancelar consulta
 1. Chame `list_appointments()` para localizar o agendamento.
-2. Confirme com o paciente que deseja realmente cancelar antes de executar.
-3. Chame `cancel_appointment(schedule_id)`.
-4. Confirme o cancelamento e, com gentileza, deixe a porta aberta para reagendar quando quiser.
+2. Confirme com o paciente que deseja realmente cancelar antes de executar (pergunta única, aguardar confirmação explícita).
+3. Só após confirmação explícita, chame `cancel_appointment(schedule_id)`.
+4. Se der erro, nunca afirme que foi cancelado — informe o problema. Se der certo, confirme o cancelamento e, com gentileza, deixe a porta aberta para reagendar quando quiser, perguntando se pode ajudar em mais alguma coisa.
 
 ### 4. Confirmar presença (resposta a lembrete)
 Quando o paciente responder confirmando presença após um lembrete (ver [lembretes_confirmacoes.md](lembretes_confirmacoes.md)):

@@ -6,6 +6,7 @@ import * as schedulingService from "./schedulingService";
 import * as flow from "./conversationFlowService";
 import * as conversationRepository from "../repositories/conversationRepository";
 import { Conversation, ConversationFlowState, User } from "../types";
+import { logger } from "../utils/logger";
 
 const WORKFLOWS_DIR = path.join(__dirname, "..", "..", "workflows");
 
@@ -361,6 +362,7 @@ async function executeTool(
         return { output: JSON.stringify({ error: `Ferramenta desconhecida: ${name}` }), conversation };
     }
   } catch (err: any) {
+    logger.error("aiAgentService.executeTool", `Excecao ao executar ferramenta ${name}`, err);
     return { output: `Erro ao executar ${name}: ${err.message}`, conversation };
   }
 }
@@ -378,7 +380,16 @@ export interface AgentResult {
   handoffRequested: boolean;
 }
 
+const SCOPE = "aiAgentService";
+
 export async function handleMessage(user: User, conversation: Conversation, userMessage: string): Promise<AgentResult> {
+  logger.info(SCOPE, "handleMessage: inicio", {
+    userId: user.id,
+    conversationId: conversation.id,
+    state: conversation.state,
+    userMessage,
+  });
+
   const priorMessages = await conversationRepository.listMessages(conversation.id);
   const isFirstMessage = priorMessages.length === 0;
 
@@ -387,12 +398,15 @@ export async function handleMessage(user: User, conversation: Conversation, user
   // Fast-path deterministico: se o estado atual e uma confirmacao pendente e o texto
   // do cliente e uma afirmacao clara, executa a acao direto, sem passar pelo LLM.
   if (flow.isConfirmState(conversation.state) && flow.isConfirmationText(userMessage)) {
+    logger.info(SCOPE, "Fast-path de confirmacao acionado", { conversationId: conversation.id, state: conversation.state });
     const result = await flow.executePendingConfirmation(user, conversation);
+    logger.info(SCOPE, "Fast-path de confirmacao concluido", { novoEstado: result.state, mensagem: result.message });
     await conversationRepository.addMessage(conversation.id, "assistant", result.message);
     return { reply: result.message, handoffRequested: false };
   }
 
   if (conversation.state !== "MENU" && flow.isAbandonText(userMessage)) {
+    logger.info(SCOPE, "Fast-path de abandono de fluxo acionado", { conversationId: conversation.id, state: conversation.state });
     const result = await flow.abandonFlow(conversation);
     await conversationRepository.addMessage(conversation.id, "assistant", result.message);
     return { reply: result.message, handoffRequested: false };
@@ -404,50 +418,75 @@ export async function handleMessage(user: User, conversation: Conversation, user
 
   let handoffRequested = false;
 
-  while (true) {
-    const systemPrompt = buildSystemPrompt(currentConversation, isFirstMessage);
-    const tools = buildToolsForState(currentConversation.state);
+  try {
+    let iteration = 0;
+    while (true) {
+      iteration += 1;
+      const systemPrompt = buildSystemPrompt(currentConversation, isFirstMessage);
+      const tools = buildToolsForState(currentConversation.state);
+      logger.info(SCOPE, `Chamando Claude (iteracao ${iteration})`, {
+        state: currentConversation.state,
+        toolNames: tools.map((t: any) => t.name),
+        historyLength: history.length,
+      });
 
-    const response = await createMessage({
-      model: env.anthropicModel,
-      max_tokens: 1024,
-      system: systemPrompt,
-      tools,
-      messages: history,
-    });
+      const response = await createMessage({
+        model: env.anthropicModel,
+        max_tokens: 1024,
+        system: systemPrompt,
+        tools,
+        messages: history,
+      });
 
-    if (response.stop_reason === "tool_use") {
-      history.push({ role: "assistant", content: response.content });
+      logger.info(SCOPE, `Resposta da Claude (iteracao ${iteration})`, {
+        stopReason: response.stop_reason,
+        blocks: response.content.map((b) => (b.type === "tool_use" ? { type: "tool_use", name: b.name, input: b.input } : { type: "text" })),
+      });
 
-      const toolResults = [];
-      for (const block of response.content) {
-        if (block.type === "tool_use") {
-          const { output, conversation: updatedConversation, handoffRequested: handoff } = await executeTool(
-            block.name!,
-            block.input,
-            user,
-            currentConversation
-          );
-          currentConversation = updatedConversation;
-          if (handoff) handoffRequested = true;
-          toolResults.push({ type: "tool_result", tool_use_id: block.id, content: output });
+      if (response.stop_reason === "tool_use") {
+        history.push({ role: "assistant", content: response.content });
+
+        const toolResults = [];
+        for (const block of response.content) {
+          if (block.type === "tool_use") {
+            logger.info(SCOPE, "Executando ferramenta", { name: block.name, input: block.input, state: currentConversation.state });
+            const { output, conversation: updatedConversation, handoffRequested: handoff } = await executeTool(
+              block.name!,
+              block.input,
+              user,
+              currentConversation
+            );
+            logger.info(SCOPE, "Resultado da ferramenta", {
+              name: block.name,
+              output,
+              novoEstado: updatedConversation.state,
+            });
+            currentConversation = updatedConversation;
+            if (handoff) handoffRequested = true;
+            toolResults.push({ type: "tool_result", tool_use_id: block.id, content: output });
+          }
         }
+        history.push({ role: "user", content: toolResults });
+        continue;
       }
-      history.push({ role: "user", content: toolResults });
-      continue;
+
+      const finalText = response.content
+        .filter((block) => block.type === "text")
+        .map((block) => block.text)
+        .join("");
+
+      logger.info(SCOPE, "handleMessage: resposta final", { conversationId: conversation.id, finalText, handoffRequested });
+
+      await conversationRepository.addMessage(conversation.id, "assistant", finalText);
+
+      if (handoffRequested) {
+        await conversationRepository.updateConversationStatus(conversation.id, "human");
+      }
+
+      return { reply: finalText, handoffRequested };
     }
-
-    const finalText = response.content
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
-      .join("");
-
-    await conversationRepository.addMessage(conversation.id, "assistant", finalText);
-
-    if (handoffRequested) {
-      await conversationRepository.updateConversationStatus(conversation.id, "human");
-    }
-
-    return { reply: finalText, handoffRequested };
+  } catch (err) {
+    logger.error(SCOPE, "handleMessage: excecao no loop de conversa com a Claude", err);
+    throw err;
   }
 }

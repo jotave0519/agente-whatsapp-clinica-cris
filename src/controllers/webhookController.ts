@@ -3,44 +3,67 @@ import { parseIncomingWebhook, sendWhatsAppMessage } from "../integrations/evolu
 import { getOrCreateUserByPhone } from "../services/userService";
 import * as conversationRepository from "../repositories/conversationRepository";
 import * as aiAgentService from "../services/aiAgentService";
+import { logger } from "../utils/logger";
+
+const SCOPE = "webhookController";
 
 export async function handleWhatsAppWebhook(req: Request, res: Response): Promise<void> {
+  logger.info(SCOPE, "Webhook recebido", { body: req.body });
+
   const incoming = parseIncomingWebhook(req.body);
 
   if (!incoming) {
+    logger.info(SCOPE, "Evento ignorado (nao e mensagem de texto recebida)");
     res.status(200).json({ status: "ignored" });
     return;
   }
 
   const { phone, text, pushName } = incoming;
-  console.log(`Mensagem recebida de ${phone}: ${text}`);
+  logger.info(SCOPE, "Mensagem recebida", { phone, text, pushName });
 
   try {
     const user = await getOrCreateUserByPhone(phone, pushName);
+    logger.info(SCOPE, "Usuario resolvido", { userId: user.id, phone: user.phone, name: user.name });
+
     const conversation = await conversationRepository.findOrCreateActiveConversation(user.id);
+    logger.info(SCOPE, "Conversa resolvida", {
+      conversationId: conversation.id,
+      status: conversation.status,
+      state: conversation.state,
+      stateData: conversation.state_data,
+    });
 
     const wasClosed = conversation.status === "closed";
     await conversationRepository.touchUserActivity(conversation.id, wasClosed);
-    if (wasClosed) conversation.status = "ai";
+    if (wasClosed) {
+      conversation.status = "ai";
+      logger.info(SCOPE, "Conversa estava encerrada por inatividade - reaberta", { conversationId: conversation.id });
+    }
 
     if (conversation.status === "human") {
+      logger.info(SCOPE, "Conversa em atendimento humano - mensagem apenas registrada", { conversationId: conversation.id });
       await conversationRepository.addMessage(conversation.id, "user", text);
       res.status(200).json({ status: "ok", handled_by: "human" });
       return;
     }
 
-    const { reply } = await aiAgentService.handleMessage(user, conversation, text);
+    logger.info(SCOPE, "Encaminhando para aiAgentService.handleMessage", { conversationId: conversation.id, state: conversation.state });
+    const { reply, handoffRequested } = await aiAgentService.handleMessage(user, conversation, text);
+    logger.info(SCOPE, "Resposta gerada pelo agente", { conversationId: conversation.id, handoffRequested, reply });
+
     await sendWhatsAppMessage(phone, reply);
+    logger.info(SCOPE, "Resposta enviada via Evolution API", { phone });
+
     res.status(200).json({ status: "ok" });
   } catch (err) {
-    console.error(`Erro ao processar mensagem de ${phone}:`, err);
+    logger.error(SCOPE, `Erro ao processar mensagem de ${phone}`, err);
     try {
       await sendWhatsAppMessage(
         phone,
         "Desculpe, tive um problema para responder agora. Nossa equipe vai te retornar em breve."
       );
     } catch (sendErr) {
-      console.error(`Falha tambem ao enviar mensagem de erro para ${phone}:`, sendErr);
+      logger.error(SCOPE, `Falha tambem ao enviar mensagem de erro para ${phone}`, sendErr);
     }
     res.status(200).json({ status: "error" });
   }

@@ -1,6 +1,9 @@
 import * as schedulingService from "./schedulingService";
 import * as conversationRepository from "../repositories/conversationRepository";
 import { Conversation, ConversationFlowState, FlowStateData, User } from "../types";
+import { logger } from "../utils/logger";
+
+const SCOPE = "conversationFlowService";
 
 const CLINIC_ADDRESS =
   "Estrada Santa Isabel, 965, Sala 23, Edifício Comercial Arujazinho, Arujá - SP";
@@ -86,6 +89,12 @@ export interface FlowResult {
 }
 
 async function persist(conversation: Conversation, result: FlowResult): Promise<FlowResult> {
+  logger.info(SCOPE, "Transicao de estado", {
+    conversationId: conversation.id,
+    de: conversation.state,
+    para: result.state,
+    stateData: result.stateData,
+  });
   await conversationRepository.updateConversationFlow(conversation.id, result.state, result.stateData);
   return result;
 }
@@ -167,7 +176,9 @@ async function resolveDateStep(
   flowKind: "scheduling" | "rescheduling"
 ): Promise<FlowResult> {
   const durationMinutes = baseStateData.durationMinutes ?? 30;
+  logger.info(SCOPE, "resolveDateStep: consultando disponibilidade no Google Calendar", { conversationId: conversation.id, date, durationMinutes, flowKind });
   const slots = await schedulingService.checkAvailability(date, durationMinutes);
+  logger.info(SCOPE, "resolveDateStep: disponibilidade recebida", { conversationId: conversation.id, date, slotCount: slots.length });
 
   const noSlotsState: ConversationFlowState = flowKind === "scheduling" ? "SCHEDULING_DATE" : "RESCHEDULING_DATE";
   const nextState: ConversationFlowState = flowKind === "scheduling" ? "SCHEDULING_TIME" : "RESCHEDULING_TIME";
@@ -234,6 +245,7 @@ export async function confirmScheduling(user: User, conversation: Conversation):
     });
   }
 
+  logger.info(SCOPE, "confirmScheduling: criando agendamento", { conversationId: conversation.id, name, procedure, selectedStart });
   try {
     await schedulingService.createAppointment({
       userId: user.id,
@@ -243,6 +255,7 @@ export async function confirmScheduling(user: User, conversation: Conversation):
       start: selectedStart,
       durationMinutes,
     });
+    logger.info(SCOPE, "confirmScheduling: agendamento criado com sucesso", { conversationId: conversation.id });
 
     const { date, time } = formatDateTime(selectedStart);
     return persist(conversation, {
@@ -251,6 +264,7 @@ export async function confirmScheduling(user: User, conversation: Conversation):
       message: `Agendamento confirmado! 😊\n\n${procedure} em ${date} às ${time}.\nEndereço: ${CLINIC_ADDRESS}\n\nPosso ajudar com mais alguma coisa?`,
     });
   } catch (err: any) {
+    logger.error(SCOPE, "confirmScheduling: falha ao criar agendamento", err);
     return persist(conversation, {
       state: "SCHEDULING_CONFIRM",
       stateData: conversation.state_data,
@@ -318,8 +332,10 @@ export async function confirmRescheduling(conversation: Conversation): Promise<F
     });
   }
 
+  logger.info(SCOPE, "confirmRescheduling: atualizando agendamento", { conversationId: conversation.id, scheduleId, selectedStart });
   try {
     await schedulingService.rescheduleAppointment(scheduleId, selectedStart, durationMinutes);
+    logger.info(SCOPE, "confirmRescheduling: remarcacao concluida com sucesso", { conversationId: conversation.id });
     const { date, time } = formatDateTime(selectedStart);
     return persist(conversation, {
       state: "MENU",
@@ -327,6 +343,7 @@ export async function confirmRescheduling(conversation: Conversation): Promise<F
       message: `Remarcação confirmada! 😊\n\nSeu novo horário é ${date} às ${time}.\n\nPosso ajudar com mais alguma coisa?`,
     });
   } catch (err: any) {
+    logger.error(SCOPE, "confirmRescheduling: falha ao remarcar", err);
     return persist(conversation, {
       state: "RESCHEDULING_CONFIRM",
       stateData: conversation.state_data,
@@ -394,8 +411,10 @@ export async function confirmCancellation(conversation: Conversation): Promise<F
     });
   }
 
+  logger.info(SCOPE, "confirmCancellation: cancelando agendamento", { conversationId: conversation.id, scheduleId });
   try {
     await schedulingService.cancelAppointment(scheduleId);
+    logger.info(SCOPE, "confirmCancellation: cancelamento concluido com sucesso", { conversationId: conversation.id });
     return persist(conversation, {
       state: "MENU",
       stateData: {},
@@ -403,6 +422,7 @@ export async function confirmCancellation(conversation: Conversation): Promise<F
         "Cancelamento confirmado. 💛 Se quiser reagendar quando for melhor pra você, é só me chamar.\n\nPosso ajudar com mais alguma coisa?",
     });
   } catch (err: any) {
+    logger.error(SCOPE, "confirmCancellation: falha ao cancelar", err);
     return persist(conversation, {
       state: "CANCELING_CONFIRM",
       stateData: conversation.state_data,

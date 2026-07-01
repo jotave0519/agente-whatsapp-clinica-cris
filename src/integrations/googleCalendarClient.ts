@@ -1,6 +1,7 @@
 import fs from "fs";
 import axios from "axios";
 import { env } from "../config/env";
+import { logger } from "../utils/logger";
 
 // Cliente REST feito com axios (em vez da lib "googleapis") porque o gaxios/node-fetch
 // interno da lib apresenta "Premature close" ao ler respostas gzip neste ambiente.
@@ -12,6 +13,7 @@ const TIMEZONE = "America/Sao_Paulo";
 const CALENDAR_API_BASE = "https://www.googleapis.com/calendar/v3";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const TOKEN_REFRESH_BUFFER_MS = 60_000;
+const SCOPE = "googleCalendarClient";
 
 export interface CalendarEvent {
   id: string;
@@ -79,28 +81,40 @@ async function getAccessToken(): Promise<string> {
     return token.access_token;
   }
 
+  logger.info(SCOPE, "Access token expirado ou proximo de expirar - renovando via refresh_token");
   const { client_id, client_secret } = loadCredentials();
-  const response = await axios.post(
-    TOKEN_URL,
-    new URLSearchParams({
-      client_id,
-      client_secret,
-      refresh_token: token.refresh_token,
-      grant_type: "refresh_token",
-    }).toString(),
-    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-  );
 
-  const updated: StoredToken = {
-    ...token,
-    access_token: response.data.access_token,
-    expiry_date: Date.now() + response.data.expires_in * 1000,
-  };
-  cachedToken = updated;
-  if (!env.googleTokenJson) {
-    fs.writeFileSync(env.googleTokenPath, JSON.stringify(updated, null, 2));
+  try {
+    const response = await axios.post(
+      TOKEN_URL,
+      new URLSearchParams({
+        client_id,
+        client_secret,
+        refresh_token: token.refresh_token,
+        grant_type: "refresh_token",
+      }).toString(),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+
+    const updated: StoredToken = {
+      ...token,
+      access_token: response.data.access_token,
+      expiry_date: Date.now() + response.data.expires_in * 1000,
+    };
+    cachedToken = updated;
+    if (!env.googleTokenJson) {
+      fs.writeFileSync(env.googleTokenPath, JSON.stringify(updated, null, 2));
+    }
+    logger.info(SCOPE, "Access token renovado com sucesso");
+    return updated.access_token;
+  } catch (err) {
+    logger.error(
+      SCOPE,
+      "Falha ao renovar access token do Google (refresh_token pode estar expirado/revogado - reautorizar com 'npm run google:auth')",
+      err
+    );
+    throw err;
   }
-  return updated.access_token;
 }
 
 async function calendarRequest<T = unknown>(
@@ -109,14 +123,22 @@ async function calendarRequest<T = unknown>(
   options: { params?: Record<string, unknown>; data?: unknown } = {}
 ): Promise<T> {
   const accessToken = await getAccessToken();
-  const response = await axios.request<T>({
-    method,
-    url: `${CALENDAR_API_BASE}${path}`,
-    params: options.params,
-    data: options.data,
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  return response.data;
+  logger.info(SCOPE, `Chamando ${method.toUpperCase()} ${path}`, { params: options.params });
+
+  try {
+    const response = await axios.request<T>({
+      method,
+      url: `${CALENDAR_API_BASE}${path}`,
+      params: options.params,
+      data: options.data,
+      headers: { Authorization: `Bearer ${accessToken}` },
+      timeout: 30_000,
+    });
+    return response.data;
+  } catch (err) {
+    logger.error(SCOPE, `Falha em ${method.toUpperCase()} ${path}`, err);
+    throw err;
+  }
 }
 
 function eventsPath(suffix = ""): string {

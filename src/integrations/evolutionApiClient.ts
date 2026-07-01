@@ -1,6 +1,9 @@
 import axios from "axios";
 import { env } from "../config/env";
 import { IncomingWhatsAppMessage } from "../types";
+import { logger } from "../utils/logger";
+
+const SCOPE = "evolutionApiClient";
 
 function requireConfig() {
   const missing = [
@@ -10,21 +13,28 @@ function requireConfig() {
   ].filter(([, value]) => !value);
 
   if (missing.length > 0) {
-    throw new Error(
-      `Variaveis de ambiente ausentes: ${missing.map(([name]) => name).join(", ")}`
-    );
+    const message = `Variaveis de ambiente ausentes: ${missing.map(([name]) => name).join(", ")}`;
+    logger.error(SCOPE, message);
+    throw new Error(message);
   }
 }
 
 export async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
   requireConfig();
   const url = `${env.evolutionApiUrl.replace(/\/$/, "")}/message/sendText/${env.evolutionInstanceName}`;
+  logger.info(SCOPE, "Enviando mensagem via Evolution API", { to, url });
 
-  await axios.post(
-    url,
-    { number: to, text },
-    { headers: { apikey: env.evolutionApiKey, "Content-Type": "application/json" }, timeout: 30000 }
-  );
+  try {
+    await axios.post(
+      url,
+      { number: to, text },
+      { headers: { apikey: env.evolutionApiKey, "Content-Type": "application/json" }, timeout: 30000 }
+    );
+    logger.info(SCOPE, "Mensagem enviada com sucesso", { to });
+  } catch (err) {
+    logger.error(SCOPE, `Falha ao enviar mensagem para ${to}`, err);
+    throw err;
+  }
 }
 
 /**

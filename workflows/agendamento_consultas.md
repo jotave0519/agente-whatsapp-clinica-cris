@@ -17,13 +17,14 @@ Você não precisa gerenciar o estado manualmente — só chamar a ferramenta ce
 Nunca combine duas perguntas na mesma mensagem (ex: nunca pergunte nome e data juntos). Cada etapa da máquina de estados já força isso — só peça a informação da etapa atual.
 
 ## Fluxo: nova consulta (`begin_scheduling` → `MENU`)
-1. Cliente demonstra interesse em agendar → chame `begin_scheduling(procedure)`, incluindo `name`/`date` se o cliente já os tiver informado na mesma mensagem.
-2. **Etapa SCHEDULING_NAME**: se faltar o nome, pergunte (só isso) e chame `provide_name(name)` quando o cliente responder.
-3. **Etapa SCHEDULING_DATE**: pergunte a data desejada (só isso). Ao receber, chame `provide_date(date)` — isso consulta o Google Calendar de verdade e retorna os horários livres.
-4. **Etapa SCHEDULING_TIME**: apresente 2-4 horários reais retornados (nunca invente) e pergunte qual o cliente prefere. Ao escolher, chame `select_time(start)`.
-5. **Etapa SCHEDULING_CONFIRM**: repita nome, procedimento, data e horário, e peça confirmação explícita (ex: "Posso confirmar sua avaliação para 02/07 às 14h?"). **Só depois de confirmação explícita do cliente** chame `confirm_scheduling()` — essa ferramenta cria o evento no Google Calendar e o registro em `schedules` no Supabase, nessa ordem, e só reporta sucesso se ambos derem certo.
-6. Se `confirm_scheduling` retornar erro, nunca diga que o agendamento foi feito — informe o problema e ofereça tentar de novo ou falar com um atendente.
-7. Se dado certo, confirme por mensagem (nome do procedimento, data, horário, endereço) e pergunte "Posso ajudar com mais alguma coisa?".
+1. **Assim que o cliente demonstrar qualquer intenção de agendar** (mesmo sem dizer qual procedimento, ex: "quero agendar um horário") → chame `begin_scheduling` IMEDIATAMENTE, incluindo `procedure`/`name`/`date` se o cliente já os tiver informado na mesma mensagem. Nunca faça perguntas de esclarecimento ou peça confirmação em texto livre antes de chamar essa ferramenta — a intenção de agendar tem prioridade sobre explicar o procedimento ou informar preço.
+2. **Etapa SCHEDULING_PROCEDURE**: se faltar o procedimento, pergunte (só isso) e chame `provide_procedure(procedure)` quando o cliente responder.
+3. **Etapa SCHEDULING_NAME**: se faltar o nome, pergunte (só isso) e chame `provide_name(name)` quando o cliente responder.
+4. **Etapa SCHEDULING_DATE**: pergunte a data desejada (só isso). Ao receber, chame `provide_date(date)` — isso consulta o Google Calendar de verdade e retorna os horários livres.
+5. **Etapa SCHEDULING_TIME**: apresente 2-4 horários reais retornados (nunca invente) e pergunte qual o cliente prefere. Ao escolher, chame `select_time(start)`.
+6. **Etapa SCHEDULING_CONFIRM**: repita nome, procedimento, data e horário, e peça confirmação explícita (ex: "Posso confirmar sua avaliação para 02/07 às 14h?"). **Só depois de confirmação explícita do cliente** chame `confirm_scheduling()` — essa ferramenta cria o evento no Google Calendar e o registro em `schedules` no Supabase, nessa ordem, e só reporta sucesso se ambos derem certo.
+7. Se `confirm_scheduling` retornar erro, nunca diga que o agendamento foi feito — informe o problema e ofereça tentar de novo ou falar com um atendente.
+8. Se dado certo, confirme por mensagem (nome do procedimento, data, horário, endereço) e pergunte "Posso ajudar com mais alguma coisa?".
 
 ## Fluxo: remarcação (`begin_rescheduling`)
 1. Cliente pede para remarcar → chame `begin_rescheduling()`. A ferramenta já busca os agendamentos ativos do cliente no Supabase.
@@ -58,7 +59,7 @@ Quando o paciente responder confirmando presença após um lembrete automático 
 
 ## Ferramentas usadas
 Implementadas em `src/services/conversationFlowService.ts` (lógica determinística de estado) e expostas ao modelo via `src/services/aiAgentService.ts`, que só libera as ferramentas da etapa atual:
-`begin_scheduling`, `provide_name`, `provide_date`, `select_time`, `confirm_scheduling`, `begin_rescheduling`, `select_appointment_to_reschedule`, `provide_reschedule_date`, `select_reschedule_time`, `confirm_rescheduling`, `begin_cancellation`, `select_appointment_to_cancel`, `confirm_cancellation`, `abandon_flow`, `confirm_appointment`.
+`begin_scheduling`, `provide_procedure`, `provide_name`, `provide_date`, `select_time`, `confirm_scheduling`, `begin_rescheduling`, `select_appointment_to_reschedule`, `provide_reschedule_date`, `select_reschedule_time`, `confirm_rescheduling`, `begin_cancellation`, `select_appointment_to_cancel`, `confirm_cancellation`, `abandon_flow`, `confirm_appointment`.
 
 ## Encaminhamento
 - Dúvidas sobre tratamentos, valores ou a clínica → ver [atendimento_faq.md](atendimento_faq.md) (só se aplica quando o estado é `MENU`).

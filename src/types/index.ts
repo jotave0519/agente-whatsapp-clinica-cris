@@ -28,6 +28,7 @@ export type ConversationStatus = "ai" | "human" | "closed";
 
 export type ConversationFlowState =
   | "MENU"
+  | "SCHEDULING_PROCEDURE"
   | "SCHEDULING_NAME"
   | "SCHEDULING_DATE"
   | "SCHEDULING_TIME"

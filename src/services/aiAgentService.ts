@@ -21,7 +21,8 @@ const BASE_RULES =
   "Responda sempre em portugues do Brasil, em mensagens curtas e naturais de WhatsApp (evite paredes de texto).\n" +
   "REGRA CRITICA: faca APENAS UMA pergunta por mensagem, nunca duas ou mais juntas.\n" +
   "REGRA CRITICA: nunca invente horarios - use somente os que vierem do resultado de uma ferramenta.\n" +
-  "REGRA CRITICA: nunca diga que agendar/remarcar/cancelar foi concluido sem que a ferramenta correspondente tenha retornado sucesso.\n";
+  "REGRA CRITICA: nunca diga que agendar/remarcar/cancelar foi concluido sem que a ferramenta correspondente tenha retornado sucesso.\n" +
+  "REGRA CRITICA: nunca informe precos/valores de procedimentos por conta propria - apenas quando o cliente perguntar explicitamente (ex: \"quanto custa\", \"qual o valor\").\n";
 
 function buildSystemPrompt(conversation: Conversation, isFirstMessage: boolean): string {
   const { state, state_data: stateData } = conversation;
@@ -30,8 +31,15 @@ function buildSystemPrompt(conversation: Conversation, isFirstMessage: boolean):
 
   if (state === "MENU") {
     header +=
-      "Voce esta no atendimento geral. Use os workflows abaixo para tirar duvidas sobre a clinica. " +
-      "Quando o cliente quiser agendar, remarcar ou cancelar, chame begin_scheduling, begin_rescheduling ou begin_cancellation.\n";
+      "Voce esta no atendimento geral. Use os workflows abaixo para tirar duvidas sobre a clinica.\n" +
+      "REGRA CRITICA: assim que voce perceber QUALQUER sinal de que o cliente quer agendar, remarcar ou cancelar " +
+      "(ex: \"quero agendar um horario\", \"quero marcar Botox\", \"preciso remarcar\"), chame IMEDIATAMENTE " +
+      "begin_scheduling, begin_rescheduling ou begin_cancellation NA MESMA RESPOSTA - mesmo que ainda nao saiba " +
+      "o procedimento, nome ou data. NUNCA faca perguntas de esclarecimento ou peça confirmacao em texto livre " +
+      "antes de chamar essa ferramenta (ex: nunca responda so com \"Gostaria de agendar uma avaliacao para Botox?\" " +
+      "sem chamar a ferramenta) - e a propria ferramenta e as etapas seguintes que vao conduzir as perguntas, uma de cada vez. " +
+      "A intencao de agendar tem prioridade sobre explicar o procedimento ou informar preco: se o cliente disser " +
+      "\"quero agendar Botox\", va direto para o agendamento, nao explique o que e Botox nem quanto custa.\n";
     if (isFirstMessage) {
       header +=
         "Esta e a primeira mensagem deste cliente na conversa: cumprimente-o pelo nome (se souber) e apresente " +
@@ -47,6 +55,12 @@ function buildSystemPrompt(conversation: Conversation, isFirstMessage: boolean):
     "Se o cliente pedir claramente para parar ou desistir deste fluxo, chame abandon_flow. Fora isso, siga apenas a etapa atual abaixo:\n\n";
 
   switch (state) {
+    case "SCHEDULING_PROCEDURE":
+      header +=
+        "Etapa: falta saber qual procedimento o cliente quer agendar. Se a ultima mensagem ja contem o procedimento " +
+        "(ex: Botox, preenchimento, limpeza de pele, avaliacao), chame provide_procedure com esse valor. " +
+        "Caso contrario, pergunte (apenas) qual procedimento ele deseja agendar. Nao explique o procedimento nem informe preco aqui.";
+      break;
     case "SCHEDULING_NAME":
       header +=
         "Etapa: falta o nome completo do paciente. Se a ultima mensagem do cliente ja contem o nome, chame provide_name. " +
@@ -114,15 +128,17 @@ const ABANDON_TOOL = {
 const MENU_TOOLS: any[] = [
   {
     name: "begin_scheduling",
-    description: "Inicia o fluxo de agendamento de uma nova avaliacao/procedimento.",
+    description:
+      "Inicia o fluxo de agendamento. Chame IMEDIATAMENTE ao perceber que o cliente quer agendar algo, mesmo sem " +
+      "saber ainda o procedimento, nome ou data - esses dados serao perguntados nas proximas etapas se nao informados aqui.",
     input_schema: {
       type: "object",
       properties: {
-        procedure: { type: "string", description: "Procedimento de interesse, ou 'avaliacao' se nao souber" },
+        procedure: { type: "string", description: "Procedimento de interesse, se ja mencionado nesta mensagem (ex: Botox, avaliacao)" },
         name: { type: "string", description: "Nome completo do paciente, se ja informado nesta mensagem" },
         date: { type: "string", description: "Data desejada (YYYY-MM-DD), se ja informada nesta mensagem" },
       },
-      required: ["procedure"],
+      required: [],
     },
   },
   {
@@ -156,6 +172,14 @@ const MENU_TOOLS: any[] = [
 ];
 
 const STATE_TOOLS: Partial<Record<ConversationFlowState, any[]>> = {
+  SCHEDULING_PROCEDURE: [
+    {
+      name: "provide_procedure",
+      description: "Registra o procedimento que o cliente quer agendar.",
+      input_schema: { type: "object", properties: { procedure: { type: "string" } }, required: ["procedure"] },
+    },
+    ABANDON_TOOL,
+  ],
   SCHEDULING_NAME: [
     {
       name: "provide_name",
@@ -252,6 +276,10 @@ async function executeTool(
     switch (name) {
       case "begin_scheduling": {
         const result = await flow.beginScheduling(conversation, input);
+        return applyResult(result, conversation);
+      }
+      case "provide_procedure": {
+        const result = await flow.provideProcedure(conversation, input.procedure);
         return applyResult(result, conversation);
       }
       case "provide_name": {

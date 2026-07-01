@@ -62,14 +62,23 @@ export async function beginScheduling(
   conversation: Conversation,
   input: { procedure?: string; name?: string; date?: string }
 ): Promise<FlowResult> {
-  const stateData: FlowStateData = { procedure: input.procedure };
+  const stateData: FlowStateData = {};
+  if (input.procedure) stateData.procedure = input.procedure;
   if (input.name) stateData.name = input.name;
+
+  if (!stateData.procedure) {
+    return persist(conversation, {
+      state: "SCHEDULING_PROCEDURE",
+      stateData,
+      message: "Fluxo de agendamento iniciado. Peça (apenas) qual procedimento o cliente deseja agendar.",
+    });
+  }
 
   if (!stateData.name) {
     return persist(conversation, {
       state: "SCHEDULING_NAME",
       stateData,
-      message: "Fluxo de agendamento iniciado. Peça o nome completo do paciente.",
+      message: `Procedimento registrado: ${stateData.procedure}. Peça o nome completo do paciente.`,
     });
   }
 
@@ -81,6 +90,22 @@ export async function beginScheduling(
     state: "SCHEDULING_DATE",
     stateData,
     message: "Nome ja registrado. Peça a data desejada.",
+  });
+}
+
+export async function provideProcedure(conversation: Conversation, procedure: string): Promise<FlowResult> {
+  const stateData: FlowStateData = { ...conversation.state_data, procedure };
+  if (stateData.name) {
+    return persist(conversation, {
+      state: "SCHEDULING_DATE",
+      stateData,
+      message: `Procedimento registrado: ${procedure}. Nome ja conhecido. Peça a data desejada.`,
+    });
+  }
+  return persist(conversation, {
+    state: "SCHEDULING_NAME",
+    stateData,
+    message: `Procedimento registrado: ${procedure}. Peça o nome completo do paciente.`,
   });
 }
 

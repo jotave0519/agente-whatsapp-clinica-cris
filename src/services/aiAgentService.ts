@@ -16,6 +16,18 @@ function loadWorkflowsText(): string {
 
 const WORKFLOWS_TEXT = loadWorkflowsText();
 
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+}
+
+function describeSlots(slots?: string[]): string {
+  return (slots || []).map((s, i) => `${i + 1}) ${formatTime(s)}`).join("  ");
+}
+
+function describeCandidatesForPrompt(candidates?: { procedure: string; date: string; time: string }[]): string {
+  return (candidates || []).map((c, i) => `${i + 1}) ${c.procedure} em ${c.date} as ${c.time}`).join("  ");
+}
+
 const BASE_RULES =
   "Voce e o assistente de WhatsApp da clinica da Dra. Cristiane Zangelmi. " +
   "Responda sempre em portugues do Brasil, em mensagens curtas e naturais de WhatsApp (evite paredes de texto).\n" +
@@ -75,9 +87,9 @@ function buildSystemPrompt(conversation: Conversation, isFirstMessage: boolean):
       break;
     case "SCHEDULING_TIME":
       header +=
-        `Etapa: falta escolher o horario. Horarios disponiveis (ja consultados no Google Calendar): ${JSON.stringify(stateData.availableSlots)}. ` +
-        "Apresente 2-4 desses horarios de forma amigavel (HH:MM) e pergunte qual o cliente prefere. " +
-        "Se o cliente ja escolheu um horario da lista, chame select_time com o valor ISO exato correspondente.";
+        `Etapa: falta escolher o horario. Opcoes disponiveis (ja consultadas no Google Calendar): ${describeSlots(stateData.availableSlots)}. ` +
+        "Apresente essas opcoes numeradas ao cliente (formato HH:MM) e pergunte qual ele prefere. " +
+        "Se o cliente ja escolheu (por numero, horario ou descricao como \"o das 10h\"), chame select_time com o NUMERO da opcao (index, comecando em 1).";
       break;
     case "SCHEDULING_CONFIRM":
       header +=
@@ -86,8 +98,8 @@ function buildSystemPrompt(conversation: Conversation, isFirstMessage: boolean):
       break;
     case "RESCHEDULING_SELECT":
       header +=
-        `Etapa: o cliente tem varios agendamentos ativos: ${JSON.stringify(stateData.candidates)}. ` +
-        "Liste-os e pergunte qual ele quer remarcar. Se ja escolheu, chame select_appointment_to_reschedule com o schedule_id correspondente.";
+        `Etapa: o cliente tem varios agendamentos ativos: ${describeCandidatesForPrompt(stateData.candidates)}. ` +
+        "Liste-os numerados e pergunte qual ele quer remarcar. Se ja escolheu, chame select_appointment_to_reschedule com o NUMERO da opcao (index, comecando em 1).";
       break;
     case "RESCHEDULING_DATE":
       header +=
@@ -96,8 +108,8 @@ function buildSystemPrompt(conversation: Conversation, isFirstMessage: boolean):
       break;
     case "RESCHEDULING_TIME":
       header +=
-        `Etapa: falta escolher o novo horario. Horarios disponiveis: ${JSON.stringify(stateData.availableSlots)}. ` +
-        "Apresente-os e pergunte qual prefere. Se ja escolheu, chame select_reschedule_time.";
+        `Etapa: falta escolher o novo horario. Opcoes disponiveis: ${describeSlots(stateData.availableSlots)}. ` +
+        "Apresente-as numeradas e pergunte qual prefere. Se ja escolheu, chame select_reschedule_time com o NUMERO da opcao (index, comecando em 1).";
       break;
     case "RESCHEDULING_CONFIRM":
       header +=
@@ -106,8 +118,8 @@ function buildSystemPrompt(conversation: Conversation, isFirstMessage: boolean):
       break;
     case "CANCELING_SELECT":
       header +=
-        `Etapa: o cliente tem varios agendamentos ativos: ${JSON.stringify(stateData.candidates)}. ` +
-        "Liste-os e pergunte qual ele quer cancelar. Se ja escolheu, chame select_appointment_to_cancel.";
+        `Etapa: o cliente tem varios agendamentos ativos: ${describeCandidatesForPrompt(stateData.candidates)}. ` +
+        "Liste-os numerados e pergunte qual ele quer cancelar. Se ja escolheu, chame select_appointment_to_cancel com o NUMERO da opcao (index, comecando em 1).";
       break;
     case "CANCELING_CONFIRM":
       header +=
@@ -199,8 +211,8 @@ const STATE_TOOLS: Partial<Record<ConversationFlowState, any[]>> = {
   SCHEDULING_TIME: [
     {
       name: "select_time",
-      description: "Registra o horario escolhido pelo cliente (deve ser um dos horarios disponiveis apresentados).",
-      input_schema: { type: "object", properties: { start: { type: "string", description: "Horario ISO exato escolhido" } }, required: ["start"] },
+      description: "Registra o horario escolhido pelo cliente, pelo numero da opcao apresentada (1, 2, 3...).",
+      input_schema: { type: "object", properties: { index: { type: "integer", description: "Numero da opcao escolhida, comecando em 1" } }, required: ["index"] },
     },
     ABANDON_TOOL,
   ],
@@ -215,8 +227,8 @@ const STATE_TOOLS: Partial<Record<ConversationFlowState, any[]>> = {
   RESCHEDULING_SELECT: [
     {
       name: "select_appointment_to_reschedule",
-      description: "Seleciona qual agendamento existente o cliente quer remarcar.",
-      input_schema: { type: "object", properties: { schedule_id: { type: "string" } }, required: ["schedule_id"] },
+      description: "Seleciona qual agendamento existente o cliente quer remarcar, pelo numero da opcao apresentada (1, 2, 3...).",
+      input_schema: { type: "object", properties: { index: { type: "integer", description: "Numero da opcao escolhida, comecando em 1" } }, required: ["index"] },
     },
     ABANDON_TOOL,
   ],
@@ -231,8 +243,8 @@ const STATE_TOOLS: Partial<Record<ConversationFlowState, any[]>> = {
   RESCHEDULING_TIME: [
     {
       name: "select_reschedule_time",
-      description: "Registra o novo horario escolhido pelo cliente (deve ser um dos horarios disponiveis apresentados).",
-      input_schema: { type: "object", properties: { start: { type: "string", description: "Horario ISO exato escolhido" } }, required: ["start"] },
+      description: "Registra o novo horario escolhido pelo cliente, pelo numero da opcao apresentada (1, 2, 3...).",
+      input_schema: { type: "object", properties: { index: { type: "integer", description: "Numero da opcao escolhida, comecando em 1" } }, required: ["index"] },
     },
     ABANDON_TOOL,
   ],
@@ -247,8 +259,8 @@ const STATE_TOOLS: Partial<Record<ConversationFlowState, any[]>> = {
   CANCELING_SELECT: [
     {
       name: "select_appointment_to_cancel",
-      description: "Seleciona qual agendamento existente o cliente quer cancelar.",
-      input_schema: { type: "object", properties: { schedule_id: { type: "string" } }, required: ["schedule_id"] },
+      description: "Seleciona qual agendamento existente o cliente quer cancelar, pelo numero da opcao apresentada (1, 2, 3...).",
+      input_schema: { type: "object", properties: { index: { type: "integer", description: "Numero da opcao escolhida, comecando em 1" } }, required: ["index"] },
     },
     ABANDON_TOOL,
   ],
@@ -291,7 +303,7 @@ async function executeTool(
         return applyResult(result, conversation);
       }
       case "select_time": {
-        const result = await flow.selectTime(conversation, input.start);
+        const result = await flow.selectTime(conversation, Number(input.index));
         return applyResult(result, conversation);
       }
       case "confirm_scheduling": {
@@ -303,7 +315,7 @@ async function executeTool(
         return applyResult(result, conversation);
       }
       case "select_appointment_to_reschedule": {
-        const result = await flow.selectAppointmentToReschedule(conversation, input.schedule_id);
+        const result = await flow.selectAppointmentToReschedule(conversation, Number(input.index));
         return applyResult(result, conversation);
       }
       case "provide_reschedule_date": {
@@ -311,7 +323,7 @@ async function executeTool(
         return applyResult(result, conversation);
       }
       case "select_reschedule_time": {
-        const result = await flow.selectTime(conversation, input.start);
+        const result = await flow.selectTime(conversation, Number(input.index));
         return applyResult(result, conversation);
       }
       case "confirm_rescheduling": {
@@ -323,7 +335,7 @@ async function executeTool(
         return applyResult(result, conversation);
       }
       case "select_appointment_to_cancel": {
-        const result = await flow.selectAppointmentToCancel(conversation, input.schedule_id);
+        const result = await flow.selectAppointmentToCancel(conversation, Number(input.index));
         return applyResult(result, conversation);
       }
       case "confirm_cancellation": {

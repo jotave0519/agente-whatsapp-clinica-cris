@@ -15,14 +15,52 @@ function normalize(text: string): string {
     .trim();
 }
 
-const CONFIRMATION_PATTERN =
-  /^(sim|pode ser|pode|confirmo|confirmado|confirma|ok(ay)?|beleza|certo|isso mesmo|isso ai|isso|claro|com certeza|positivo)$/;
+const AFFIRMATIVE_WORDS = [
+  "sim",
+  "pode",
+  "podes",
+  "confirmo",
+  "confirmado",
+  "confirma",
+  "confirmar",
+  "confirmando",
+  "ok",
+  "okay",
+  "beleza",
+  "certo",
+  "isso",
+  "claro",
+  "positivo",
+  "exato",
+  "correto",
+  "aceito",
+  "fechado",
+  "show",
+  "perfeito",
+  "isso mesmo",
+  "com certeza",
+];
+
+const NEGATION_PATTERN = /\b(nao|não|espera|calma|errado|troca|mudar|corrig|na verdade|melhor nao|deixa)\b/;
 
 const ABANDON_PATTERN =
   /^(cancela isso|esquece|esquece isso|deixa pra la|deixa para la|mudei de ideia|quero voltar ao menu|voltar ao menu|para|pausa isso|nao quero mais)$/;
 
+/**
+ * Deteccao deliberadamente tolerante: mensagens curtas (ate 6 palavras) sem
+ * negacao, que contenham uma palavra afirmativa, contam como confirmacao.
+ * Isso reduz a dependencia de o LLM sempre chamar a ferramenta de confirmacao
+ * corretamente - a maioria das confirmacoes reais do WhatsApp e curta.
+ */
 export function isConfirmationText(text: string): boolean {
-  return CONFIRMATION_PATTERN.test(normalize(text));
+  const norm = normalize(text);
+  if (!norm) return false;
+  if (NEGATION_PATTERN.test(norm)) return false;
+
+  const wordCount = norm.split(/\s+/).filter(Boolean).length;
+  if (wordCount === 0 || wordCount > 6) return false;
+
+  return AFFIRMATIVE_WORDS.some((phrase) => norm === phrase || norm.includes(phrase));
 }
 
 export function isAbandonText(text: string): boolean {
@@ -35,6 +73,10 @@ function formatDateTime(startIso: string): { date: string; time: string } {
     date: dt.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }),
     time: dt.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
   };
+}
+
+function describeCandidates(candidates: { procedure: string; date: string; time: string }[]): string {
+  return candidates.map((c, i) => `${i + 1}) ${c.procedure} em ${c.date} as ${c.time}`).join("  ");
 }
 
 export interface FlowResult {
@@ -139,10 +181,11 @@ async function resolveDateStep(
   }
 
   const stateData: FlowStateData = { ...baseStateData, date, availableSlots: slots.slice(0, 6) };
+  const labeledSlots = stateData.availableSlots!.map((s, i) => `${i + 1}) ${formatDateTime(s).time}`).join("  ");
   return persist(conversation, {
     state: nextState,
     stateData,
-    message: `Horarios disponiveis em ${date}: ${stateData.availableSlots!.join(", ")}. Apresente 2-4 desses horarios (formatados como HH:MM) e pergunte qual o cliente prefere.`,
+    message: `Horarios disponiveis em ${date}: ${labeledSlots}. Apresente essas opcoes numeradas (formato HH:MM) e pergunte qual o cliente prefere.`,
   });
 }
 
@@ -154,14 +197,17 @@ export async function provideRescheduleDate(conversation: Conversation, date: st
   return resolveDateStep(conversation, conversation.state_data, date, "rescheduling");
 }
 
-export async function selectTime(conversation: Conversation, start: string): Promise<FlowResult> {
+export async function selectTime(conversation: Conversation, index: number): Promise<FlowResult> {
   const stateData = conversation.state_data;
   const slots = stateData.availableSlots || [];
-  if (!slots.includes(start)) {
+  const start = slots[index - 1];
+
+  if (!start) {
+    const labeledSlots = slots.map((s, i) => `${i + 1}) ${formatDateTime(s).time}`).join("  ");
     return persist(conversation, {
       state: conversation.state,
       stateData,
-      message: `Horario invalido. Os horarios validos sao: ${slots.join(", ")}. Peça ao cliente para escolher um desses.`,
+      message: `Opcao invalida. As opcoes validas sao: ${labeledSlots}. Peça ao cliente para escolher um desses numeros.`,
     });
   }
 
@@ -239,17 +285,18 @@ export async function beginRescheduling(user: User, conversation: Conversation):
   return persist(conversation, {
     state: "RESCHEDULING_SELECT",
     stateData: { candidates },
-    message: `Varios agendamentos ativos encontrados: ${JSON.stringify(candidates)}. Liste-os ao cliente e pergunte qual ele quer remarcar.`,
+    message: `Varios agendamentos ativos encontrados: ${describeCandidates(candidates)}. Liste-os numerados ao cliente e pergunte qual ele quer remarcar.`,
   });
 }
 
-export async function selectAppointmentToReschedule(conversation: Conversation, scheduleId: string): Promise<FlowResult> {
-  const candidate = (conversation.state_data.candidates || []).find((c) => c.scheduleId === scheduleId);
+export async function selectAppointmentToReschedule(conversation: Conversation, index: number): Promise<FlowResult> {
+  const candidates = conversation.state_data.candidates || [];
+  const candidate = candidates[index - 1];
   if (!candidate) {
     return persist(conversation, {
       state: "RESCHEDULING_SELECT",
       stateData: conversation.state_data,
-      message: "ID de agendamento invalido. Peça ao cliente para escolher um da lista apresentada.",
+      message: `Opcao invalida. Opcoes validas: ${describeCandidates(candidates)}. Peça ao cliente para escolher um desses numeros.`,
     });
   }
 
@@ -314,17 +361,18 @@ export async function beginCancellation(user: User, conversation: Conversation):
   return persist(conversation, {
     state: "CANCELING_SELECT",
     stateData: { candidates },
-    message: `Varios agendamentos ativos encontrados: ${JSON.stringify(candidates)}. Liste-os ao cliente e pergunte qual ele quer cancelar.`,
+    message: `Varios agendamentos ativos encontrados: ${describeCandidates(candidates)}. Liste-os numerados ao cliente e pergunte qual ele quer cancelar.`,
   });
 }
 
-export async function selectAppointmentToCancel(conversation: Conversation, scheduleId: string): Promise<FlowResult> {
-  const candidate = (conversation.state_data.candidates || []).find((c) => c.scheduleId === scheduleId);
+export async function selectAppointmentToCancel(conversation: Conversation, index: number): Promise<FlowResult> {
+  const candidates = conversation.state_data.candidates || [];
+  const candidate = candidates[index - 1];
   if (!candidate) {
     return persist(conversation, {
       state: "CANCELING_SELECT",
       stateData: conversation.state_data,
-      message: "ID de agendamento invalido. Peça ao cliente para escolher um da lista apresentada.",
+      message: `Opcao invalida. Opcoes validas: ${describeCandidates(candidates)}. Peça ao cliente para escolher um desses numeros.`,
     });
   }
 

@@ -62,20 +62,19 @@ npm start
 Endpoint de health check: `GET /health`.
 
 ### 8. CRM web
-1. Preencher `SUPABASE_ANON_KEY` no `.env` (Project Settings → API → **anon public key** — diferente da service_role key usada pelo backend; é segura para expor no frontend).
-2. Rodar o SQL de [supabase/migrations/004_staff.sql](supabase/migrations/004_staff.sql) (cria a tabela `staff`, separada de `users` que são os pacientes do WhatsApp).
-3. Criar o primeiro usuário admin do CRM:
+1. Rodar o SQL de [supabase/migrations/004_staff.sql](supabase/migrations/004_staff.sql) (cria a tabela `staff`, separada de `users` que são os pacientes do WhatsApp).
+2. Criar o primeiro usuário admin do CRM:
    ```
    npm run staff:create -- --email dra@clinica.com --password "senha-forte" --name "Dra. Cristiane Zangelmi"
    ```
-4. Instalar e configurar o frontend:
+3. Instalar e configurar o frontend para desenvolvimento local:
    ```
    cd web
    npm install
-   cp .env.example .env   # preencher VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY (mesmos valores do .env principal)
+   cp .env.example .env   # preencher VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY (Project Settings -> API -> anon public key; e' publica por design, protegida por RLS)
    npm run dev             # roda em http://localhost:5173, com proxy /api -> http://localhost:5000
    ```
-5. Em produção, o build do frontend (`web/dist`) é gerado pelo `Dockerfile` (estágio `web-build`) e servido pelo próprio Express em `/` — nenhum serviço novo no EasyPanel. As variáveis `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` precisam ser passadas como **build args** do Docker (Vite as compila no build, não em runtime).
+4. Em produção, o build do frontend (`web/dist`) é gerado pelo `Dockerfile` (estágio `web-build`) e servido pelo próprio Express em `/` — nenhum serviço novo no EasyPanel. As variáveis `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` já vêm com valor padrão bakeado no `Dockerfile` (são públicas, não segredos) — só editar o `Dockerfile` se o projeto Supabase mudar; não é preciso configurar build args na UI do EasyPanel.
 
 ### 9. Lembretes diários
 Já rodam automaticamente in-process (todo dia útil às 08:00, horário de São Paulo) enquanto o servidor estiver de pé — ver `src/cron/reminderCron.ts`. Alternativa via cron/Task Scheduler do sistema operacional, sem depender do servidor:

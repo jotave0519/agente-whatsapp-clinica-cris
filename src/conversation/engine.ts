@@ -65,7 +65,7 @@ export async function runTurn(user: User, conversation: Conversation, userMessag
       iteration += 1;
       const step = getStep(workingConversation.state);
       const ctx: FlowContext = { user, conversation: workingConversation, isFirstMessage };
-      const systemPrompt = buildSystemPrompt(step, ctx);
+      const systemPrompt = await buildSystemPrompt(step, ctx);
 
       logger.info(SCOPE, `Chamando Claude (iteracao ${iteration})`, {
         conversationId: conversation.id,
@@ -141,7 +141,7 @@ export async function runTurn(user: User, conversation: Conversation, userMessag
   }
 }
 
-function buildSystemPrompt(step: StepDefinition, ctx: FlowContext): string {
+async function buildSystemPrompt(step: StepDefinition, ctx: FlowContext): Promise<string> {
   const header = GLOBAL_RULES + `Data e hora atual: ${currentDateTimeLabel()} (America/Sao_Paulo).\n\n`;
   const guardrail =
     step.id === "MENU"
@@ -150,7 +150,7 @@ function buildSystemPrompt(step: StepDefinition, ctx: FlowContext): string {
         "E PROIBIDO voltar ao menu principal, listar as opcoes novamente, ou mudar de assunto antes de concluir esta operacao. " +
         "Se o cliente pedir claramente para parar ou desistir deste fluxo, chame abandon_flow. Fora isso, siga apenas a etapa atual abaixo:\n\n";
 
-  return header + guardrail + step.instructions(ctx);
+  return header + guardrail + (await step.instructions(ctx));
 }
 
 async function finalize(conversation: Conversation, result: { nextStep: Conversation["state"]; data: Conversation["state_data"]; message: string; handoffRequested?: boolean }): Promise<EngineResult> {

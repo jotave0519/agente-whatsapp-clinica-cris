@@ -98,7 +98,68 @@ export interface Staff {
   name: string;
   email: string;
   role: StaffRole;
+  active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export type TransactionType = "receita" | "despesa";
+export type TransactionStatus = "pago" | "pendente";
+
+export interface Transaction {
+  id: string;
+  type: TransactionType;
+  description: string;
+  category: string | null;
+  amount: number;
+  method: string | null;
+  status: TransactionStatus;
+  patient_id: string | null;
+  procedure_id: string | null;
+  occurred_on: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  category: string | null;
+  unit: string;
+  quantity: number;
+  min_quantity: number;
+  expiry_date: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type InventoryMovementType = "entrada" | "saida";
+
+export interface InventoryMovement {
+  id: string;
+  item_id: string;
+  type: InventoryMovementType;
+  quantity: number;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface ClinicSettings {
+  id: number;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  updated_at: string;
+}
+
+export interface BusinessHourRow {
+  weekday: number;
+  enabled: boolean;
+  open_time: string;
+  close_time: string;
 }
 

@@ -17,7 +17,7 @@ Sistema de atendimento inteligente via WhatsApp, construído no framework **WAT*
 3. **Agendamento, remarcação e cancelamento** — via Google Calendar (agenda visual) + Supabase (`schedules`, registro estruturado).
 4. **Lembretes e confirmações** — rotina diária automática.
 5. **Atendimento humano** — a IA transfere a conversa (`request_human_handoff`) quando solicitado ou quando não consegue ajudar; a equipe assume pelo próprio WhatsApp.
-6. **CRM web** (Fases 1 e 2) — login (Supabase Auth), Dashboard (KPIs, agendamentos do dia, conversas recentes), Agenda (grade semanal, criar/remarcar/cancelar), Pacientes (busca), Conversas (lista + chat em tempo real, assumir/devolver para a IA, enviar mensagem manual via Evolution API) e Procedimentos (catálogo, criar/editar) — todos lendo/escrevendo nas mesmas tabelas e serviços do agente, nunca duplicando lógica. Fase seguinte: Financeiro, Estoque, Usuários/papéis, Configurações.
+6. **CRM web** (Fases 1, 2 e 3) — login (Supabase Auth), Dashboard, Agenda, Pacientes, Conversas, Procedimentos, **Financeiro** (receitas/despesas, fluxo de caixa, relatórios), **Estoque** (produtos/insumos, movimentações de entrada/saída), **Usuários** (papéis/permissões, ativar/desativar acesso, restrito a admin) e **Configurações** (dados da clínica + horário de atendimento) — todos lendo/escrevendo nas mesmas tabelas e serviços do agente, nunca duplicando lógica. O horário de atendimento salvo em Configurações é a fonte real usada pela IA (FAQ e disponibilidade de horários no WhatsApp).
 
 ## Stack
 Node.js + TypeScript, Express, Supabase (PostgreSQL), Google Calendar API, Evolution API (WhatsApp via Baileys), Claude (Anthropic API).
@@ -65,8 +65,10 @@ Endpoint de health check: `GET /health`.
 1. Rodar o SQL de [supabase/migrations/004_staff.sql](supabase/migrations/004_staff.sql) (cria a tabela `staff`, separada de `users` que são os pacientes do WhatsApp).
 2. Criar o primeiro usuário admin do CRM:
    ```
-   npm run staff:create -- --email dra@clinica.com --password "senha-forte" --name "Dra. Cristiane Zangelmi"
+   npm run staff:create -- --email dra@clinica.com --password "senha-forte" --name "Dra. Cristiane Zangelmi" [--role admin|recepcionista|profissional]
    ```
+   (`--role` é opcional, default `admin`. Não há convite por e-mail pela própria tela do CRM — usuários adicionais são criados por este script.)
+2b. Rodar também [006_transactions.sql](supabase/migrations/006_transactions.sql), [007_inventory.sql](supabase/migrations/007_inventory.sql), [008_clinic_settings.sql](supabase/migrations/008_clinic_settings.sql) e [009_staff_active.sql](supabase/migrations/009_staff_active.sql) (Fase 3 — Financeiro, Estoque, Configurações e desativação de usuários).
 3. Instalar e configurar o frontend para desenvolvimento local:
    ```
    cd web
@@ -91,13 +93,16 @@ src/
   controllers/
     webhookController.ts          # recebe mensagens do WhatsApp
     healthController.ts
-    api/                          # controllers da API do CRM (dashboard, schedule, patient, conversation, procedure)
+    api/                          # controllers da API do CRM (dashboard, schedule, patient, conversation, procedure, finance, inventory, staff, settings)
   routes/api.ts                   # monta /api/v1/* sob requireAuth
-  middleware/requireAuth.ts       # valida o JWT do Supabase Auth (sessao do CRM)
+  middleware/requireAuth.ts       # valida o JWT do Supabase Auth (sessao do CRM) + bloqueia staff.active=false
+  middleware/requireAdmin.ts      # restringe rotas (Usuarios) a staff.role='admin'
   services/
     userService.ts                # identificacao/criacao de cliente
     schedulingService.ts          # orquestra Google Calendar + Supabase (usado pelo WhatsApp E pelo CRM)
     reminderService.ts            # rotina de lembretes
+    inventoryService.ts           # orquestra movimentacao de estoque (valida saldo, atualiza quantidade)
+    businessHoursService.ts       # horario de atendimento real (cache 60s) - usado pelo Calendar E pelo prompt da IA
   conversation/                   # maquina de estados do atendimento
     engine.ts                     # orquestra o loop de tool-use com Claude, uma etapa por vez
     confirmations.ts              # deteccao deterministica de confirmacao/desistencia
@@ -115,6 +120,9 @@ src/
     conversationRepository.ts      # conversas/mensagens (+ listRecent para o Dashboard)
     staffRepository.ts             # equipe do CRM (Supabase Auth)
     procedureRepository.ts         # catalogo de procedimentos (CRM)
+    transactionRepository.ts       # receitas/despesas (Financeiro)
+    inventoryRepository.ts         # itens e movimentacoes de estoque
+    settingsRepository.ts          # dados da clinica + horario de atendimento (business_hours)
   integrations/
     evolutionApiClient.ts
     googleCalendarClient.ts
@@ -128,7 +136,8 @@ web/                               # CRM web (Vite + React + TS)
     lib/supabaseClient.ts, api.ts # auth direto no Supabase + fetch client p/ /api/v1
     context/AuthContext.tsx
     components/Layout.tsx, ProtectedRoute.tsx
-    pages/Login.tsx, Dashboard.tsx, Agenda.tsx, Pacientes.tsx, Conversas.tsx, Procedimentos.tsx
+    pages/Login.tsx, Dashboard.tsx, Agenda.tsx, Pacientes.tsx, Conversas.tsx, Procedimentos.tsx,
+    pages/Financeiro.tsx, Estoque.tsx, Usuarios.tsx, Configuracoes.tsx
 scripts/
   googleAuthSetup.ts               # setup unico do OAuth do Google
   createStaffAdmin.ts              # cria o primeiro usuario admin do CRM
@@ -138,6 +147,10 @@ supabase/migrations/
   003_conversation_state.sql       # state/state_data (maquina de estados)
   004_staff.sql                    # tabela staff (CRM), vinculada ao Supabase Auth
   005_procedures_extra.sql         # duration_minutes/active em procedures (CRM)
+  006_transactions.sql             # receitas/despesas (Financeiro)
+  007_inventory.sql                # inventory_items + inventory_movements (Estoque)
+  008_clinic_settings.sql          # clinic_settings + business_hours (Configuracoes, fonte real p/ a IA)
+  009_staff_active.sql             # staff.active (desativar acesso sem apagar a conta)
 workflows/
   atendimento_faq.md              # persona, dados da clinica, tratamentos, valores, objecoes, menu
   agendamento_consultas.md        # fluxo de marcar/remarcar/cancelar consultas

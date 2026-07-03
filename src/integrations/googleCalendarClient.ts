@@ -1,13 +1,12 @@
 import fs from "fs";
 import axios from "axios";
 import { env } from "../config/env";
+import * as businessHoursService from "../services/businessHoursService";
 import { logger } from "../utils/logger";
 
 // Cliente REST feito com axios (em vez da lib "googleapis") porque o gaxios/node-fetch
 // interno da lib apresenta "Premature close" ao ler respostas gzip neste ambiente.
 
-const WORK_START_HOUR = 8;
-const WORK_END_HOUR = 18;
 const DEFAULT_SLOT_MINUTES = 30;
 const TIMEZONE = "America/Sao_Paulo";
 const CALENDAR_API_BASE = "https://www.googleapis.com/calendar/v3";
@@ -145,20 +144,19 @@ function eventsPath(suffix = ""): string {
   return `/calendars/${encodeURIComponent(env.googleCalendarId)}/events${suffix}`;
 }
 
-function dayBounds(date: string): { start: Date; end: Date } {
-  const start = new Date(`${date}T${String(WORK_START_HOUR).padStart(2, "0")}:00:00-03:00`);
-  const end = new Date(`${date}T${String(WORK_END_HOUR).padStart(2, "0")}:00:00-03:00`);
-  return { start, end };
+async function dayBounds(date: string): Promise<{ start: Date; end: Date; enabled: boolean }> {
+  const hours = await businessHoursService.getDayHours(date);
+  const start = new Date(`${date}T${hours.open}:00-03:00`);
+  const end = new Date(`${date}T${hours.close}:00-03:00`);
+  return { start, end, enabled: hours.enabled };
 }
 
 export async function checkAvailability(
   date: string,
   durationMinutes: number = DEFAULT_SLOT_MINUTES
 ): Promise<string[]> {
-  const weekday = new Date(`${date}T12:00:00-03:00`).getDay();
-  if (weekday === 0 || weekday === 6) return [];
-
-  const { start, end } = dayBounds(date);
+  const { start, end, enabled } = await dayBounds(date);
+  if (!enabled) return [];
 
   const data = await calendarRequest<{ items?: CalendarEvent[] }>("get", eventsPath(), {
     params: { timeMin: start.toISOString(), timeMax: end.toISOString(), singleEvents: true, orderBy: "startTime" },
@@ -231,7 +229,7 @@ export async function cancelEvent(eventId: string): Promise<void> {
 }
 
 export async function listEvents(date: string): Promise<CalendarEvent[]> {
-  const { start, end } = dayBounds(date);
+  const { start, end } = await dayBounds(date);
   const data = await calendarRequest<{ items?: CalendarEvent[] }>("get", eventsPath(), {
     params: { timeMin: start.toISOString(), timeMax: end.toISOString(), singleEvents: true, orderBy: "startTime" },
   });

@@ -7,8 +7,13 @@ function loadFile(name: string): string {
   return fs.readFileSync(path.join(WORKFLOWS_DIR, name), "utf-8");
 }
 
-/** Conteudo institucional (persona, dados da clinica, FAQ) - so usado na etapa MENU. */
-export const CLINIC_INFO_TEXT = loadFile("atendimento_faq.md");
+/** Template institucional (persona, dados da clinica, FAQ) - so usado na etapa MENU. */
+const CLINIC_INFO_TEMPLATE = loadFile("atendimento_faq.md");
+
+/** Substitui o placeholder de horario de atendimento pelo valor real (vindo de Configuracoes). */
+export function clinicInfoText(hoursLabel: string): string {
+  return CLINIC_INFO_TEMPLATE.replace("{{HORARIO_ATENDIMENTO}}", hoursLabel);
+}
 
 export const GLOBAL_RULES =
   "Voce e o assistente de WhatsApp da clinica da Dra. Cristiane Zangelmi. " +

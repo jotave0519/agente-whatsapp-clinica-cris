@@ -1,7 +1,8 @@
+import * as businessHoursService from "../../services/businessHoursService";
 import * as schedulingService from "../../services/schedulingService";
 import { FlowStateData } from "../../types";
 import { logger } from "../../utils/logger";
-import { CLINIC_INFO_TEXT } from "../prompt";
+import { clinicInfoText } from "../prompt";
 import { FlowContext, StepDefinition } from "../types";
 import { beginCancellation } from "./cancellation";
 import { beginRescheduling } from "./rescheduling";
@@ -11,7 +12,7 @@ const SCOPE = "conversation.menu";
 
 export const menuStep: StepDefinition = {
   id: "MENU",
-  instructions: (ctx: FlowContext) => {
+  instructions: async (ctx: FlowContext) => {
     let text =
       "Voce esta no atendimento geral. Use as informacoes da clinica abaixo para tirar duvidas.\n" +
       "REGRA CRITICA: assim que perceber QUALQUER sinal de que o cliente quer agendar, remarcar ou cancelar " +
@@ -29,7 +30,8 @@ export const menuStep: StepDefinition = {
         "4. Conhecer nossos tratamentos, 5. Falar com um atendente), mas tambem entenda linguagem natural livremente.\n";
     }
 
-    return text + "\n\n---\n\n" + CLINIC_INFO_TEXT;
+    const hoursLabel = await businessHoursService.describeWeeklyHoursLabel();
+    return text + "\n\n---\n\n" + clinicInfoText(hoursLabel);
   },
   tools: [
     {

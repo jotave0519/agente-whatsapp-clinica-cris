@@ -13,7 +13,16 @@ const NAV_GROUPS = [
   },
   {
     label: "Gestão",
-    items: [{ to: "/procedimentos", label: "Procedimentos" }],
+    items: [
+      { to: "/procedimentos", label: "Procedimentos" },
+      { to: "/financeiro", label: "Financeiro" },
+      { to: "/estoque", label: "Estoque" },
+      { to: "/usuarios", label: "Usuários" },
+    ],
+  },
+  {
+    label: "Sistema",
+    items: [{ to: "/configuracoes", label: "Configurações" }],
   },
 ];
 

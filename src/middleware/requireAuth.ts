@@ -42,6 +42,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       res.status(403).json({ error: "Usuario nao tem acesso ao CRM." });
       return;
     }
+    if (!staff.active) {
+      logger.warn(SCOPE, "Usuario desativado tentou acessar o CRM", { userId: data.user.id });
+      res.status(403).json({ error: "Usuario desativado. Fale com um administrador." });
+      return;
+    }
 
     req.staff = staff;
     next();

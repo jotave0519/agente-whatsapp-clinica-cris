@@ -3,11 +3,15 @@ import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import { Agenda } from "./pages/Agenda";
+import { Configuracoes } from "./pages/Configuracoes";
 import { Conversas } from "./pages/Conversas";
 import { Dashboard } from "./pages/Dashboard";
+import { Estoque } from "./pages/Estoque";
+import { Financeiro } from "./pages/Financeiro";
 import { Login } from "./pages/Login";
 import { Pacientes } from "./pages/Pacientes";
 import { Procedimentos } from "./pages/Procedimentos";
+import { Usuarios } from "./pages/Usuarios";
 
 export function App() {
   return (
@@ -22,6 +26,10 @@ export function App() {
               <Route path="/pacientes" element={<Pacientes />} />
               <Route path="/conversas" element={<Conversas />} />
               <Route path="/procedimentos" element={<Procedimentos />} />
+              <Route path="/financeiro" element={<Financeiro />} />
+              <Route path="/estoque" element={<Estoque />} />
+              <Route path="/usuarios" element={<Usuarios />} />
+              <Route path="/configuracoes" element={<Configuracoes />} />
             </Route>
           </Route>
         </Routes>

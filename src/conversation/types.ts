@@ -37,7 +37,7 @@ export type ToolHandler = (ctx: FlowContext, input: any) => Promise<StepResult>;
 export interface StepDefinition {
   id: ConversationFlowState;
   /** Texto de instrucao especifico desta etapa (a regra global fica em prompt.ts). */
-  instructions: (ctx: FlowContext) => string;
+  instructions: (ctx: FlowContext) => string | Promise<string>;
   tools: ToolSchema[];
   handlers: Record<string, ToolHandler>;
 }

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import * as scheduleRepository from "../../repositories/scheduleRepository";
 import * as userRepository from "../../repositories/userRepository";
 import * as schedulingService from "../../services/schedulingService";
+import { getOrCreateUserByPhone } from "../../services/userService";
 import { logger } from "../../utils/logger";
 
 const SCOPE = "api.schedule";
@@ -25,19 +26,28 @@ export async function listSchedules(req: Request, res: Response): Promise<void> 
 
 export async function createSchedule(req: Request, res: Response): Promise<void> {
   try {
-    const { userId, procedure, start, durationMinutes } = req.body;
-    if (!userId || !procedure || !start) {
-      res.status(400).json({ error: "userId, procedure e start sao obrigatorios." });
+    const { userId, newPatient, procedure, start, durationMinutes, notes } = req.body;
+    if ((!userId && !newPatient) || !procedure || !start) {
+      res.status(400).json({ error: "userId (ou newPatient), procedure e start sao obrigatorios." });
       return;
     }
 
-    const patient = await userRepository.findById(userId);
-    if (!patient) {
-      res.status(404).json({ error: "Paciente nao encontrado." });
-      return;
+    let patient;
+    if (userId) {
+      patient = await userRepository.findById(userId);
+      if (!patient) {
+        res.status(404).json({ error: "Paciente nao encontrado." });
+        return;
+      }
+    } else {
+      if (!newPatient.name || !newPatient.phone) {
+        res.status(400).json({ error: "newPatient.name e newPatient.phone sao obrigatorios." });
+        return;
+      }
+      patient = await getOrCreateUserByPhone(newPatient.phone, newPatient.name);
     }
 
-    logger.info(SCOPE, "Criando agendamento via CRM", { staffId: req.staff?.id, userId, procedure, start });
+    logger.info(SCOPE, "Criando agendamento via CRM", { staffId: req.staff?.id, patientId: patient.id, procedure, start });
     const schedule = await schedulingService.createAppointment({
       userId: patient.id,
       name: patient.name,
@@ -45,6 +55,7 @@ export async function createSchedule(req: Request, res: Response): Promise<void>
       service: procedure,
       start,
       durationMinutes,
+      notes,
     });
     res.status(201).json(schedule);
   } catch (err: any) {

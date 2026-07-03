@@ -43,3 +43,8 @@ export async function update(
   if (error) throw error;
   return data;
 }
+
+export async function remove(id: string): Promise<void> {
+  const { error } = await getSupabaseClient().from("procedures").delete().eq("id", id);
+  if (error) throw error;
+}

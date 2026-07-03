@@ -53,10 +53,37 @@ export async function listAll(params: { search?: string; limit?: number; offset?
     .range(offset, offset + limit - 1);
 
   if (params.search) {
-    query = query.or(`name.ilike.%${params.search}%,phone.ilike.%${params.search}%`);
+    query = query.or(`name.ilike.%${params.search}%,phone.ilike.%${params.search}%,email.ilike.%${params.search}%`);
   }
 
   const { data, error, count } = await query;
   if (error) throw error;
   return { items: data || [], total: count ?? 0 };
+}
+
+/** Criacao manual pelo CRM (agendamento manual / cadastro direto de paciente). */
+export async function createPatient(params: { name: string; phone: string; email?: string | null }): Promise<User> {
+  const { data, error } = await getSupabaseClient()
+    .from("users")
+    .insert({ name: params.name, phone: params.phone, email: params.email ?? null })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updatePatient(
+  id: string,
+  params: Partial<{ name: string; phone: string; email: string | null; active: boolean }>
+): Promise<User> {
+  const { data, error } = await getSupabaseClient()
+    .from("users")
+    .update({ ...params, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data;
 }

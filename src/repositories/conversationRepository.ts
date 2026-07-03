@@ -208,6 +208,17 @@ export async function countActive(): Promise<number> {
   return count ?? 0;
 }
 
+/** Usado pelo Dashboard do CRM (KPI "conversas aguardando"). */
+export async function countByStatus(status: ConversationStatus): Promise<number> {
+  const { count, error } = await getSupabaseClient()
+    .from("conversations")
+    .select("*", { count: "exact", head: true })
+    .eq("status", status);
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function listMessages(conversationId: string, limit = 30): Promise<Message[]> {
   const { data, error } = await getSupabaseClient()
     .from("messages")

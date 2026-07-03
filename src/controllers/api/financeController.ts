@@ -119,3 +119,33 @@ export async function createTransaction(req: Request, res: Response): Promise<vo
     res.status(500).json({ error: "Erro ao criar transacao." });
   }
 }
+
+export async function updateTransaction(req: Request, res: Response): Promise<void> {
+  try {
+    const { description, category, amount, method, status, occurred_on } = req.body;
+    logger.info(SCOPE, "Atualizando transacao via CRM", { staffId: req.staff?.id, id: req.params.id });
+    const transaction = await transactionRepository.update(req.params.id, {
+      description,
+      category,
+      amount: amount != null ? Number(amount) : undefined,
+      method,
+      status,
+      occurredOn: occurred_on,
+    });
+    res.json(transaction);
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao atualizar transacao", err);
+    res.status(500).json({ error: "Erro ao atualizar transacao." });
+  }
+}
+
+export async function deleteTransaction(req: Request, res: Response): Promise<void> {
+  try {
+    logger.info(SCOPE, "Excluindo transacao via CRM", { staffId: req.staff?.id, id: req.params.id });
+    await transactionRepository.remove(req.params.id);
+    res.status(204).send();
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao excluir transacao", err);
+    res.status(500).json({ error: "Erro ao excluir transacao." });
+  }
+}

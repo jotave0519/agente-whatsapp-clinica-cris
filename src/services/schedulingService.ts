@@ -13,6 +13,7 @@ export async function createAppointment(params: {
   service: string;
   start: string;
   durationMinutes?: number;
+  notes?: string | null;
 }): Promise<Schedule> {
   const event = await googleCalendar.createEvent({
     name: params.name,
@@ -20,6 +21,7 @@ export async function createAppointment(params: {
     service: params.service,
     start: params.start,
     durationMinutes: params.durationMinutes,
+    notes: params.notes,
   });
 
   const startDate = new Date(params.start);
@@ -34,6 +36,7 @@ export async function createAppointment(params: {
     date,
     time,
     googleEventId: event.id!,
+    notes: params.notes,
   });
 }
 

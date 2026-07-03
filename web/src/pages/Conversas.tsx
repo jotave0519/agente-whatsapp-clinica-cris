@@ -88,6 +88,14 @@ export function Conversas() {
     await loadList();
   }
 
+  async function handleClose() {
+    if (!conversation) return;
+    if (!window.confirm("Encerrar esta conversa? A IA não voltará a responder automaticamente até uma nova mensagem do paciente.")) return;
+    await api.patch(`/conversations/${conversation.id}/status`, { status: "closed" });
+    await loadConversation(conversation.id);
+    await loadList();
+  }
+
   function statusBadge(status: ConversationSummary["status"]) {
     const cls = status === "human" ? "badge-blue" : status === "closed" ? "badge-neutral" : "badge-green";
     const label = status === "human" ? "Humano" : status === "closed" ? "Encerrado" : "IA";
@@ -155,9 +163,16 @@ export function Conversas() {
                   <div style={{ fontWeight: 600 }}>{conversation.userName || conversation.userPhone}</div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{conversation.userPhone}</div>
                 </div>
-                <button className="btn btn-secondary" onClick={handleToggleStatus}>
-                  {conversation.status === "human" ? "Devolver para IA" : "Assumir conversa"}
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="btn btn-secondary" onClick={handleToggleStatus}>
+                    {conversation.status === "human" ? "Devolver para IA" : "Assumir conversa"}
+                  </button>
+                  {conversation.status !== "closed" && (
+                    <button className="btn-danger" style={{ borderRadius: 10, padding: "9px 14px", fontSize: 13.5, fontWeight: 600 }} onClick={handleClose}>
+                      Encerrar
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div style={{ flex: 1, overflowY: "auto", padding: 18, display: "flex", flexDirection: "column", gap: 10 }}>

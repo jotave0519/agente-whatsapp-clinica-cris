@@ -31,3 +31,32 @@ export async function getPatient(req: Request, res: Response): Promise<void> {
     res.status(500).json({ error: "Erro ao buscar paciente." });
   }
 }
+
+export async function createPatient(req: Request, res: Response): Promise<void> {
+  try {
+    const { name, phone, email } = req.body;
+    if (!name || !phone) {
+      res.status(400).json({ error: "name e phone sao obrigatorios." });
+      return;
+    }
+
+    logger.info(SCOPE, "Criando paciente via CRM", { staffId: req.staff?.id, name });
+    const patient = await userRepository.createPatient({ name, phone, email });
+    res.status(201).json(patient);
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao criar paciente", err);
+    res.status(500).json({ error: "Erro ao criar paciente." });
+  }
+}
+
+export async function updatePatient(req: Request, res: Response): Promise<void> {
+  try {
+    const { name, phone, email, active } = req.body;
+    logger.info(SCOPE, "Atualizando paciente via CRM", { staffId: req.staff?.id, id: req.params.id });
+    const patient = await userRepository.updatePatient(req.params.id, { name, phone, email, active });
+    res.json(patient);
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao atualizar paciente", err);
+    res.status(500).json({ error: "Erro ao atualizar paciente." });
+  }
+}

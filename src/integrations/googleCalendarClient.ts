@@ -186,14 +186,18 @@ export async function createEvent(params: {
   service: string;
   start: string;
   durationMinutes?: number;
+  notes?: string | null;
 }): Promise<CalendarEvent> {
   const startDate = new Date(params.start);
   const endDate = new Date(startDate.getTime() + (params.durationMinutes ?? DEFAULT_SLOT_MINUTES) * 60 * 1000);
+  const description =
+    `Paciente: ${params.name}\nTelefone: ${params.phone}\nProcedimento: ${params.service}` +
+    (params.notes ? `\nObservacoes: ${params.notes}` : "");
 
   return calendarRequest<CalendarEvent>("post", eventsPath(), {
     data: {
       summary: `${params.service} - ${params.name}`,
-      description: `Paciente: ${params.name}\nTelefone: ${params.phone}\nProcedimento: ${params.service}`,
+      description,
       start: { dateTime: startDate.toISOString(), timeZone: TIMEZONE },
       end: { dateTime: endDate.toISOString(), timeZone: TIMEZONE },
       extendedProperties: { private: { phone: params.phone } },

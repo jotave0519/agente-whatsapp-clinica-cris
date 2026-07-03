@@ -113,6 +113,16 @@ export function Estoque() {
     }
   }
 
+  async function handleDeleteItem(item: InventoryItem) {
+    if (!window.confirm(`Excluir "${item.name}"? O histórico de movimentações desse item também será apagado.`)) return;
+    try {
+      await api.delete(`/inventory/items/${item.id}`);
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
+
   async function handleMoveSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -295,9 +305,12 @@ export function Estoque() {
                   </td>
                   <td>{i.min_quantity}</td>
                   <td>{i.expiry_date ? new Date(i.expiry_date).toLocaleDateString("pt-BR") : "—"}</td>
-                  <td>
+                  <td style={{ display: "flex", gap: 6 }}>
                     <button className="btn btn-secondary" onClick={() => startEditItem(i)}>
                       Editar
+                    </button>
+                    <button className="btn-danger" style={{ borderRadius: 8, padding: "6px 12px", fontSize: 12.5 }} onClick={() => handleDeleteItem(i)}>
+                      Excluir
                     </button>
                   </td>
                 </tr>

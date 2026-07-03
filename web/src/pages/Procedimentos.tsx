@@ -16,6 +16,7 @@ const EMPTY_FORM = { name: "", category: "", price: "", description: "", duratio
 export function Procedimentos() {
   const [items, setItems] = useState<ProcedureItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState("Todos");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -80,16 +81,41 @@ export function Procedimentos() {
     }
   }
 
+  async function handleDelete(p: ProcedureItem) {
+    if (!window.confirm(`Excluir o procedimento "${p.name}"?`)) return;
+    try {
+      await api.delete(`/procedures/${p.id}`);
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
+
+  const categories = ["Todos", ...Array.from(new Set((items || []).map((p) => p.category).filter(Boolean) as string[]))];
+  const filtered = (items || []).filter((p) => categoryFilter === "Todos" || p.category === categoryFilter);
+
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 22 }}>
         <div>
           <h1 className="page-title">Procedimentos</h1>
-          <p className="page-subtitle">Tratamentos oferecidos pela clínica</p>
+          <p className="page-subtitle">Catálogo de serviços e protocolos da clínica</p>
         </div>
-        <button className="btn" onClick={startCreate}>
-          + Novo procedimento
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <div className="segmented">
+            {categories.map((c) => (
+              <span key={c} className={`segmented-item${categoryFilter === c ? " active" : ""}`} style={{ cursor: "pointer" }} onClick={() => setCategoryFilter(c)}>
+                {c}
+              </span>
+            ))}
+          </div>
+          <button
+            onClick={startCreate}
+            style={{ display: "flex", alignItems: "center", gap: 7, height: 38, padding: "0 15px", borderRadius: 11, background: "var(--text)", color: "var(--bg)", fontSize: 13.5, fontWeight: 500 }}
+          >
+            + Novo
+          </button>
+        </div>
       </div>
 
       {error && <div className="error-text">{error}</div>}
@@ -107,22 +133,11 @@ export function Procedimentos() {
           <div style={{ display: "flex", gap: 12 }}>
             <div style={{ flex: 1 }}>
               <label className="field-label">Preço (R$)</label>
-              <input
-                className="input"
-                type="number"
-                step="0.01"
-                value={form.price}
-                onChange={(e) => setForm({ ...form, price: e.target.value })}
-              />
+              <input className="input" type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
             </div>
             <div style={{ flex: 1 }}>
               <label className="field-label">Duração (min)</label>
-              <input
-                className="input"
-                type="number"
-                value={form.duration_minutes}
-                onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })}
-              />
+              <input className="input" type="number" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} />
             </div>
           </div>
           <div>
@@ -144,51 +159,49 @@ export function Procedimentos() {
         </form>
       )}
 
-      <div className="card" style={{ padding: 0 }}>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Categoria</th>
-              <th>Preço</th>
-              <th>Duração</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items === null && (
-              <tr>
-                <td colSpan={6} className="empty-state">
-                  Carregando...
-                </td>
-              </tr>
-            )}
-            {items !== null && items.length === 0 && (
-              <tr>
-                <td colSpan={6} className="empty-state">
-                  Nenhum procedimento cadastrado.
-                </td>
-              </tr>
-            )}
-            {items?.map((p) => (
-              <tr key={p.id}>
-                <td style={{ fontWeight: 600 }}>{p.name}</td>
-                <td>{p.category || "—"}</td>
-                <td>{p.price != null ? `R$ ${p.price.toFixed(2)}` : "Sob avaliação"}</td>
-                <td>{p.duration_minutes ? `${p.duration_minutes} min` : "—"}</td>
-                <td>
-                  <span className={`badge ${p.active ? "badge-green" : "badge-neutral"}`}>{p.active ? "Ativo" : "Inativo"}</span>
-                </td>
-                <td>
-                  <button className="btn btn-secondary" onClick={() => startEdit(p)}>
-                    Editar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {items === null && <div className="empty-state">Carregando...</div>}
+      {items !== null && filtered.length === 0 && <div className="empty-state">Nenhum procedimento encontrado.</div>}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+        {filtered.map((p) => (
+          <div key={p.id} className="card" style={{ display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 13,
+                  background: "var(--accent-bg)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 18,
+                  fontWeight: 600,
+                  color: "var(--accent-dark)",
+                }}
+              >
+                {p.name.slice(0, 1).toUpperCase()}
+              </div>
+              {p.category && <span className="badge badge-neutral">{p.category}</span>}
+            </div>
+            <div style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: "-.01em" }}>{p.name}</div>
+            <p style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5, marginTop: 6, flex: 1 }}>{p.description || "Sem descrição."}</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--border-soft)" }}>
+              <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{p.duration_minutes ? `${p.duration_minutes} min` : "—"}</span>
+              <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{p.price != null ? `R$ ${p.price.toFixed(2)}` : "Sob avaliação"}</span>
+              <div style={{ flex: 1 }} />
+              <span className={`badge ${p.active ? "badge-green" : "badge-neutral"}`}>{p.active ? "Ativo" : "Inativo"}</span>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => startEdit(p)}>
+                Editar
+              </button>
+              <button className="btn-danger" style={{ borderRadius: 10, padding: "9px 14px", fontSize: 12.5, fontWeight: 600 }} onClick={() => handleDelete(p)}>
+                Excluir
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

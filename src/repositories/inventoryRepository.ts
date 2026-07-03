@@ -64,6 +64,11 @@ export async function updateItem(
   return data;
 }
 
+export async function removeItem(id: string): Promise<void> {
+  const { error } = await getSupabaseClient().from("inventory_items").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export async function updateItemQuantity(id: string, quantity: number): Promise<InventoryItem> {
   const { data, error } = await getSupabaseClient()
     .from("inventory_items")

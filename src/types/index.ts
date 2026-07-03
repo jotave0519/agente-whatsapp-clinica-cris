@@ -2,6 +2,8 @@ export interface User {
   id: string;
   name: string;
   phone: string;
+  email: string | null;
+  active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -16,6 +18,7 @@ export interface Schedule {
   procedure: string;
   date: string;
   time: string;
+  notes: string | null;
   google_event_id: string | null;
   status: ScheduleStatus;
   reminder_sent: boolean;

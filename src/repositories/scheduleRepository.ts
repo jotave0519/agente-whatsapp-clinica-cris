@@ -9,6 +9,7 @@ export async function createSchedule(params: {
   date: string;
   time: string;
   googleEventId: string;
+  notes?: string | null;
 }): Promise<Schedule> {
   const { data, error } = await getSupabaseClient()
     .from("schedules")
@@ -20,6 +21,7 @@ export async function createSchedule(params: {
       date: params.date,
       time: params.time,
       google_event_id: params.googleEventId,
+      notes: params.notes ?? null,
       status: "Agendado",
     })
     .select("*")

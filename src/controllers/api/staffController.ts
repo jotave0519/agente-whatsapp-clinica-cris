@@ -27,6 +27,49 @@ export async function listStaff(_req: Request, res: Response): Promise<void> {
   }
 }
 
+export async function createStaff(req: Request, res: Response): Promise<void> {
+  try {
+    const { name, email, password, role } = req.body;
+    if (!name || !email || !password) {
+      res.status(400).json({ error: "name, email e password sao obrigatorios." });
+      return;
+    }
+
+    logger.info(SCOPE, "Criando staff via CRM", { adminId: req.staff?.id, email, role });
+    const { data, error } = await getSupabaseClient().auth.admin.createUser({ email, password, email_confirm: true });
+    if (error || !data.user) {
+      res.status(400).json({ error: error?.message || "Erro ao criar usuario no Supabase Auth." });
+      return;
+    }
+
+    const staff = await staffRepository.create(data.user.id, name, email, role || "recepcionista");
+    res.status(201).json(staff);
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao criar staff", err);
+    res.status(500).json({ error: "Erro ao criar usuario." });
+  }
+}
+
+export async function deleteStaff(req: Request, res: Response): Promise<void> {
+  try {
+    if (req.params.id === req.staff?.id) {
+      res.status(400).json({ error: "Nao e possivel excluir sua propria conta." });
+      return;
+    }
+
+    logger.info(SCOPE, "Excluindo staff via CRM", { adminId: req.staff?.id, targetId: req.params.id });
+    const { error } = await getSupabaseClient().auth.admin.deleteUser(req.params.id);
+    if (error) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    res.status(204).send();
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao excluir staff", err);
+    res.status(500).json({ error: "Erro ao excluir usuario." });
+  }
+}
+
 export async function updateStaff(req: Request, res: Response): Promise<void> {
   try {
     const { role, active } = req.body;

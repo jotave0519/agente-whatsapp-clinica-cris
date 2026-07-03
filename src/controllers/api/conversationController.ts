@@ -64,8 +64,8 @@ export async function sendMessage(req: Request, res: Response): Promise<void> {
 export async function updateStatus(req: Request, res: Response): Promise<void> {
   try {
     const { status } = req.body;
-    if (status !== "ai" && status !== "human") {
-      res.status(400).json({ error: "status deve ser 'ai' ou 'human'." });
+    if (status !== "ai" && status !== "human" && status !== "closed") {
+      res.status(400).json({ error: "status deve ser 'ai', 'human' ou 'closed'." });
       return;
     }
 

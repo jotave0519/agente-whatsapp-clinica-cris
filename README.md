@@ -17,7 +17,7 @@ Sistema de atendimento inteligente via WhatsApp, construído no framework **WAT*
 3. **Agendamento, remarcação e cancelamento** — via Google Calendar (agenda visual) + Supabase (`schedules`, registro estruturado).
 4. **Lembretes e confirmações** — rotina diária automática.
 5. **Atendimento humano** — a IA transfere a conversa (`request_human_handoff`) quando solicitado ou quando não consegue ajudar; a equipe assume pelo próprio WhatsApp.
-6. **CRM web** (Fases 1, 2, 3 e tela WhatsApp) — login (Supabase Auth), Dashboard, Agenda, Pacientes, Conversas, Procedimentos, **Financeiro** (receitas/despesas, fluxo de caixa, relatórios), **Estoque** (produtos/insumos, movimentações de entrada/saída), **Usuários** (papéis/permissões, ativar/desativar acesso, restrito a admin), **Configurações** (dados da clínica + horário de atendimento) e **WhatsApp** (status real da conexão via Evolution API, QR code para reconectar, estatísticas de mensagens/contatos, toggles reais para ligar/desligar lembretes automáticos e mensagem de inatividade) — todos lendo/escrevendo nas mesmas tabelas e serviços do agente, nunca duplicando lógica. O horário de atendimento salvo em Configurações é a fonte real usada pela IA (FAQ e disponibilidade de horários no WhatsApp). Completa as ~10 telas do design original.
+6. **CRM web** (Fases 1, 2, 3, tela WhatsApp e rodada de refinamento) — login (Supabase Auth), Dashboard (saudação, KPIs, gráfico de faturamento, resumo financeiro), Agenda (grade horária semanal/dia, criação manual de agendamento, remarcar/cancelar por clique), Pacientes, Conversas, Procedimentos, **Financeiro**, **Estoque**, **Usuários**, **Configurações** (dados da clínica + horário de atendimento + preferência de tema) e **WhatsApp** — todos lendo/escrevendo nas mesmas tabelas e serviços do agente, nunca duplicando lógica. CRUD completo (criar/editar/ativar-desativar/excluir, conforme o caso) em Pacientes, Usuários, Procedimentos, Estoque, Financeiro e Conversas. Suporte a **Dark Mode** (paleta própria, não é inversão automática) com preferência salva por dispositivo. O horário de atendimento salvo em Configurações é a fonte real usada pela IA (FAQ e disponibilidade de horários no WhatsApp). Fiel ao protótipo do Claude Design (`CRM Clinica.dc.html`).
 
 ## Stack
 Node.js + TypeScript, Express, Supabase (PostgreSQL), Google Calendar API, Evolution API (WhatsApp via Baileys), Claude (Anthropic API).
@@ -134,8 +134,8 @@ src/
 web/                               # CRM web (Vite + React + TS)
   src/
     lib/supabaseClient.ts, api.ts # auth direto no Supabase + fetch client p/ /api/v1
-    context/AuthContext.tsx
-    components/Layout.tsx, ProtectedRoute.tsx
+    context/AuthContext.tsx, ThemeContext.tsx, AppointmentModalContext.tsx
+    components/Layout.tsx, Topbar.tsx, ProtectedRoute.tsx, NewAppointmentModal.tsx, icons.tsx
     pages/Login.tsx, Dashboard.tsx, Agenda.tsx, Pacientes.tsx, Conversas.tsx, Procedimentos.tsx,
     pages/Financeiro.tsx, Estoque.tsx, Usuarios.tsx, Configuracoes.tsx, WhatsApp.tsx
 scripts/
@@ -152,6 +152,7 @@ supabase/migrations/
   008_clinic_settings.sql          # clinic_settings + business_hours (Configuracoes, fonte real p/ a IA)
   009_staff_active.sql             # staff.active (desativar acesso sem apagar a conta)
   010_automation_flags.sql         # clinic_settings.reminders_enabled / inactivity_nudge_enabled (tela WhatsApp)
+  011_schedule_notes_patient_fields.sql # schedules.notes + users.active/email (agendamento manual, CRUD de pacientes)
 workflows/
   atendimento_faq.md              # persona, dados da clinica, tratamentos, valores, objecoes, menu
   agendamento_consultas.md        # fluxo de marcar/remarcar/cancelar consultas

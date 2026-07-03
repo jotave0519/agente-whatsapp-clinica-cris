@@ -88,6 +88,17 @@ export async function updateItem(req: Request, res: Response): Promise<void> {
   }
 }
 
+export async function deleteItem(req: Request, res: Response): Promise<void> {
+  try {
+    logger.info(SCOPE, "Excluindo item de estoque via CRM", { staffId: req.staff?.id, id: req.params.id });
+    await inventoryRepository.removeItem(req.params.id);
+    res.status(204).send();
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao excluir item de estoque", err);
+    res.status(500).json({ error: "Erro ao excluir item de estoque." });
+  }
+}
+
 export async function createMovement(req: Request, res: Response): Promise<void> {
   try {
     const { item_id, type, quantity, note } = req.body;

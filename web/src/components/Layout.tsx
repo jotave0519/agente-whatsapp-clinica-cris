@@ -1,5 +1,7 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useAppointmentModal } from "../context/AppointmentModalContext";
 import { useAuth } from "../context/AuthContext";
+import { Topbar } from "./Topbar";
 
 const NAV_GROUPS = [
   {
@@ -24,41 +26,62 @@ const NAV_GROUPS = [
     label: "Integrações",
     items: [{ to: "/whatsapp", label: "WhatsApp" }],
   },
-  {
-    label: "Sistema",
-    items: [{ to: "/configuracoes", label: "Configurações" }],
-  },
 ];
 
 export function Layout() {
-  const { signOut } = useAuth();
+  const { session, signOut } = useAuth();
+  const { open: openNewAppointment } = useAppointmentModal();
+  const navigate = useNavigate();
+
+  const email = session?.user.email || "";
+  const initials = email.slice(0, 2).toUpperCase();
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="sidebar-brand">Clínica Zangelmi</div>
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label}>
-            <div className="sidebar-group-label">{group.label}</div>
-            {group.items.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === "/"}
-                className={({ isActive }) => `sidebar-item${isActive ? " active" : ""}`}
-              >
-                {item.label}
-              </NavLink>
-            ))}
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-mark">
+            <span>Z</span>
           </div>
-        ))}
-        <button className="sidebar-item" style={{ marginTop: "auto" }} onClick={signOut}>
-          Sair
+          <div>
+            <div className="sidebar-brand-name">Dra. Zangelmi</div>
+            <div className="sidebar-brand-sub">Estética Avançada</div>
+          </div>
+        </div>
+
+        <nav style={{ flex: 1, overflowY: "auto" }}>
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label} style={{ marginBottom: 16 }}>
+              <div className="sidebar-group-label">{group.label}</div>
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === "/"}
+                  className={({ isActive }) => `sidebar-item${isActive ? " active" : ""}`}
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
+          ))}
+        </nav>
+
+        <button className="sidebar-footer" onClick={() => navigate("/configuracoes")}>
+          <div className="sidebar-footer-avatar">{initials || "?"}</div>
+          <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>
+            <div style={{ fontSize: 11, color: "var(--text-faint)" }}>Configurações</div>
+          </div>
         </button>
       </aside>
-      <main className="main">
-        <Outlet />
-      </main>
+
+      <div className="main-column">
+        <Topbar onNewAppointment={openNewAppointment} onSignOut={signOut} />
+        <main className="main">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

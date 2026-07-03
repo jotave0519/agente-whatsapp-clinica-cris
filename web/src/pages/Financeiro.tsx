@@ -31,6 +31,7 @@ export function Financeiro() {
   const [data, setData] = useState<FinanceData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
@@ -48,7 +49,21 @@ export function Financeiro() {
   }, []);
 
   function openForm(type: "receita" | "despesa") {
+    setEditingId(null);
     setForm({ ...EMPTY_FORM, type });
+    setShowForm(true);
+  }
+
+  function openEdit(t: Transaction) {
+    setEditingId(t.id);
+    setForm({
+      type: t.type,
+      description: t.description,
+      category: t.category || "",
+      amount: String(t.amount),
+      method: t.method || "",
+      status: t.status,
+    });
     setShowForm(true);
   }
 
@@ -56,21 +71,36 @@ export function Financeiro() {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    const payload = {
+      type: form.type,
+      description: form.description,
+      category: form.category || null,
+      amount: Number(form.amount),
+      method: form.method || null,
+      status: form.status,
+    };
     try {
-      await api.post("/finance/transactions", {
-        type: form.type,
-        description: form.description,
-        category: form.category || null,
-        amount: Number(form.amount),
-        method: form.method || null,
-        status: form.status,
-      });
+      if (editingId) {
+        await api.patch(`/finance/transactions/${editingId}`, payload);
+      } else {
+        await api.post("/finance/transactions", payload);
+      }
       setShowForm(false);
       await load();
     } catch (e: any) {
       setError(e.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete(t: Transaction) {
+    if (!window.confirm(`Excluir "${t.description}"?`)) return;
+    try {
+      await api.delete(`/finance/transactions/${t.id}`);
+      await load();
+    } catch (e: any) {
+      setError(e.message);
     }
   }
 
@@ -100,7 +130,10 @@ export function Financeiro() {
 
       {showForm && (
         <form className="card" onSubmit={handleSubmit} style={{ marginBottom: 20, display: "grid", gap: 12, maxWidth: 480 }}>
-          <div style={{ fontWeight: 600 }}>{form.type === "receita" ? "Nova receita" : "Nova despesa"}</div>
+          <div style={{ fontWeight: 600 }}>
+            {editingId ? "Editar " : "Nova "}
+            {form.type === "receita" ? "receita" : "despesa"}
+          </div>
           <div>
             <label className="field-label">Descrição</label>
             <input className="input" required value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
@@ -186,14 +219,22 @@ export function Financeiro() {
           <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border-soft)", fontWeight: 600 }}>Receitas recentes</div>
           {data.receitas.length === 0 && <div className="empty-state">Nenhuma receita registrada.</div>}
           {data.receitas.map((r) => (
-            <div key={r.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 18px", borderBottom: "1px solid var(--border-soft)" }}>
+            <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 18px", borderBottom: "1px solid var(--border-soft)" }}>
               <div>
                 <div style={{ fontWeight: 600, fontSize: 13.5 }}>{r.description}</div>
                 <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{r.method || "—"}</div>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontWeight: 600, fontSize: 13.5 }}>{formatMoney(r.amount)}</div>
-                <span className={`badge ${r.status === "pago" ? "badge-green" : "badge-yellow"}`}>{r.status === "pago" ? "Pago" : "Pendente"}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>{formatMoney(r.amount)}</div>
+                  <span className={`badge ${r.status === "pago" ? "badge-green" : "badge-yellow"}`}>{r.status === "pago" ? "Pago" : "Pendente"}</span>
+                </div>
+                <button className="btn btn-secondary" style={{ padding: "6px 10px", fontSize: 12 }} onClick={() => openEdit(r)}>
+                  Editar
+                </button>
+                <button className="btn-danger" style={{ borderRadius: 8, padding: "6px 10px", fontSize: 12 }} onClick={() => handleDelete(r)}>
+                  Excluir
+                </button>
               </div>
             </div>
           ))}
@@ -203,12 +244,20 @@ export function Financeiro() {
           <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border-soft)", fontWeight: 600 }}>Despesas recentes</div>
           {data.despesas.length === 0 && <div className="empty-state">Nenhuma despesa registrada.</div>}
           {data.despesas.map((d) => (
-            <div key={d.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 18px", borderBottom: "1px solid var(--border-soft)" }}>
+            <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 18px", borderBottom: "1px solid var(--border-soft)" }}>
               <div>
                 <div style={{ fontWeight: 600, fontSize: 13.5 }}>{d.description}</div>
                 {d.category && <span className="badge badge-neutral">{d.category}</span>}
               </div>
-              <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--red)" }}>− {formatMoney(d.amount)}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--red)" }}>− {formatMoney(d.amount)}</div>
+                <button className="btn btn-secondary" style={{ padding: "6px 10px", fontSize: 12 }} onClick={() => openEdit(d)}>
+                  Editar
+                </button>
+                <button className="btn-danger" style={{ borderRadius: 8, padding: "6px 10px", fontSize: 12 }} onClick={() => handleDelete(d)}>
+                  Excluir
+                </button>
+              </div>
             </div>
           ))}
         </div>

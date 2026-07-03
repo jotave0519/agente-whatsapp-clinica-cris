@@ -79,6 +79,18 @@ export interface IncomingWhatsAppMessage {
   pushName?: string;
 }
 
+export interface Procedure {
+  id: string;
+  name: string;
+  category: string | null;
+  price: number | null;
+  description: string | null;
+  duration_minutes: number | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export type StaffRole = "admin" | "recepcionista" | "profissional";
 
 export interface Staff {

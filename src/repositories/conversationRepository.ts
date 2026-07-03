@@ -157,6 +157,46 @@ export async function listRecent(limit = 5): Promise<ConversationSummary[]> {
   return summaries;
 }
 
+/** Usado pela tela de Conversas do CRM web (lista paginada). */
+export async function listConversations(params: { limit?: number; offset?: number } = {}): Promise<{ items: ConversationSummary[]; total: number }> {
+  const limit = params.limit ?? 30;
+  const offset = params.offset ?? 0;
+
+  const { data, error, count } = await getSupabaseClient()
+    .from("conversations")
+    .select("*, users(name, phone)", { count: "exact" })
+    .order("updated_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) throw error;
+
+  const items: ConversationSummary[] = [];
+  for (const row of (data || []) as any[]) {
+    const { data: lastMsg } = await getSupabaseClient()
+      .from("messages")
+      .select("content")
+      .eq("conversation_id", row.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    items.push({ ...row, userName: row.users?.name, userPhone: row.users?.phone, lastMessage: lastMsg?.content ?? null });
+  }
+  return { items, total: count ?? 0 };
+}
+
+export async function findConversationById(id: string): Promise<ConversationSummary | null> {
+  const { data, error } = await getSupabaseClient()
+    .from("conversations")
+    .select("*, users(name, phone)")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+  const row: any = data;
+  return { ...row, userName: row.users?.name, userPhone: row.users?.phone, lastMessage: null };
+}
+
 export async function listMessages(conversationId: string, limit = 30): Promise<Message[]> {
   const { data, error } = await getSupabaseClient()
     .from("messages")

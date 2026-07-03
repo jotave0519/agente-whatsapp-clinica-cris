@@ -17,7 +17,7 @@ Sistema de atendimento inteligente via WhatsApp, construído no framework **WAT*
 3. **Agendamento, remarcação e cancelamento** — via Google Calendar (agenda visual) + Supabase (`schedules`, registro estruturado).
 4. **Lembretes e confirmações** — rotina diária automática.
 5. **Atendimento humano** — a IA transfere a conversa (`request_human_handoff`) quando solicitado ou quando não consegue ajudar; a equipe assume pelo próprio WhatsApp.
-6. **CRM web** (Fase 1) — login (Supabase Auth), Dashboard (KPIs, agendamentos do dia, conversas recentes), Agenda (grade semanal, criar/remarcar/cancelar) e Pacientes (busca), todos lendo/escrevendo nas mesmas tabelas e serviços do agente — nunca duplicando a lógica de agendamento. Fases seguintes: Conversas, Procedimentos, Financeiro, Estoque, Usuários/papéis, Configurações.
+6. **CRM web** (Fases 1 e 2) — login (Supabase Auth), Dashboard (KPIs, agendamentos do dia, conversas recentes), Agenda (grade semanal, criar/remarcar/cancelar), Pacientes (busca), Conversas (lista + chat em tempo real, assumir/devolver para a IA, enviar mensagem manual via Evolution API) e Procedimentos (catálogo, criar/editar) — todos lendo/escrevendo nas mesmas tabelas e serviços do agente, nunca duplicando lógica. Fase seguinte: Financeiro, Estoque, Usuários/papéis, Configurações.
 
 ## Stack
 Node.js + TypeScript, Express, Supabase (PostgreSQL), Google Calendar API, Evolution API (WhatsApp via Baileys), Claude (Anthropic API).
@@ -91,7 +91,7 @@ src/
   controllers/
     webhookController.ts          # recebe mensagens do WhatsApp
     healthController.ts
-    api/                          # controllers da API do CRM (dashboard, schedule, patient)
+    api/                          # controllers da API do CRM (dashboard, schedule, patient, conversation, procedure)
   routes/api.ts                   # monta /api/v1/* sob requireAuth
   middleware/requireAuth.ts       # valida o JWT do Supabase Auth (sessao do CRM)
   services/
@@ -114,6 +114,7 @@ src/
     scheduleRepository.ts          # agendamentos (+ findByDateRange para a Agenda)
     conversationRepository.ts      # conversas/mensagens (+ listRecent para o Dashboard)
     staffRepository.ts             # equipe do CRM (Supabase Auth)
+    procedureRepository.ts         # catalogo de procedimentos (CRM)
   integrations/
     evolutionApiClient.ts
     googleCalendarClient.ts
@@ -127,13 +128,16 @@ web/                               # CRM web (Vite + React + TS)
     lib/supabaseClient.ts, api.ts # auth direto no Supabase + fetch client p/ /api/v1
     context/AuthContext.tsx
     components/Layout.tsx, ProtectedRoute.tsx
-    pages/Login.tsx, Dashboard.tsx, Agenda.tsx, Pacientes.tsx
+    pages/Login.tsx, Dashboard.tsx, Agenda.tsx, Pacientes.tsx, Conversas.tsx, Procedimentos.tsx
 scripts/
   googleAuthSetup.ts               # setup unico do OAuth do Google
   createStaffAdmin.ts              # cria o primeiro usuario admin do CRM
 supabase/migrations/
   001_init.sql                     # schema base (users, schedules, conversations, messages, procedures)
+  002_conversation_inactivity.sql  # campos de inatividade + status "closed"
+  003_conversation_state.sql       # state/state_data (maquina de estados)
   004_staff.sql                    # tabela staff (CRM), vinculada ao Supabase Auth
+  005_procedures_extra.sql         # duration_minutes/active em procedures (CRM)
 workflows/
   atendimento_faq.md              # persona, dados da clinica, tratamentos, valores, objecoes, menu
   agendamento_consultas.md        # fluxo de marcar/remarcar/cancelar consultas
@@ -144,5 +148,5 @@ credentials.json, token.json      # OAuth do Google (nao versionar)
 
 ## Limitações da versão inicial
 - Cada usuário tem uma única "conversa" contínua no Supabase (sem conceito de sessão/expiração) — simples e suficiente para o volume esperado, mas pode ser revisitado se necessário.
-- Handoff humano muda o status da conversa para `human` e a IA para de responder automaticamente; não há um mecanismo de UI para a equipe "devolver" a conversa para a IA — isso precisa ser feito manualmente (ex: update direto no Supabase) até que exista um painel administrativo.
+- Handoff humano muda o status da conversa para `human` e a IA para de responder automaticamente; a equipe assume/devolve a conversa pela tela **Conversas** do CRM (ou manualmente no Supabase, se preferir).
 - Lista de objeções em `workflows/atendimento_faq.md` é um rascunho inicial baseado no setor; revisar com a Dra. Cristiane.

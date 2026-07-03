@@ -8,7 +8,12 @@ const NAV_GROUPS = [
       { to: "/", label: "Dashboard" },
       { to: "/agenda", label: "Agenda" },
       { to: "/pacientes", label: "Pacientes" },
+      { to: "/conversas", label: "Conversas" },
     ],
+  },
+  {
+    label: "Gestão",
+    items: [{ to: "/procedimentos", label: "Procedimentos" }],
   },
 ];
 

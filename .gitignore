@@ -7,3 +7,10 @@ node_modules/
 dist/
 npm-debug.log*
 .claude/
+web/node_modules/
+web/dist/
+web/.env
+web/*.tsbuildinfo
+web/vite.config.js
+web/vite.config.d.ts
+web-dist/

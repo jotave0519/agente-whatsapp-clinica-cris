@@ -127,6 +127,36 @@ export async function addMessage(
   return data;
 }
 
+export interface ConversationSummary extends Conversation {
+  userName: string;
+  userPhone: string;
+  lastMessage: string | null;
+}
+
+/** Usado pelo Dashboard do CRM web (widget de conversas recentes). */
+export async function listRecent(limit = 5): Promise<ConversationSummary[]> {
+  const { data, error } = await getSupabaseClient()
+    .from("conversations")
+    .select("*, users(name, phone)")
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+
+  const summaries: ConversationSummary[] = [];
+  for (const row of (data || []) as any[]) {
+    const { data: lastMsg } = await getSupabaseClient()
+      .from("messages")
+      .select("content")
+      .eq("conversation_id", row.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    summaries.push({ ...row, userName: row.users?.name, userPhone: row.users?.phone, lastMessage: lastMsg?.content ?? null });
+  }
+  return summaries;
+}
+
 export async function listMessages(conversationId: string, limit = 30): Promise<Message[]> {
   const { data, error } = await getSupabaseClient()
     .from("messages")

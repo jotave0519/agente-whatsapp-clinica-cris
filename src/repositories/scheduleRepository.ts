@@ -94,6 +94,21 @@ export async function updateScheduleStatus(
   return data;
 }
 
+/** Usado pela Agenda do CRM web (grade semanal). */
+export async function findByDateRange(startDate: string, endDate: string): Promise<Schedule[]> {
+  const { data, error } = await getSupabaseClient()
+    .from("schedules")
+    .select("*")
+    .gte("date", startDate)
+    .lte("date", endDate)
+    .neq("status", "Cancelado")
+    .order("date", { ascending: true })
+    .order("time", { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
 export async function findSchedulesByDate(date: string): Promise<Schedule[]> {
   const { data, error } = await getSupabaseClient()
     .from("schedules")

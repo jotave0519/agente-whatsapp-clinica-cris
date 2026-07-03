@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "google:auth": "ts-node scripts/googleAuthSetup.ts",
+    "staff:create": "ts-node scripts/createStaffAdmin.ts",
     "reminders": "ts-node src/jobs/sendReminders.ts"
   },
   "dependencies": {

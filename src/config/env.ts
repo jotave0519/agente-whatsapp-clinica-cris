@@ -22,6 +22,8 @@ export const env = {
 
   supabaseUrl: process.env.SUPABASE_URL || "",
   supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY || "",
+  // Chave publica, usada so para verificar o JWT de sessoes do CRM web (src/middleware/requireAuth.ts).
+  supabaseAnonKey: process.env.SUPABASE_ANON_KEY || "",
 
   googleCalendarId: process.env.GOOGLE_CALENDAR_ID || "primary",
   googleCredentialsPath: process.env.GOOGLE_CREDENTIALS_PATH || "credentials.json",

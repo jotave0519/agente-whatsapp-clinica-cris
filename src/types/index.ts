@@ -79,3 +79,14 @@ export interface IncomingWhatsAppMessage {
   pushName?: string;
 }
 
+export type StaffRole = "admin" | "recepcionista" | "profissional";
+
+export interface Staff {
+  id: string;
+  name: string;
+  email: string;
+  role: StaffRole;
+  created_at: string;
+  updated_at: string;
+}
+

@@ -28,3 +28,35 @@ export async function findOrCreateUser(phone: string, fallbackName: string): Pro
   if (existing) return existing;
   return createUser(phone, fallbackName || phone);
 }
+
+export async function count(): Promise<number> {
+  const { count, error } = await getSupabaseClient().from("users").select("*", { count: "exact", head: true });
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function findById(id: string): Promise<User | null> {
+  const { data, error } = await getSupabaseClient().from("users").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** Usado pela tela de Pacientes do CRM web. */
+export async function listAll(params: { search?: string; limit?: number; offset?: number }): Promise<{ items: User[]; total: number }> {
+  const limit = params.limit ?? 20;
+  const offset = params.offset ?? 0;
+
+  let query = getSupabaseClient()
+    .from("users")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (params.search) {
+    query = query.or(`name.ilike.%${params.search}%,phone.ilike.%${params.search}%`);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return { items: data || [], total: count ?? 0 };
+}

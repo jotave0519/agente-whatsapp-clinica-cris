@@ -46,6 +46,7 @@ export function Estoque() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [itemForm, setItemForm] = useState(EMPTY_ITEM_FORM);
   const [showMoveForm, setShowMoveForm] = useState(false);
+  const [editingMovementId, setEditingMovementId] = useState<string | null>(null);
   const [moveForm, setMoveForm] = useState(EMPTY_MOVE_FORM);
   const [saving, setSaving] = useState(false);
 
@@ -123,19 +124,38 @@ export function Estoque() {
     }
   }
 
+  function startEditMovement(m: Movement) {
+    setEditingMovementId(m.id);
+    setMoveForm({ item_id: m.item_id, type: m.type, quantity: String(m.quantity), note: m.note || "" });
+    setShowMoveForm(true);
+  }
+
+  function closeMoveForm() {
+    setShowMoveForm(false);
+    setEditingMovementId(null);
+    setMoveForm(EMPTY_MOVE_FORM);
+  }
+
   async function handleMoveSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
     try {
-      await api.post("/inventory/movements", {
-        item_id: moveForm.item_id,
-        type: moveForm.type,
-        quantity: Number(moveForm.quantity),
-        note: moveForm.note || null,
-      });
-      setShowMoveForm(false);
-      setMoveForm(EMPTY_MOVE_FORM);
+      if (editingMovementId) {
+        await api.patch(`/inventory/movements/${editingMovementId}`, {
+          type: moveForm.type,
+          quantity: Number(moveForm.quantity),
+          note: moveForm.note || null,
+        });
+      } else {
+        await api.post("/inventory/movements", {
+          item_id: moveForm.item_id,
+          type: moveForm.type,
+          quantity: Number(moveForm.quantity),
+          note: moveForm.note || null,
+        });
+      }
+      closeMoveForm();
       await load();
     } catch (e: any) {
       setError(e.message);
@@ -157,7 +177,14 @@ export function Estoque() {
           <p className="page-subtitle">Controle de produtos e insumos da clínica</p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <button className="btn btn-secondary" onClick={() => setShowMoveForm(true)}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              setEditingMovementId(null);
+              setMoveForm(EMPTY_MOVE_FORM);
+              setShowMoveForm(true);
+            }}
+          >
             Registrar movimentação
           </button>
           <button className="btn" onClick={startCreateItem}>
@@ -213,9 +240,16 @@ export function Estoque() {
 
       {showMoveForm && (
         <form className="card" onSubmit={handleMoveSubmit} style={{ marginBottom: 20, display: "grid", gap: 12, maxWidth: 480 }}>
+          <div style={{ fontWeight: 600 }}>{editingMovementId ? "Editar movimentação" : "Registrar movimentação"}</div>
           <div>
             <label className="field-label">Item</label>
-            <select className="input" required value={moveForm.item_id} onChange={(e) => setMoveForm({ ...moveForm, item_id: e.target.value })}>
+            <select
+              className="input"
+              required
+              disabled={!!editingMovementId}
+              value={moveForm.item_id}
+              onChange={(e) => setMoveForm({ ...moveForm, item_id: e.target.value })}
+            >
               <option value="">Selecione...</option>
               {data.items.map((i) => (
                 <option key={i.id} value={i.id}>
@@ -243,9 +277,9 @@ export function Estoque() {
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button className="btn" type="submit" disabled={saving}>
-              {saving ? "Salvando..." : "Registrar"}
+              {saving ? "Salvando..." : editingMovementId ? "Salvar alterações" : "Registrar"}
             </button>
-            <button className="btn btn-secondary" type="button" onClick={() => setShowMoveForm(false)}>
+            <button className="btn btn-secondary" type="button" onClick={closeMoveForm}>
               Cancelar
             </button>
           </div>
@@ -324,14 +358,20 @@ export function Estoque() {
           {data.movements.length === 0 && <div className="empty-state">Nenhuma movimentação ainda.</div>}
           {data.movements.map((m) => (
             <div key={m.id} style={{ padding: "9px 0", borderTop: "1px solid var(--border-soft)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{m.item_name}</span>
-                <span style={{ fontWeight: 600, fontSize: 12.5, color: m.type === "entrada" ? "var(--green)" : "var(--red)" }}>
-                  {m.type === "entrada" ? "+" : "−"}
-                  {m.quantity}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontWeight: 600, fontSize: 12.5, color: m.type === "entrada" ? "var(--green)" : "var(--red)" }}>
+                    {m.type === "entrada" ? "+" : "−"}
+                    {m.quantity}
+                  </span>
+                  <button style={{ fontSize: 11.5, color: "var(--accent)" }} onClick={() => startEditMovement(m)}>
+                    editar
+                  </button>
+                </div>
               </div>
               <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{new Date(m.created_at).toLocaleString("pt-BR")}</div>
+              {m.note && <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 2 }}>{m.note}</div>}
             </div>
           ))}
         </div>

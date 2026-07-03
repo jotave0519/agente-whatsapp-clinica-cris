@@ -13,17 +13,18 @@ interface ScheduleItem {
   notes: string | null;
 }
 
-interface ProcedureOption {
-  name: string;
-  category: string | null;
-}
+const APPT_COLORS: { bg: string; border: string }[] = [
+  { bg: "var(--accent-bg)", border: "var(--accent)" },
+  { bg: "var(--blue-bg)", border: "var(--blue)" },
+  { bg: "var(--green-bg)", border: "var(--green)" },
+  { bg: "var(--yellow-bg)", border: "var(--yellow)" },
+];
 
-const CATEGORY_COLORS: Record<string, { bg: string; border: string }> = {
-  Facial: { bg: "var(--accent-bg)", border: "var(--accent)" },
-  Corporal: { bg: "var(--blue-bg)", border: "var(--blue)" },
-  Injetáveis: { bg: "var(--green-bg)", border: "var(--green)" },
-};
-const DEFAULT_COLOR = { bg: "var(--neutral-bg)", border: "var(--neutral)" };
+function hashColor(name: string): { bg: string; border: string } {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return APPT_COLORS[hash % APPT_COLORS.length];
+}
 
 const HOUR_HEIGHT = 56;
 const WEEKDAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -46,7 +47,6 @@ export function Agenda() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [view, setView] = useState<"dia" | "semana">("semana");
   const [items, setItems] = useState<ScheduleItem[] | null>(null);
-  const [procedures, setProcedures] = useState<ProcedureOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ScheduleItem | null>(null);
   const [rescheduling, setRescheduling] = useState(false);
@@ -81,18 +81,6 @@ export function Agenda() {
     loadSchedules();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekStart, lastCreatedAt]);
-
-  useEffect(() => {
-    api
-      .get<{ items: ProcedureOption[] }>("/procedures")
-      .then((r) => setProcedures(r.items))
-      .catch(() => {});
-  }, []);
-
-  function colorFor(procedureName: string) {
-    const proc = procedures.find((p) => p.name === procedureName);
-    return (proc?.category && CATEGORY_COLORS[proc.category]) || DEFAULT_COLOR;
-  }
 
   const todayStr = toDateStr(new Date());
   const totalAppts = (items || []).length;
@@ -242,7 +230,7 @@ export function Agenda() {
                 {dayItems.map((it) => {
                   const [h, m] = it.time.split(":").map(Number);
                   const top = ((h - 7) * 60 + m) * (HOUR_HEIGHT / 60);
-                  const color = colorFor(it.procedure);
+                  const color = hashColor(it.procedure);
                   return (
                     <div
                       key={it.id}

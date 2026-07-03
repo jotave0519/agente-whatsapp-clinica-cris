@@ -63,7 +63,7 @@ export async function deleteStaff(req: Request, res: Response): Promise<void> {
       res.status(400).json({ error: error.message });
       return;
     }
-    res.status(204).send();
+    res.json({ status: "deleted" });
   } catch (err) {
     logger.error(SCOPE, "Erro ao excluir staff", err);
     res.status(500).json({ error: "Erro ao excluir usuario." });

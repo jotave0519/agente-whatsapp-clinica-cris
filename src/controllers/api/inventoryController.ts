@@ -92,7 +92,7 @@ export async function deleteItem(req: Request, res: Response): Promise<void> {
   try {
     logger.info(SCOPE, "Excluindo item de estoque via CRM", { staffId: req.staff?.id, id: req.params.id });
     await inventoryRepository.removeItem(req.params.id);
-    res.status(204).send();
+    res.json({ status: "deleted" });
   } catch (err) {
     logger.error(SCOPE, "Erro ao excluir item de estoque", err);
     res.status(500).json({ error: "Erro ao excluir item de estoque." });
@@ -119,5 +119,22 @@ export async function createMovement(req: Request, res: Response): Promise<void>
   } catch (err) {
     logger.error(SCOPE, "Erro ao registrar movimentacao de estoque", err);
     res.status(400).json({ error: (err as Error).message || "Erro ao registrar movimentacao." });
+  }
+}
+
+export async function updateMovement(req: Request, res: Response): Promise<void> {
+  try {
+    const { type, quantity, note } = req.body;
+    if (!type || !quantity) {
+      res.status(400).json({ error: "type e quantity sao obrigatorios." });
+      return;
+    }
+
+    logger.info(SCOPE, "Editando movimentacao de estoque via CRM", { staffId: req.staff?.id, id: req.params.id, type, quantity });
+    const result = await inventoryService.editMovement(req.params.id, { type, quantity: Number(quantity), note });
+    res.json(result);
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao editar movimentacao de estoque", err);
+    res.status(400).json({ error: (err as Error).message || "Erro ao editar movimentacao." });
   }
 }

@@ -46,7 +46,7 @@ export async function deleteProcedure(req: Request, res: Response): Promise<void
   try {
     logger.info(SCOPE, "Excluindo procedimento via CRM", { staffId: req.staff?.id, id: req.params.id });
     await procedureRepository.remove(req.params.id);
-    res.status(204).send();
+    res.json({ status: "deleted" });
   } catch (err) {
     logger.error(SCOPE, "Erro ao excluir procedimento", err);
     res.status(500).json({ error: "Erro ao excluir procedimento." });

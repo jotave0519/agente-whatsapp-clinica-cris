@@ -18,12 +18,22 @@ function monthLabel(d: Date): string {
   return d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
 }
 
-export async function getFinanceOverview(_req: Request, res: Response): Promise<void> {
+function parseReferenceMonth(raw: unknown): Date {
+  if (typeof raw === "string" && /^\d{4}-\d{2}$/.test(raw)) {
+    const [year, month] = raw.split("-").map(Number);
+    return new Date(year, month - 1, 1);
+  }
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+export async function getFinanceOverview(req: Request, res: Response): Promise<void> {
   try {
     const now = new Date();
-    const monthStart = toDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
-    const monthEnd = toDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
-    const sixMonthsAgoStart = toDateStr(new Date(now.getFullYear(), now.getMonth() - 5, 1));
+    const reference = parseReferenceMonth(req.query.month);
+    const monthStart = toDateStr(new Date(reference.getFullYear(), reference.getMonth(), 1));
+    const monthEnd = toDateStr(new Date(reference.getFullYear(), reference.getMonth() + 1, 0));
+    const sixMonthsAgoStart = toDateStr(new Date(reference.getFullYear(), reference.getMonth() - 5, 1));
     const ninetyDaysAgo = toDateStr(new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000));
 
     const [monthTransactions, sixMonthTransactions, recentSchedules] = await Promise.all([
@@ -40,7 +50,7 @@ export async function getFinanceOverview(_req: Request, res: Response): Promise<
 
     const bars: { label: string; in: number; out: number }[] = [];
     for (let i = 5; i >= 0; i--) {
-      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthDate = new Date(reference.getFullYear(), reference.getMonth() - i, 1);
       const start = toDateStr(monthDate);
       const end = toDateStr(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0));
       const monthTx = sixMonthTransactions.filter((t) => t.occurred_on >= start && t.occurred_on <= end);
@@ -67,12 +77,11 @@ export async function getFinanceOverview(_req: Request, res: Response): Promise<
       .slice(0, 5)
       .map(([name, visits]) => ({ name, visits }));
 
-    const [receitas, despesas] = await Promise.all([
-      transactionRepository.listRecentByType("receita", 10),
-      transactionRepository.listRecentByType("despesa", 10),
-    ]);
+    const receitas = receitasMes.slice(0, 20);
+    const despesas = despesasMes.slice(0, 20);
 
     res.json({
+      month: `${reference.getFullYear()}-${String(reference.getMonth() + 1).padStart(2, "0")}`,
       kpis: {
         receita: receitaTotal,
         despesa: despesaTotal,
@@ -143,7 +152,7 @@ export async function deleteTransaction(req: Request, res: Response): Promise<vo
   try {
     logger.info(SCOPE, "Excluindo transacao via CRM", { staffId: req.staff?.id, id: req.params.id });
     await transactionRepository.remove(req.params.id);
-    res.status(204).send();
+    res.json({ status: "deleted" });
   } catch (err) {
     logger.error(SCOPE, "Erro ao excluir transacao", err);
     res.status(500).json({ error: "Erro ao excluir transacao." });

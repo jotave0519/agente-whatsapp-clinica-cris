@@ -4,19 +4,17 @@ import { api } from "../lib/api";
 interface ProcedureItem {
   id: string;
   name: string;
-  category: string | null;
   price: number | null;
   description: string | null;
   duration_minutes: number | null;
   active: boolean;
 }
 
-const EMPTY_FORM = { name: "", category: "", price: "", description: "", duration_minutes: "", active: true };
+const EMPTY_FORM = { name: "", price: "", description: "", duration_minutes: "", active: true };
 
 export function Procedimentos() {
   const [items, setItems] = useState<ProcedureItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState("Todos");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -45,7 +43,6 @@ export function Procedimentos() {
     setEditingId(p.id);
     setForm({
       name: p.name,
-      category: p.category || "",
       price: p.price != null ? String(p.price) : "",
       description: p.description || "",
       duration_minutes: p.duration_minutes != null ? String(p.duration_minutes) : "",
@@ -60,7 +57,6 @@ export function Procedimentos() {
     setError(null);
     const payload = {
       name: form.name,
-      category: form.category || null,
       price: form.price ? Number(form.price) : null,
       description: form.description || null,
       duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
@@ -91,9 +87,6 @@ export function Procedimentos() {
     }
   }
 
-  const categories = ["Todos", ...Array.from(new Set((items || []).map((p) => p.category).filter(Boolean) as string[]))];
-  const filtered = (items || []).filter((p) => categoryFilter === "Todos" || p.category === categoryFilter);
-
   return (
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 22 }}>
@@ -101,21 +94,12 @@ export function Procedimentos() {
           <h1 className="page-title">Procedimentos</h1>
           <p className="page-subtitle">Catálogo de serviços e protocolos da clínica</p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <div className="segmented">
-            {categories.map((c) => (
-              <span key={c} className={`segmented-item${categoryFilter === c ? " active" : ""}`} style={{ cursor: "pointer" }} onClick={() => setCategoryFilter(c)}>
-                {c}
-              </span>
-            ))}
-          </div>
-          <button
-            onClick={startCreate}
-            style={{ display: "flex", alignItems: "center", gap: 7, height: 38, padding: "0 15px", borderRadius: 11, background: "var(--text)", color: "var(--bg)", fontSize: 13.5, fontWeight: 500 }}
-          >
-            + Novo
-          </button>
-        </div>
+        <button
+          onClick={startCreate}
+          style={{ display: "flex", alignItems: "center", gap: 7, height: 38, padding: "0 15px", borderRadius: 11, background: "var(--text)", color: "var(--bg)", fontSize: 13.5, fontWeight: 500 }}
+        >
+          + Novo
+        </button>
       </div>
 
       {error && <div className="error-text">{error}</div>}
@@ -125,10 +109,6 @@ export function Procedimentos() {
           <div>
             <label className="field-label">Nome</label>
             <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </div>
-          <div>
-            <label className="field-label">Categoria</label>
-            <input className="input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
           </div>
           <div style={{ display: "flex", gap: 12 }}>
             <div style={{ flex: 1 }}>
@@ -160,10 +140,10 @@ export function Procedimentos() {
       )}
 
       {items === null && <div className="empty-state">Carregando...</div>}
-      {items !== null && filtered.length === 0 && <div className="empty-state">Nenhum procedimento encontrado.</div>}
+      {items !== null && items.length === 0 && <div className="empty-state">Nenhum procedimento encontrado.</div>}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-        {filtered.map((p) => (
+        {(items || []).map((p) => (
           <div key={p.id} className="card" style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 }}>
               <div
@@ -182,15 +162,13 @@ export function Procedimentos() {
               >
                 {p.name.slice(0, 1).toUpperCase()}
               </div>
-              {p.category && <span className="badge badge-neutral">{p.category}</span>}
+              <span className={`badge ${p.active ? "badge-green" : "badge-neutral"}`}>{p.active ? "Ativo" : "Inativo"}</span>
             </div>
             <div style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: "-.01em" }}>{p.name}</div>
             <p style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5, marginTop: 6, flex: 1 }}>{p.description || "Sem descrição."}</p>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--border-soft)" }}>
               <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{p.duration_minutes ? `${p.duration_minutes} min` : "—"}</span>
               <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{p.price != null ? `R$ ${p.price.toFixed(2)}` : "Sob avaliação"}</span>
-              <div style={{ flex: 1 }} />
-              <span className={`badge ${p.active ? "badge-green" : "badge-neutral"}`}>{p.active ? "Ativo" : "Inativo"}</span>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => startEdit(p)}>

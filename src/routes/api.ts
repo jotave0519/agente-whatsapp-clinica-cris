@@ -8,8 +8,9 @@ import {
   deleteItem,
   listInventory,
   updateItem as updateInventoryItem,
+  updateMovement,
 } from "../controllers/api/inventoryController";
-import { createPatient, getPatient, listPatients, updatePatient } from "../controllers/api/patientController";
+import { createPatient, deletePatient, getPatient, listPatients, updatePatient } from "../controllers/api/patientController";
 import { createProcedure, deleteProcedure, listProcedures, updateProcedure } from "../controllers/api/procedureController";
 import { cancelSchedule, createSchedule, listSchedules, rescheduleSchedule } from "../controllers/api/scheduleController";
 import { getSettings, updateSettings } from "../controllers/api/settingsController";
@@ -28,6 +29,7 @@ apiRouter.get("/patients", listPatients);
 apiRouter.get("/patients/:id", getPatient);
 apiRouter.post("/patients", createPatient);
 apiRouter.patch("/patients/:id", updatePatient);
+apiRouter.delete("/patients/:id", deletePatient);
 
 apiRouter.get("/schedules", listSchedules);
 apiRouter.post("/schedules", createSchedule);
@@ -54,6 +56,7 @@ apiRouter.post("/inventory/items", createItem);
 apiRouter.patch("/inventory/items/:id", updateInventoryItem);
 apiRouter.delete("/inventory/items/:id", deleteItem);
 apiRouter.post("/inventory/movements", createMovement);
+apiRouter.patch("/inventory/movements/:id", updateMovement);
 
 apiRouter.get("/staff", requireAdmin, listStaff);
 apiRouter.post("/staff", requireAdmin, createStaff);

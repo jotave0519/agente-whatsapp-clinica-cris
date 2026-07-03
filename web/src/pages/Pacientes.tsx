@@ -7,7 +7,6 @@ interface Patient {
   name: string;
   phone: string;
   email: string | null;
-  active: boolean;
   created_at: string;
 }
 
@@ -16,7 +15,7 @@ const EMPTY_FORM = { name: "", phone: "", email: "" };
 export function Pacientes() {
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("search") || "");
-  const [filter, setFilter] = useState<"todos" | "ativos" | "novos" | "inativos">("todos");
+  const [filter, setFilter] = useState<"todos" | "novos">("todos");
   const [items, setItems] = useState<Patient[] | null>(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -74,9 +73,11 @@ export function Pacientes() {
     }
   }
 
-  async function toggleActive(p: Patient) {
+  async function handleDelete(p: Patient) {
+    if (!window.confirm(`Excluir "${p.name}"? Isso remove permanentemente o paciente e seus agendamentos/conversas. Esta ação não pode ser desfeita.`)) return;
+    setError(null);
     try {
-      await api.patch(`/patients/${p.id}`, { active: !p.active });
+      await api.delete(`/patients/${p.id}`);
       load();
     } catch (e: any) {
       setError(e.message);
@@ -88,14 +89,10 @@ export function Pacientes() {
   const allItems = items || [];
   const stats = {
     total,
-    ativos: allItems.filter((p) => p.active).length,
     novos: allItems.filter((p) => now - new Date(p.created_at).getTime() < monthMs).length,
-    inativos: allItems.filter((p) => !p.active).length,
   };
 
   const filtered = allItems.filter((p) => {
-    if (filter === "ativos") return p.active;
-    if (filter === "inativos") return !p.active;
     if (filter === "novos") return now - new Date(p.created_at).getTime() < monthMs;
     return true;
   });
@@ -144,22 +141,14 @@ export function Pacientes() {
         </form>
       )}
 
-      <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+      <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)", maxWidth: 420 }}>
         <div className="card">
           <div className="kpi-value">{stats.total}</div>
           <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Total cadastrados</div>
         </div>
         <div className="card">
-          <div className="kpi-value">{stats.ativos}</div>
-          <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Ativos</div>
-        </div>
-        <div className="card">
           <div className="kpi-value">{stats.novos}</div>
           <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Novos (30 dias)</div>
-        </div>
-        <div className="card">
-          <div className="kpi-value">{stats.inativos}</div>
-          <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Inativos</div>
         </div>
       </div>
 
@@ -173,7 +162,7 @@ export function Pacientes() {
             onChange={(e) => setSearch(e.target.value)}
           />
           <div className="segmented">
-            {(["todos", "ativos", "novos", "inativos"] as const).map((f) => (
+            {(["todos", "novos"] as const).map((f) => (
               <span key={f} className={`segmented-item${filter === f ? " active" : ""}`} style={{ cursor: "pointer", textTransform: "capitalize" }} onClick={() => setFilter(f)}>
                 {f}
               </span>
@@ -187,19 +176,18 @@ export function Pacientes() {
               <th>Paciente</th>
               <th>Telefone</th>
               <th>Cadastrado em</th>
-              <th>Status</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {items === null && (
               <tr>
-                <td colSpan={5} className="empty-state">Carregando...</td>
+                <td colSpan={4} className="empty-state">Carregando...</td>
               </tr>
             )}
             {items !== null && filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="empty-state">Nenhum paciente encontrado.</td>
+                <td colSpan={4} className="empty-state">Nenhum paciente encontrado.</td>
               </tr>
             )}
             {filtered.map((p) => {
@@ -217,15 +205,12 @@ export function Pacientes() {
                   </td>
                   <td>{p.phone}</td>
                   <td>{new Date(p.created_at).toLocaleDateString("pt-BR")}</td>
-                  <td>
-                    <span className={`badge ${p.active ? "badge-green" : "badge-neutral"}`}>{p.active ? "Ativo" : "Inativo"}</span>
-                  </td>
                   <td style={{ display: "flex", gap: 6 }}>
                     <button className="btn btn-secondary" onClick={() => startEdit(p)}>
                       Editar
                     </button>
-                    <button className="btn btn-secondary" onClick={() => toggleActive(p)}>
-                      {p.active ? "Desativar" : "Ativar"}
+                    <button className="btn-danger" style={{ borderRadius: 8, padding: "6px 12px", fontSize: 12.5 }} onClick={() => handleDelete(p)}>
+                      Excluir
                     </button>
                   </td>
                 </tr>

@@ -73,6 +73,12 @@ export async function createPatient(params: { name: string; phone: string; email
   return data;
 }
 
+/** Exclusao definitiva. Cascade em schedules/conversations/messages ja garantido pelo schema. */
+export async function deleteUser(id: string): Promise<void> {
+  const { error } = await getSupabaseClient().from("users").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export async function updatePatient(
   id: string,
   params: Partial<{ name: string; phone: string; email: string | null; active: boolean }>

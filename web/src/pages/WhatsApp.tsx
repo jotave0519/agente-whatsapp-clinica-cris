@@ -107,7 +107,7 @@ export function WhatsApp() {
           ) : (
             <>
               <div style={{ flex: 1 }}>
-                <span className={`badge ${connected ? "badge-green" : "badge-red"}`}>{connected ? "Conectado" : status.connectionStatus}</span>
+                <span className={`badge ${connected ? "badge-green" : "badge-red"}`}>{connected ? "Conectado" : "Desconectado"}</span>
                 <div style={{ fontSize: 19, fontWeight: 600, marginTop: 8 }}>{status.profileName || "Instância WhatsApp"}</div>
                 <div style={{ fontSize: 13.5, color: "#C7BBAF", marginTop: 2 }}>{status.phone ? `+${status.phone}` : "—"} · Evolution API</div>
                 <div style={{ display: "flex", gap: 22, marginTop: 14 }}>
@@ -121,9 +121,15 @@ export function WhatsApp() {
                   </div>
                 </div>
               </div>
-              <button className="btn btn-secondary" onClick={handleDisconnect}>
-                Desconectar
-              </button>
+              {connected ? (
+                <button className="btn btn-secondary" onClick={handleDisconnect}>
+                  Desconectar
+                </button>
+              ) : (
+                <button className="btn btn-secondary" onClick={handleGenerateQr} disabled={loadingQr}>
+                  {loadingQr ? "Gerando QR..." : "Conectar WhatsApp"}
+                </button>
+              )}
             </>
           )}
         </div>

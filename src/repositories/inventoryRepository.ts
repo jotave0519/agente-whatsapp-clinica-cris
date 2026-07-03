@@ -115,6 +115,26 @@ export async function createMovement(params: {
   return data;
 }
 
+export async function findMovementById(id: string): Promise<InventoryMovement | null> {
+  const { data, error } = await getSupabaseClient().from("inventory_movements").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateMovement(
+  id: string,
+  params: Partial<{ type: InventoryMovementType; quantity: number; note: string | null }>
+): Promise<InventoryMovement> {
+  const payload: Record<string, unknown> = {};
+  if (params.type !== undefined) payload.type = params.type;
+  if (params.quantity !== undefined) payload.quantity = params.quantity;
+  if (params.note !== undefined) payload.note = params.note;
+
+  const { data, error } = await getSupabaseClient().from("inventory_movements").update(payload).eq("id", id).select("*").single();
+  if (error) throw error;
+  return data;
+}
+
 export async function countMovementsSince(sinceIso: string): Promise<number> {
   const { count, error } = await getSupabaseClient()
     .from("inventory_movements")

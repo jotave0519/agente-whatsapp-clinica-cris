@@ -1,6 +1,7 @@
 import * as googleCalendar from "../integrations/googleCalendarClient";
 import * as scheduleRepository from "../repositories/scheduleRepository";
 import { Schedule } from "../types";
+import { toSaoPauloDateTimeParts } from "../utils/timezone";
 
 export async function checkAvailability(date: string, durationMinutes?: number): Promise<string[]> {
   return googleCalendar.checkAvailability(date, durationMinutes);
@@ -24,9 +25,7 @@ export async function createAppointment(params: {
     notes: params.notes,
   });
 
-  const startDate = new Date(params.start);
-  const date = startDate.toISOString().slice(0, 10);
-  const time = startDate.toISOString().slice(11, 16);
+  const { date, time } = toSaoPauloDateTimeParts(new Date(params.start));
 
   return scheduleRepository.createSchedule({
     userId: params.userId,
@@ -55,9 +54,7 @@ export async function rescheduleAppointment(
 
   await googleCalendar.updateEvent(schedule.google_event_id, newStart, durationMinutes);
 
-  const startDate = new Date(newStart);
-  const date = startDate.toISOString().slice(0, 10);
-  const time = startDate.toISOString().slice(11, 16);
+  const { date, time } = toSaoPauloDateTimeParts(new Date(newStart));
 
   return scheduleRepository.updateScheduleDateTime(scheduleId, date, time);
 }

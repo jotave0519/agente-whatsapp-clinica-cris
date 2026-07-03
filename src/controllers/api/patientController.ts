@@ -1,4 +1,6 @@
 import { Request, Response } from "express";
+import * as googleCalendar from "../../integrations/googleCalendarClient";
+import * as scheduleRepository from "../../repositories/scheduleRepository";
 import * as userRepository from "../../repositories/userRepository";
 import { logger } from "../../utils/logger";
 
@@ -58,5 +60,35 @@ export async function updatePatient(req: Request, res: Response): Promise<void> 
   } catch (err) {
     logger.error(SCOPE, "Erro ao atualizar paciente", err);
     res.status(500).json({ error: "Erro ao atualizar paciente." });
+  }
+}
+
+export async function deletePatient(req: Request, res: Response): Promise<void> {
+  try {
+    const patient = await userRepository.findById(req.params.id);
+    if (!patient) {
+      res.status(404).json({ error: "Paciente nao encontrado." });
+      return;
+    }
+
+    const activeSchedules = await scheduleRepository.findActiveSchedulesByUser(patient.id);
+    for (const schedule of activeSchedules) {
+      if (!schedule.google_event_id) continue;
+      try {
+        await googleCalendar.cancelEvent(schedule.google_event_id);
+      } catch (err) {
+        logger.warn(SCOPE, "Falha ao cancelar evento no Google Calendar (seguindo com a exclusao)", {
+          scheduleId: schedule.id,
+          error: (err as Error).message,
+        });
+      }
+    }
+
+    logger.info(SCOPE, "Excluindo paciente via CRM", { staffId: req.staff?.id, id: patient.id, activeSchedules: activeSchedules.length });
+    await userRepository.deleteUser(patient.id);
+    res.json({ status: "deleted" });
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao excluir paciente", err);
+    res.status(500).json({ error: "Erro ao excluir paciente." });
   }
 }

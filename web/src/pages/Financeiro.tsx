@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { ChevronLeftIcon, ChevronRightIcon } from "../components/icons";
 
 interface Transaction {
   id: string;
@@ -13,6 +14,7 @@ interface Transaction {
 }
 
 interface FinanceData {
+  month: string;
   kpis: { receita: number; despesa: number; lucro: number; pendentes: number };
   chart: { label: string; in: number; out: number }[];
   receitas: Transaction[];
@@ -27,7 +29,25 @@ function formatMoney(v: number): string {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function currentMonthKey(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function shiftMonth(monthKey: string, delta: number): string {
+  const [year, month] = monthKey.split("-").map(Number);
+  const d = new Date(year, month - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabel(monthKey: string): string {
+  const [year, month] = monthKey.split("-").map(Number);
+  const d = new Date(year, month - 1, 1);
+  return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+}
+
 export function Financeiro() {
+  const [month, setMonth] = useState(currentMonthKey);
   const [data, setData] = useState<FinanceData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -37,7 +57,7 @@ export function Financeiro() {
 
   async function load() {
     try {
-      const r = await api.get<FinanceData>("/finance");
+      const r = await api.get<FinanceData>(`/finance?month=${month}`);
       setData(r);
     } catch (e: any) {
       setError(e.message);
@@ -46,7 +66,8 @@ export function Financeiro() {
 
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month]);
 
   function openForm(type: "receita" | "despesa") {
     setEditingId(null);
@@ -114,9 +135,22 @@ export function Financeiro() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <h1 className="page-title">Financeiro</h1>
-          <p className="page-subtitle">Gestão financeira da clínica</p>
+          <p className="page-subtitle" style={{ textTransform: "capitalize" }}>
+            {monthLabel(month)}
+          </p>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 11, padding: 3 }}>
+            <button style={{ width: 32, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setMonth((m) => shiftMonth(m, -1))}>
+              <ChevronLeftIcon color="var(--text-muted)" />
+            </button>
+            <span style={{ fontSize: 13, fontWeight: 500, padding: "0 8px", cursor: "pointer" }} onClick={() => setMonth(currentMonthKey())}>
+              Mês atual
+            </span>
+            <button style={{ width: 32, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setMonth((m) => shiftMonth(m, 1))}>
+              <ChevronRightIcon color="var(--text-muted)" />
+            </button>
+          </div>
           <button className="btn btn-secondary" onClick={() => openForm("receita")}>
             + Nova receita
           </button>

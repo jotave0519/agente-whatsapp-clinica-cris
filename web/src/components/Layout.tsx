@@ -21,6 +21,10 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: "Integrações",
+    items: [{ to: "/whatsapp", label: "WhatsApp" }],
+  },
+  {
     label: "Sistema",
     items: [{ to: "/configuracoes", label: "Configurações" }],
   },

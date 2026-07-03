@@ -12,6 +12,7 @@ import { Login } from "./pages/Login";
 import { Pacientes } from "./pages/Pacientes";
 import { Procedimentos } from "./pages/Procedimentos";
 import { Usuarios } from "./pages/Usuarios";
+import { WhatsApp } from "./pages/WhatsApp";
 
 export function App() {
   return (
@@ -29,6 +30,7 @@ export function App() {
               <Route path="/financeiro" element={<Financeiro />} />
               <Route path="/estoque" element={<Estoque />} />
               <Route path="/usuarios" element={<Usuarios />} />
+              <Route path="/whatsapp" element={<WhatsApp />} />
               <Route path="/configuracoes" element={<Configuracoes />} />
             </Route>
           </Route>

@@ -17,7 +17,7 @@ Sistema de atendimento inteligente via WhatsApp, construído no framework **WAT*
 3. **Agendamento, remarcação e cancelamento** — via Google Calendar (agenda visual) + Supabase (`schedules`, registro estruturado).
 4. **Lembretes e confirmações** — rotina diária automática.
 5. **Atendimento humano** — a IA transfere a conversa (`request_human_handoff`) quando solicitado ou quando não consegue ajudar; a equipe assume pelo próprio WhatsApp.
-6. **CRM web** (Fases 1, 2 e 3) — login (Supabase Auth), Dashboard, Agenda, Pacientes, Conversas, Procedimentos, **Financeiro** (receitas/despesas, fluxo de caixa, relatórios), **Estoque** (produtos/insumos, movimentações de entrada/saída), **Usuários** (papéis/permissões, ativar/desativar acesso, restrito a admin) e **Configurações** (dados da clínica + horário de atendimento) — todos lendo/escrevendo nas mesmas tabelas e serviços do agente, nunca duplicando lógica. O horário de atendimento salvo em Configurações é a fonte real usada pela IA (FAQ e disponibilidade de horários no WhatsApp).
+6. **CRM web** (Fases 1, 2, 3 e tela WhatsApp) — login (Supabase Auth), Dashboard, Agenda, Pacientes, Conversas, Procedimentos, **Financeiro** (receitas/despesas, fluxo de caixa, relatórios), **Estoque** (produtos/insumos, movimentações de entrada/saída), **Usuários** (papéis/permissões, ativar/desativar acesso, restrito a admin), **Configurações** (dados da clínica + horário de atendimento) e **WhatsApp** (status real da conexão via Evolution API, QR code para reconectar, estatísticas de mensagens/contatos, toggles reais para ligar/desligar lembretes automáticos e mensagem de inatividade) — todos lendo/escrevendo nas mesmas tabelas e serviços do agente, nunca duplicando lógica. O horário de atendimento salvo em Configurações é a fonte real usada pela IA (FAQ e disponibilidade de horários no WhatsApp). Completa as ~10 telas do design original.
 
 ## Stack
 Node.js + TypeScript, Express, Supabase (PostgreSQL), Google Calendar API, Evolution API (WhatsApp via Baileys), Claude (Anthropic API).
@@ -93,7 +93,7 @@ src/
   controllers/
     webhookController.ts          # recebe mensagens do WhatsApp
     healthController.ts
-    api/                          # controllers da API do CRM (dashboard, schedule, patient, conversation, procedure, finance, inventory, staff, settings)
+    api/                          # controllers da API do CRM (dashboard, schedule, patient, conversation, procedure, finance, inventory, staff, settings, whatsapp)
   routes/api.ts                   # monta /api/v1/* sob requireAuth
   middleware/requireAuth.ts       # valida o JWT do Supabase Auth (sessao do CRM) + bloqueia staff.active=false
   middleware/requireAdmin.ts      # restringe rotas (Usuarios) a staff.role='admin'
@@ -137,7 +137,7 @@ web/                               # CRM web (Vite + React + TS)
     context/AuthContext.tsx
     components/Layout.tsx, ProtectedRoute.tsx
     pages/Login.tsx, Dashboard.tsx, Agenda.tsx, Pacientes.tsx, Conversas.tsx, Procedimentos.tsx,
-    pages/Financeiro.tsx, Estoque.tsx, Usuarios.tsx, Configuracoes.tsx
+    pages/Financeiro.tsx, Estoque.tsx, Usuarios.tsx, Configuracoes.tsx, WhatsApp.tsx
 scripts/
   googleAuthSetup.ts               # setup unico do OAuth do Google
   createStaffAdmin.ts              # cria o primeiro usuario admin do CRM
@@ -151,6 +151,7 @@ supabase/migrations/
   007_inventory.sql                # inventory_items + inventory_movements (Estoque)
   008_clinic_settings.sql          # clinic_settings + business_hours (Configuracoes, fonte real p/ a IA)
   009_staff_active.sql             # staff.active (desativar acesso sem apagar a conta)
+  010_automation_flags.sql         # clinic_settings.reminders_enabled / inactivity_nudge_enabled (tela WhatsApp)
 workflows/
   atendimento_faq.md              # persona, dados da clinica, tratamentos, valores, objecoes, menu
   agendamento_consultas.md        # fluxo de marcar/remarcar/cancelar consultas

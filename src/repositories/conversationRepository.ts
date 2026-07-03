@@ -197,6 +197,17 @@ export async function findConversationById(id: string): Promise<ConversationSumm
   return { ...row, userName: row.users?.name, userPhone: row.users?.phone, lastMessage: null };
 }
 
+/** Usado pela tela WhatsApp do CRM (card de estatisticas). */
+export async function countActive(): Promise<number> {
+  const { count, error } = await getSupabaseClient()
+    .from("conversations")
+    .select("*", { count: "exact", head: true })
+    .neq("status", "closed");
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function listMessages(conversationId: string, limit = 30): Promise<Message[]> {
   const { data, error } = await getSupabaseClient()
     .from("messages")

@@ -7,7 +7,16 @@ export async function getClinicSettings(): Promise<ClinicSettings> {
   return data;
 }
 
-export async function updateClinicSettings(params: Partial<{ name: string; phone: string | null; email: string | null; address: string | null }>): Promise<ClinicSettings> {
+export async function updateClinicSettings(
+  params: Partial<{
+    name: string;
+    phone: string | null;
+    email: string | null;
+    address: string | null;
+    reminders_enabled: boolean;
+    inactivity_nudge_enabled: boolean;
+  }>
+): Promise<ClinicSettings> {
   const { data, error } = await getSupabaseClient()
     .from("clinic_settings")
     .update({ ...params, updated_at: new Date().toISOString() })

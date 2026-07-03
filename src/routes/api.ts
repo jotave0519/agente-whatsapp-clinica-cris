@@ -8,6 +8,7 @@ import { createProcedure, listProcedures, updateProcedure } from "../controllers
 import { cancelSchedule, createSchedule, listSchedules, rescheduleSchedule } from "../controllers/api/scheduleController";
 import { getSettings, updateSettings } from "../controllers/api/settingsController";
 import { listStaff, updateStaff } from "../controllers/api/staffController";
+import { disconnect, getQrCode, getStatus } from "../controllers/api/whatsappController";
 import { requireAdmin } from "../middleware/requireAdmin";
 import { requireAuth } from "../middleware/requireAuth";
 
@@ -47,3 +48,7 @@ apiRouter.patch("/staff/:id", requireAdmin, updateStaff);
 
 apiRouter.get("/settings", getSettings);
 apiRouter.patch("/settings", updateSettings);
+
+apiRouter.get("/whatsapp/status", getStatus);
+apiRouter.get("/whatsapp/qrcode", getQrCode);
+apiRouter.post("/whatsapp/disconnect", requireAdmin, disconnect);

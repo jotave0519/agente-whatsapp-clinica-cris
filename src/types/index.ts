@@ -153,6 +153,8 @@ export interface ClinicSettings {
   phone: string | null;
   email: string | null;
   address: string | null;
+  reminders_enabled: boolean;
+  inactivity_nudge_enabled: boolean;
   updated_at: string;
 }
 

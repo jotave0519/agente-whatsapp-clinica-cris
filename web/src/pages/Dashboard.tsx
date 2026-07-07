@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 import { ArrowRightIcon, TrendingUpIcon } from "../components/icons";
+import { NewAppointmentFab } from "../components/NewAppointmentFab";
 
 interface DashboardData {
   kpis: { activePatients: number; appointmentsThisMonth: number; revenueThisMonth: number; conversationsWaiting: number };
@@ -34,6 +36,7 @@ function greeting(): string {
 export function Dashboard() {
   const { session } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [data, setData] = useState<DashboardData | null>(null);
   const [finance, setFinance] = useState<FinanceOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +57,8 @@ export function Dashboard() {
 
   const name = session?.user.email?.split("@")[0] || "";
   const today = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-  const maxRevenue = Math.max(1, ...data.revenueChart.map((r) => r.value));
+  const chartData = isMobile ? data.revenueChart.slice(-6) : data.revenueChart;
+  const maxRevenue = Math.max(1, ...chartData.map((r) => r.value));
 
   const kpiCards = [
     { label: "Pacientes ativos", value: String(data.kpis.activePatients) },
@@ -68,7 +72,7 @@ export function Dashboard() {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 26 }}>
         <div>
           <div style={{ fontSize: 12.5, color: "var(--text-faint)", letterSpacing: ".04em", marginBottom: 6, textTransform: "capitalize" }}>{today}</div>
-          <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 34, fontWeight: 400, letterSpacing: "-.01em" }}>
+          <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: isMobile ? 26 : 34, fontWeight: 400, letterSpacing: "-.01em" }}>
             {greeting()}, <span style={{ fontStyle: "italic" }}>{name}</span>
           </h1>
           <p style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 9 }}>
@@ -89,7 +93,7 @@ export function Dashboard() {
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.55fr 1fr", gap: 20, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.55fr 1fr", gap: 20, marginBottom: 20 }}>
         <div className="card">
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6 }}>
             <div>
@@ -105,7 +109,7 @@ export function Dashboard() {
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 140 }}>
-            {data.revenueChart.map((r) => (
+            {chartData.map((r) => (
               <div key={r.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
                 <div
                   style={{
@@ -146,7 +150,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>
         <div className="card">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
             <div style={{ fontSize: 14.5, fontWeight: 600 }}>Conversas recentes</div>
@@ -245,6 +249,7 @@ export function Dashboard() {
           </button>
         </div>
       </div>
+      <NewAppointmentFab />
     </div>
   );
 }

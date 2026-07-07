@@ -1,4 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
+import { FormSheet } from "../components/FormSheet";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 import { ChevronLeftIcon, ChevronRightIcon } from "../components/icons";
 
@@ -47,6 +49,7 @@ function monthLabel(monthKey: string): string {
 }
 
 export function Financeiro() {
+  const isMobile = useIsMobile();
   const [month, setMonth] = useState(currentMonthKey);
   const [data, setData] = useState<FinanceData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -130,16 +133,60 @@ export function Financeiro() {
 
   const maxBar = Math.max(1, ...data.chart.flatMap((b) => [b.in, b.out]));
 
+  const transactionFormFields = (
+    <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
+      <div style={{ fontWeight: 600, fontSize: isMobile ? 16 : undefined }}>
+        {editingId ? "Editar " : "Nova "}
+        {form.type === "receita" ? "receita" : "despesa"}
+      </div>
+      <div>
+        <label className="field-label">Descrição</label>
+        <input className="input" required value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+      </div>
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <label className="field-label">Valor (R$)</label>
+          <input className="input" type="number" step="0.01" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label className="field-label">{form.type === "receita" ? "Forma de pagamento" : "Categoria"}</label>
+          <input
+            className="input"
+            value={form.type === "receita" ? form.method : form.category}
+            onChange={(e) => setForm(form.type === "receita" ? { ...form, method: e.target.value } : { ...form, category: e.target.value })}
+          />
+        </div>
+      </div>
+      {form.type === "receita" && (
+        <div>
+          <label className="field-label">Status</label>
+          <select className="input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as "pago" | "pendente" })}>
+            <option value="pago">Pago</option>
+            <option value="pendente">Pendente</option>
+          </select>
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 10 }}>
+        <button className="btn" type="submit" disabled={saving}>
+          {saving ? "Salvando..." : "Salvar"}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={() => setShowForm(false)}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
         <div>
           <h1 className="page-title">Financeiro</h1>
           <p className="page-subtitle" style={{ textTransform: "capitalize" }}>
             {monthLabel(month)}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 11, padding: 3 }}>
             <button style={{ width: 32, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setMonth((m) => shiftMonth(m, -1))}>
               <ChevronLeftIcon color="var(--text-muted)" />
@@ -152,59 +199,24 @@ export function Financeiro() {
             </button>
           </div>
           <button className="btn btn-secondary" onClick={() => openForm("receita")}>
-            + Nova receita
+            + Receita
           </button>
           <button className="btn" onClick={() => openForm("despesa")}>
-            + Nova despesa
+            + Despesa
           </button>
         </div>
       </div>
 
       {error && <div className="error-text">{error}</div>}
 
-      {showForm && (
-        <form className="card" onSubmit={handleSubmit} style={{ marginBottom: 20, display: "grid", gap: 12, maxWidth: 480 }}>
-          <div style={{ fontWeight: 600 }}>
-            {editingId ? "Editar " : "Nova "}
-            {form.type === "receita" ? "receita" : "despesa"}
-          </div>
-          <div>
-            <label className="field-label">Descrição</label>
-            <input className="input" required value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label className="field-label">Valor (R$)</label>
-              <input className="input" type="number" step="0.01" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label className="field-label">{form.type === "receita" ? "Forma de pagamento" : "Categoria"}</label>
-              <input
-                className="input"
-                value={form.type === "receita" ? form.method : form.category}
-                onChange={(e) => setForm(form.type === "receita" ? { ...form, method: e.target.value } : { ...form, category: e.target.value })}
-              />
-            </div>
-          </div>
-          {form.type === "receita" && (
-            <div>
-              <label className="field-label">Status</label>
-              <select className="input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as "pago" | "pendente" })}>
-                <option value="pago">Pago</option>
-                <option value="pendente">Pendente</option>
-              </select>
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 10 }}>
-            <button className="btn" type="submit" disabled={saving}>
-              {saving ? "Salvando..." : "Salvar"}
-            </button>
-            <button className="btn btn-secondary" type="button" onClick={() => setShowForm(false)}>
-              Cancelar
-            </button>
-          </div>
-        </form>
+      {!isMobile && showForm && (
+        <div className="card" style={{ marginBottom: 20, maxWidth: 480 }}>
+          {transactionFormFields}
+        </div>
       )}
+      <FormSheet open={isMobile && showForm} onClose={() => setShowForm(false)}>
+        {transactionFormFields}
+      </FormSheet>
 
       <div className="kpi-grid">
         <div className="card">
@@ -248,56 +260,99 @@ export function Financeiro() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20, marginBottom: 20 }}>
         <div className="card" style={{ padding: 0 }}>
           <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border-soft)", fontWeight: 600 }}>Receitas recentes</div>
           {data.receitas.length === 0 && <div className="empty-state">Nenhuma receita registrada.</div>}
-          {data.receitas.map((r) => (
-            <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 18px", borderBottom: "1px solid var(--border-soft)" }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13.5 }}>{r.description}</div>
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{r.method || "—"}</div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ textAlign: "right" }}>
+          {data.receitas.map((r) =>
+            isMobile ? (
+              <div key={r.id} className="mobile-list-item">
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>{r.description}</div>
                   <div style={{ fontWeight: 600, fontSize: 13.5 }}>{formatMoney(r.amount)}</div>
+                </div>
+                <div className="mobile-list-row">
+                  <span>{r.method || "—"}</span>
                   <span className={`badge ${r.status === "pago" ? "badge-green" : "badge-yellow"}`}>{r.status === "pago" ? "Pago" : "Pendente"}</span>
                 </div>
-                <button className="btn btn-secondary" style={{ padding: "6px 10px", fontSize: 12 }} onClick={() => openEdit(r)}>
-                  Editar
-                </button>
-                <button className="btn-danger" style={{ borderRadius: 8, padding: "6px 10px", fontSize: 12 }} onClick={() => handleDelete(r)}>
-                  Excluir
-                </button>
+                <div className="mobile-list-actions">
+                  <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => openEdit(r)}>
+                    Editar
+                  </button>
+                  <button className="btn-danger" style={{ flex: 1, borderRadius: 10, fontSize: 13 }} onClick={() => handleDelete(r)}>
+                    Excluir
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            ) : (
+              <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 18px", borderBottom: "1px solid var(--border-soft)" }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>{r.description}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{r.method || "—"}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontWeight: 600, fontSize: 13.5 }}>{formatMoney(r.amount)}</div>
+                    <span className={`badge ${r.status === "pago" ? "badge-green" : "badge-yellow"}`}>{r.status === "pago" ? "Pago" : "Pendente"}</span>
+                  </div>
+                  <button className="btn btn-secondary" style={{ padding: "6px 10px", fontSize: 12 }} onClick={() => openEdit(r)}>
+                    Editar
+                  </button>
+                  <button className="btn-danger" style={{ borderRadius: 8, padding: "6px 10px", fontSize: 12 }} onClick={() => handleDelete(r)}>
+                    Excluir
+                  </button>
+                </div>
+              </div>
+            )
+          )}
         </div>
 
         <div className="card" style={{ padding: 0 }}>
           <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border-soft)", fontWeight: 600 }}>Despesas recentes</div>
           {data.despesas.length === 0 && <div className="empty-state">Nenhuma despesa registrada.</div>}
-          {data.despesas.map((d) => (
-            <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 18px", borderBottom: "1px solid var(--border-soft)" }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13.5 }}>{d.description}</div>
-                {d.category && <span className="badge badge-neutral">{d.category}</span>}
+          {data.despesas.map((d) =>
+            isMobile ? (
+              <div key={d.id} className="mobile-list-item">
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>{d.description}</div>
+                  <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--red)" }}>− {formatMoney(d.amount)}</div>
+                </div>
+                {d.category && (
+                  <div className="mobile-list-row">
+                    <span className="badge badge-neutral">{d.category}</span>
+                  </div>
+                )}
+                <div className="mobile-list-actions">
+                  <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => openEdit(d)}>
+                    Editar
+                  </button>
+                  <button className="btn-danger" style={{ flex: 1, borderRadius: 10, fontSize: 13 }} onClick={() => handleDelete(d)}>
+                    Excluir
+                  </button>
+                </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--red)" }}>− {formatMoney(d.amount)}</div>
-                <button className="btn btn-secondary" style={{ padding: "6px 10px", fontSize: 12 }} onClick={() => openEdit(d)}>
-                  Editar
-                </button>
-                <button className="btn-danger" style={{ borderRadius: 8, padding: "6px 10px", fontSize: 12 }} onClick={() => handleDelete(d)}>
-                  Excluir
-                </button>
+            ) : (
+              <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 18px", borderBottom: "1px solid var(--border-soft)" }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>{d.description}</div>
+                  {d.category && <span className="badge badge-neutral">{d.category}</span>}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--red)" }}>− {formatMoney(d.amount)}</div>
+                  <button className="btn btn-secondary" style={{ padding: "6px 10px", fontSize: 12 }} onClick={() => openEdit(d)}>
+                    Editar
+                  </button>
+                  <button className="btn-danger" style={{ borderRadius: 8, padding: "6px 10px", fontSize: 12 }} onClick={() => handleDelete(d)}>
+                    Excluir
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          )}
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>
         <div className="card">
           <div style={{ fontWeight: 600, marginBottom: 14 }}>Procedimentos mais realizados</div>
           {data.reportProcs.length === 0 && <div className="empty-state">Sem dados nos últimos 90 dias.</div>}

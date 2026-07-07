@@ -1,4 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
+import { FormSheet } from "../components/FormSheet";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 
 interface InventoryItem {
@@ -39,6 +41,7 @@ function statusBadge(status: InventoryItem["status"]) {
 }
 
 export function Estoque() {
+  const isMobile = useIsMobile();
   const [data, setData] = useState<InventoryData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -169,9 +172,101 @@ export function Estoque() {
 
   const filteredItems = data.items.filter((i) => i.name.toLowerCase().includes(search.toLowerCase()));
 
+  const itemFormFields = (
+    <form onSubmit={handleItemSubmit} style={{ display: "grid", gap: 12 }}>
+      {isMobile && <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{editingId ? "Editar item" : "Novo item"}</div>}
+      <div>
+        <label className="field-label">Nome</label>
+        <input className="input" required value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} />
+      </div>
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <label className="field-label">Categoria</label>
+          <input className="input" value={itemForm.category} onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label className="field-label">Unidade</label>
+          <input className="input" value={itemForm.unit} onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })} />
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {!editingId && (
+          <div style={{ flex: 1, minWidth: 100 }}>
+            <label className="field-label">Quantidade inicial</label>
+            <input className="input" type="number" value={itemForm.quantity} onChange={(e) => setItemForm({ ...itemForm, quantity: e.target.value })} />
+          </div>
+        )}
+        <div style={{ flex: 1, minWidth: 100 }}>
+          <label className="field-label">Mínimo</label>
+          <input className="input" type="number" value={itemForm.min_quantity} onChange={(e) => setItemForm({ ...itemForm, min_quantity: e.target.value })} />
+        </div>
+        <div style={{ flex: 1, minWidth: 100 }}>
+          <label className="field-label">Validade</label>
+          <input className="input" type="date" value={itemForm.expiry_date} onChange={(e) => setItemForm({ ...itemForm, expiry_date: e.target.value })} />
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button className="btn" type="submit" disabled={saving}>
+          {saving ? "Salvando..." : "Salvar"}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={() => setShowItemForm(false)}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+
+  const moveFormFields = (
+    <form onSubmit={handleMoveSubmit} style={{ display: "grid", gap: 12 }}>
+      <div style={{ fontWeight: 600, fontSize: isMobile ? 16 : undefined }}>{editingMovementId ? "Editar movimentação" : "Registrar movimentação"}</div>
+      <div>
+        <label className="field-label">Item</label>
+        <select
+          className="input"
+          required
+          disabled={!!editingMovementId}
+          value={moveForm.item_id}
+          onChange={(e) => setMoveForm({ ...moveForm, item_id: e.target.value })}
+        >
+          <option value="">Selecione...</option>
+          {data.items.map((i) => (
+            <option key={i.id} value={i.id}>
+              {i.name} ({i.quantity} {i.unit})
+            </option>
+          ))}
+        </select>
+      </div>
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <label className="field-label">Tipo</label>
+          <select className="input" value={moveForm.type} onChange={(e) => setMoveForm({ ...moveForm, type: e.target.value as "entrada" | "saida" })}>
+            <option value="entrada">Entrada</option>
+            <option value="saida">Saída</option>
+          </select>
+        </div>
+        <div style={{ flex: 1 }}>
+          <label className="field-label">Quantidade</label>
+          <input className="input" type="number" required value={moveForm.quantity} onChange={(e) => setMoveForm({ ...moveForm, quantity: e.target.value })} />
+        </div>
+      </div>
+      <div>
+        <label className="field-label">Observação</label>
+        <input className="input" value={moveForm.note} onChange={(e) => setMoveForm({ ...moveForm, note: e.target.value })} />
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button className="btn" type="submit" disabled={saving}>
+          {saving ? "Salvando..." : editingMovementId ? "Salvar alterações" : "Registrar"}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={closeMoveForm}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
         <div>
           <h1 className="page-title">Estoque</h1>
           <p className="page-subtitle">Controle de produtos e insumos da clínica</p>
@@ -185,7 +280,7 @@ export function Estoque() {
               setShowMoveForm(true);
             }}
           >
-            Registrar movimentação
+            {isMobile ? "Movimentar" : "Registrar movimentação"}
           </button>
           <button className="btn" onClick={startCreateItem}>
             + Novo item
@@ -195,96 +290,23 @@ export function Estoque() {
 
       {error && <div className="error-text">{error}</div>}
 
-      {showItemForm && (
-        <form className="card" onSubmit={handleItemSubmit} style={{ marginBottom: 20, display: "grid", gap: 12, maxWidth: 480 }}>
-          <div>
-            <label className="field-label">Nome</label>
-            <input className="input" required value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} />
-          </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label className="field-label">Categoria</label>
-              <input className="input" value={itemForm.category} onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label className="field-label">Unidade</label>
-              <input className="input" value={itemForm.unit} onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })} />
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            {!editingId && (
-              <div style={{ flex: 1 }}>
-                <label className="field-label">Quantidade inicial</label>
-                <input className="input" type="number" value={itemForm.quantity} onChange={(e) => setItemForm({ ...itemForm, quantity: e.target.value })} />
-              </div>
-            )}
-            <div style={{ flex: 1 }}>
-              <label className="field-label">Mínimo</label>
-              <input className="input" type="number" value={itemForm.min_quantity} onChange={(e) => setItemForm({ ...itemForm, min_quantity: e.target.value })} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label className="field-label">Validade</label>
-              <input className="input" type="date" value={itemForm.expiry_date} onChange={(e) => setItemForm({ ...itemForm, expiry_date: e.target.value })} />
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button className="btn" type="submit" disabled={saving}>
-              {saving ? "Salvando..." : "Salvar"}
-            </button>
-            <button className="btn btn-secondary" type="button" onClick={() => setShowItemForm(false)}>
-              Cancelar
-            </button>
-          </div>
-        </form>
+      {!isMobile && showItemForm && (
+        <div className="card" style={{ marginBottom: 20, maxWidth: 480 }}>
+          {itemFormFields}
+        </div>
       )}
+      <FormSheet open={isMobile && showItemForm} onClose={() => setShowItemForm(false)}>
+        {itemFormFields}
+      </FormSheet>
 
-      {showMoveForm && (
-        <form className="card" onSubmit={handleMoveSubmit} style={{ marginBottom: 20, display: "grid", gap: 12, maxWidth: 480 }}>
-          <div style={{ fontWeight: 600 }}>{editingMovementId ? "Editar movimentação" : "Registrar movimentação"}</div>
-          <div>
-            <label className="field-label">Item</label>
-            <select
-              className="input"
-              required
-              disabled={!!editingMovementId}
-              value={moveForm.item_id}
-              onChange={(e) => setMoveForm({ ...moveForm, item_id: e.target.value })}
-            >
-              <option value="">Selecione...</option>
-              {data.items.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name} ({i.quantity} {i.unit})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label className="field-label">Tipo</label>
-              <select className="input" value={moveForm.type} onChange={(e) => setMoveForm({ ...moveForm, type: e.target.value as "entrada" | "saida" })}>
-                <option value="entrada">Entrada</option>
-                <option value="saida">Saída</option>
-              </select>
-            </div>
-            <div style={{ flex: 1 }}>
-              <label className="field-label">Quantidade</label>
-              <input className="input" type="number" required value={moveForm.quantity} onChange={(e) => setMoveForm({ ...moveForm, quantity: e.target.value })} />
-            </div>
-          </div>
-          <div>
-            <label className="field-label">Observação</label>
-            <input className="input" value={moveForm.note} onChange={(e) => setMoveForm({ ...moveForm, note: e.target.value })} />
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button className="btn" type="submit" disabled={saving}>
-              {saving ? "Salvando..." : editingMovementId ? "Salvar alterações" : "Registrar"}
-            </button>
-            <button className="btn btn-secondary" type="button" onClick={closeMoveForm}>
-              Cancelar
-            </button>
-          </div>
-        </form>
+      {!isMobile && showMoveForm && (
+        <div className="card" style={{ marginBottom: 20, maxWidth: 480 }}>
+          {moveFormFields}
+        </div>
       )}
+      <FormSheet open={isMobile && showMoveForm} onClose={closeMoveForm}>
+        {moveFormFields}
+      </FormSheet>
 
       <div className="kpi-grid">
         <div className="card">
@@ -305,52 +327,74 @@ export function Estoque() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.7fr 1fr", gap: 20 }}>
         <div className="card" style={{ padding: 0 }}>
           <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border-soft)" }}>
             <input className="input" placeholder="Buscar produto" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Produto</th>
-                <th>Qtd.</th>
-                <th>Mínimo</th>
-                <th>Validade</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredItems.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="empty-state">
-                    Nenhum item encontrado.
-                  </td>
-                </tr>
-              )}
-              {filteredItems.map((i) => (
-                <tr key={i.id}>
-                  <td>
+
+          {filteredItems.length === 0 && <div className="empty-state">Nenhum item encontrado.</div>}
+
+          {isMobile
+            ? filteredItems.map((i) => (
+                <div key={i.id} className="mobile-list-item">
+                  <div>
                     <div style={{ fontWeight: 600 }}>{i.name}</div>
                     <div style={{ marginTop: 4 }}>{statusBadge(i.status)}</div>
-                  </td>
-                  <td>
-                    {i.quantity} {i.unit}
-                  </td>
-                  <td>{i.min_quantity}</td>
-                  <td>{i.expiry_date ? new Date(i.expiry_date).toLocaleDateString("pt-BR") : "—"}</td>
-                  <td style={{ display: "flex", gap: 6 }}>
-                    <button className="btn btn-secondary" onClick={() => startEditItem(i)}>
+                  </div>
+                  <div className="mobile-list-row">
+                    <span>
+                      {i.quantity} {i.unit} em estoque
+                    </span>
+                    <span>mín. {i.min_quantity}</span>
+                  </div>
+                  {i.expiry_date && <div className="mobile-list-row">Validade: {new Date(i.expiry_date).toLocaleDateString("pt-BR")}</div>}
+                  <div className="mobile-list-actions">
+                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => startEditItem(i)}>
                       Editar
                     </button>
-                    <button className="btn-danger" style={{ borderRadius: 8, padding: "6px 12px", fontSize: 12.5 }} onClick={() => handleDeleteItem(i)}>
+                    <button className="btn-danger" style={{ flex: 1, borderRadius: 10, fontSize: 13 }} onClick={() => handleDeleteItem(i)}>
                       Excluir
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              ))
+            : filteredItems.length > 0 && (
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Produto</th>
+                      <th>Qtd.</th>
+                      <th>Mínimo</th>
+                      <th>Validade</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredItems.map((i) => (
+                      <tr key={i.id}>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{i.name}</div>
+                          <div style={{ marginTop: 4 }}>{statusBadge(i.status)}</div>
+                        </td>
+                        <td>
+                          {i.quantity} {i.unit}
+                        </td>
+                        <td>{i.min_quantity}</td>
+                        <td>{i.expiry_date ? new Date(i.expiry_date).toLocaleDateString("pt-BR") : "—"}</td>
+                        <td style={{ display: "flex", gap: 6 }}>
+                          <button className="btn btn-secondary" onClick={() => startEditItem(i)}>
+                            Editar
+                          </button>
+                          <button className="btn-danger" style={{ borderRadius: 8, padding: "6px 12px", fontSize: 12.5 }} onClick={() => handleDeleteItem(i)}>
+                            Excluir
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
         </div>
 
         <div className="card">

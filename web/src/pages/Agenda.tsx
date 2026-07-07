@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAppointmentModal } from "../context/AppointmentModalContext";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
+import { DayStrip } from "../components/DayStrip";
+import { NewAppointmentFab } from "../components/NewAppointmentFab";
 
 interface ScheduleItem {
   id: string;
@@ -44,8 +47,10 @@ function toDateStr(d: Date): string {
 
 export function Agenda() {
   const { open: openNewAppointment, lastCreatedAt } = useAppointmentModal();
+  const isMobile = useIsMobile();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [view, setView] = useState<"dia" | "semana">("semana");
+  const [selectedDay, setSelectedDay] = useState(() => new Date());
   const [items, setItems] = useState<ScheduleItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ScheduleItem | null>(null);
@@ -64,7 +69,25 @@ export function Agenda() {
     [weekStart]
   );
 
-  const visibleDays = view === "dia" ? [weekDays.find((d) => toDateStr(d) === toDateStr(new Date())) || weekDays[0]] : weekDays;
+  function goToWeek(deltaWeeks: number) {
+    setWeekStart((w) => {
+      const d = new Date(w);
+      d.setDate(d.getDate() + deltaWeeks * 7);
+      return d;
+    });
+    setSelectedDay((d) => {
+      const next = new Date(d);
+      next.setDate(next.getDate() + deltaWeeks * 7);
+      return next;
+    });
+  }
+
+  function goToToday() {
+    setWeekStart(startOfWeek(new Date()));
+    setSelectedDay(new Date());
+  }
+
+  const visibleDays = isMobile ? [selectedDay] : view === "dia" ? [weekDays.find((d) => toDateStr(d) === toDateStr(new Date())) || weekDays[0]] : weekDays;
 
   function loadSchedules() {
     const from = toDateStr(weekDays[0]);
@@ -115,6 +138,161 @@ export function Agenda() {
     }
   }
 
+  function renderHourColumn() {
+    return (
+      <div style={{ width: 52, flex: "0 0 52px", paddingTop: 6 }}>
+        {Array.from({ length: 13 }, (_, i) => i + 7).map((h) => (
+          <div key={h} style={{ height: HOUR_HEIGHT, textAlign: "right", paddingRight: 8 }}>
+            <span style={{ fontSize: 11, color: "var(--text-faint)", position: "relative", top: -7 }}>{String(h).padStart(2, "0")}:00</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function renderDayColumn(d: Date) {
+    const dateStr = toDateStr(d);
+    const dayItems = (items || []).filter((it) => it.date === dateStr);
+    const isToday = dateStr === todayStr;
+    const now = new Date();
+    const nowOffset = isToday ? ((now.getHours() - 7) * 60 + now.getMinutes()) * (HOUR_HEIGHT / 60) : -1;
+
+    return (
+      <div
+        key={dateStr}
+        style={{
+          flex: 1,
+          position: "relative",
+          height: 13 * HOUR_HEIGHT,
+          borderLeft: "1px solid var(--border-soft)",
+          backgroundImage: `repeating-linear-gradient(var(--surface), var(--surface) ${HOUR_HEIGHT - 1}px, var(--border-soft) ${HOUR_HEIGHT}px)`,
+        }}
+      >
+        {isToday && nowOffset >= 0 && nowOffset <= 13 * HOUR_HEIGHT && (
+          <div style={{ position: "absolute", left: 0, right: 0, top: nowOffset, height: 1.5, background: "var(--accent)", zIndex: 3 }}>
+            <span style={{ position: "absolute", left: -4, top: -3.5, width: 8, height: 8, borderRadius: "50%", background: "var(--accent)" }} />
+          </div>
+        )}
+        {items === null && <div style={{ padding: 10, fontSize: 11.5, color: "var(--text-muted)" }}>...</div>}
+        {dayItems.map((it) => {
+          const [h, m] = it.time.split(":").map(Number);
+          const top = ((h - 7) * 60 + m) * (HOUR_HEIGHT / 60);
+          const color = hashColor(it.procedure);
+          return (
+            <div
+              key={it.id}
+              onClick={() => {
+                setSelected(it);
+                setRescheduling(false);
+                setNewDate(it.date);
+                setNewTime(it.time);
+              }}
+              style={{
+                position: "absolute",
+                left: 4,
+                right: 4,
+                top,
+                minHeight: 40,
+                borderRadius: 8,
+                padding: "5px 8px",
+                background: color.bg,
+                borderLeft: `3px solid ${color.border}`,
+                cursor: "pointer",
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", opacity: 0.85 }}>{it.time}</div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {it.patient_name}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.procedure}</div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function renderActionSheet() {
+    if (!selected) return null;
+    return (
+      <div className="modal-overlay" onClick={() => setSelected(null)}>
+        <div className="modal-card" style={{ maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{selected.patient_name}</div>
+          <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>{selected.procedure}</div>
+          <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 14 }}>
+            {new Date(selected.date + "T00:00:00").toLocaleDateString("pt-BR")} às {selected.time}
+          </div>
+          {selected.notes && <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>Obs: {selected.notes}</div>}
+
+          {rescheduling ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              <div style={{ display: "flex", gap: 10 }}>
+                <input className="input" type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
+                <input className="input" type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <button className="btn btn-secondary" onClick={() => setRescheduling(false)}>
+                  Cancelar
+                </button>
+                <button className="btn" disabled={acting} onClick={handleReschedule}>
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button className="btn-danger" style={{ borderRadius: 10, padding: "9px 16px", fontSize: 13.5, fontWeight: 600 }} disabled={acting} onClick={handleCancel}>
+                Cancelar consulta
+              </button>
+              <button className="btn btn-secondary" onClick={() => setRescheduling(true)}>
+                Remarcar
+              </button>
+              <button className="btn" onClick={() => setSelected(null)}>
+                Fechar
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (isMobile) {
+    return (
+      <div>
+        <h1 className="page-title">Agenda</h1>
+        <p className="page-subtitle">
+          <strong style={{ color: "var(--text)", fontWeight: 600 }}>{totalAppts} atendimento(s)</strong> nesta semana
+        </p>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+          <button style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => goToWeek(-1)}>
+            <ChevronLeftIcon color="var(--text-muted)" />
+          </button>
+          <button style={{ flex: 1, fontSize: 12.5, fontWeight: 500, color: "var(--accent)", textAlign: "center" }} onClick={goToToday}>
+            Hoje
+          </button>
+          <button style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => goToWeek(1)}>
+            <ChevronRightIcon color="var(--text-muted)" />
+          </button>
+        </div>
+        <DayStrip days={weekDays} selected={selectedDay} onSelect={setSelectedDay} />
+
+        {error && <div className="error-text">{error}</div>}
+
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{ display: "flex", maxHeight: "calc(100dvh - 320px)", overflowY: "auto" }}>
+            {renderHourColumn()}
+            {visibleDays.map((d) => renderDayColumn(d))}
+          </div>
+        </div>
+
+        {renderActionSheet()}
+        <NewAppointmentFab />
+      </div>
+    );
+  }
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 22 }}>
@@ -129,16 +307,16 @@ export function Agenda() {
           <div style={{ display: "flex", alignItems: "center", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 11, padding: 3 }}>
             <button
               style={{ width: 32, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}
-              onClick={() => setWeekStart((w) => { const d = new Date(w); d.setDate(d.getDate() - 7); return d; })}
+              onClick={() => goToWeek(-1)}
             >
               <ChevronLeftIcon color="var(--text-muted)" />
             </button>
-            <span style={{ fontSize: 13, fontWeight: 500, padding: "0 8px", cursor: "pointer" }} onClick={() => setWeekStart(startOfWeek(new Date()))}>
+            <span style={{ fontSize: 13, fontWeight: 500, padding: "0 8px", cursor: "pointer" }} onClick={goToToday}>
               Esta semana
             </span>
             <button
               style={{ width: 32, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}
-              onClick={() => setWeekStart((w) => { const d = new Date(w); d.setDate(d.getDate() + 7); return d; })}
+              onClick={() => goToWeek(1)}
             >
               <ChevronRightIcon color="var(--text-muted)" />
             </button>
@@ -196,118 +374,12 @@ export function Agenda() {
         </div>
 
         <div style={{ display: "flex", maxHeight: 620, overflowY: "auto" }}>
-          <div style={{ width: 52, flex: "0 0 52px", paddingTop: 6 }}>
-            {Array.from({ length: 13 }, (_, i) => i + 7).map((h) => (
-              <div key={h} style={{ height: HOUR_HEIGHT, textAlign: "right", paddingRight: 8 }}>
-                <span style={{ fontSize: 11, color: "var(--text-faint)", position: "relative", top: -7 }}>{String(h).padStart(2, "0")}:00</span>
-              </div>
-            ))}
-          </div>
-          {visibleDays.map((d) => {
-            const dateStr = toDateStr(d);
-            const dayItems = (items || []).filter((it) => it.date === dateStr);
-            const isToday = dateStr === todayStr;
-            const now = new Date();
-            const nowOffset = isToday ? ((now.getHours() - 7) * 60 + now.getMinutes()) * (HOUR_HEIGHT / 60) : -1;
-
-            return (
-              <div
-                key={dateStr}
-                style={{
-                  flex: 1,
-                  position: "relative",
-                  height: 13 * HOUR_HEIGHT,
-                  borderLeft: "1px solid var(--border-soft)",
-                  backgroundImage: `repeating-linear-gradient(var(--surface), var(--surface) ${HOUR_HEIGHT - 1}px, var(--border-soft) ${HOUR_HEIGHT}px)`,
-                }}
-              >
-                {isToday && nowOffset >= 0 && nowOffset <= 13 * HOUR_HEIGHT && (
-                  <div style={{ position: "absolute", left: 0, right: 0, top: nowOffset, height: 1.5, background: "var(--accent)", zIndex: 3 }}>
-                    <span style={{ position: "absolute", left: -4, top: -3.5, width: 8, height: 8, borderRadius: "50%", background: "var(--accent)" }} />
-                  </div>
-                )}
-                {items === null && <div style={{ padding: 10, fontSize: 11.5, color: "var(--text-muted)" }}>...</div>}
-                {dayItems.map((it) => {
-                  const [h, m] = it.time.split(":").map(Number);
-                  const top = ((h - 7) * 60 + m) * (HOUR_HEIGHT / 60);
-                  const color = hashColor(it.procedure);
-                  return (
-                    <div
-                      key={it.id}
-                      onClick={() => {
-                        setSelected(it);
-                        setRescheduling(false);
-                        setNewDate(it.date);
-                        setNewTime(it.time);
-                      }}
-                      style={{
-                        position: "absolute",
-                        left: 4,
-                        right: 4,
-                        top,
-                        minHeight: 40,
-                        borderRadius: 8,
-                        padding: "5px 8px",
-                        background: color.bg,
-                        borderLeft: `3px solid ${color.border}`,
-                        cursor: "pointer",
-                      }}
-                    >
-                      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", opacity: 0.85 }}>{it.time}</div>
-                      <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {it.patient_name}
-                      </div>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.procedure}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
+          {renderHourColumn()}
+          {visibleDays.map((d) => renderDayColumn(d))}
         </div>
       </div>
 
-      {selected && (
-        <div className="modal-overlay" onClick={() => setSelected(null)}>
-          <div className="modal-card" style={{ maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{selected.patient_name}</div>
-            <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>{selected.procedure}</div>
-            <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 14 }}>
-              {new Date(selected.date + "T00:00:00").toLocaleDateString("pt-BR")} às {selected.time}
-            </div>
-            {selected.notes && <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>Obs: {selected.notes}</div>}
-
-            {rescheduling ? (
-              <div style={{ display: "grid", gap: 10 }}>
-                <div style={{ display: "flex", gap: 10 }}>
-                  <input className="input" type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
-                  <input className="input" type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
-                </div>
-                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                  <button className="btn btn-secondary" onClick={() => setRescheduling(false)}>
-                    Cancelar
-                  </button>
-                  <button className="btn" disabled={acting} onClick={handleReschedule}>
-                    Confirmar
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                <button className="btn-danger" style={{ borderRadius: 10, padding: "9px 16px", fontSize: 13.5, fontWeight: 600 }} disabled={acting} onClick={handleCancel}>
-                  Cancelar consulta
-                </button>
-                <button className="btn btn-secondary" onClick={() => setRescheduling(true)}>
-                  Remarcar
-                </button>
-                <button className="btn" onClick={() => setSelected(null)}>
-                  Fechar
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {renderActionSheet()}
     </div>
   );
 }

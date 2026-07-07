@@ -1,6 +1,9 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAppointmentModal } from "../context/AppointmentModalContext";
 import { useAuth } from "../context/AuthContext";
+import { useIsMobile } from "../hooks/useIsMobile";
+import { MobileHeader } from "./MobileHeader";
+import { MobileTabBar } from "./MobileTabBar";
 import { Topbar } from "./Topbar";
 
 const NAV_GROUPS = [
@@ -32,9 +35,22 @@ export function Layout() {
   const { session, signOut } = useAuth();
   const { open: openNewAppointment } = useAppointmentModal();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const email = session?.user.email || "";
   const initials = email.slice(0, 2).toUpperCase();
+
+  if (isMobile) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", height: "100dvh", width: "100%" }}>
+        <MobileHeader />
+        <main className="main">
+          <Outlet />
+        </main>
+        <MobileTabBar />
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">

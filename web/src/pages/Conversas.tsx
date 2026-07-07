@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
+import { ArrowLeftIcon } from "../components/icons";
 
 interface ConversationSummary {
   id: string;
@@ -17,6 +19,7 @@ interface MessageItem {
 }
 
 export function Conversas() {
+  const isMobile = useIsMobile();
   const [items, setItems] = useState<ConversationSummary[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [conversation, setConversation] = useState<ConversationSummary | null>(null);
@@ -102,114 +105,134 @@ export function Conversas() {
     return <span className={`badge ${cls}`}>{label}</span>;
   }
 
+  const showList = !isMobile || !selectedId;
+  const showThread = !isMobile || !!selectedId;
+  const chatHeight = isMobile ? "calc(100dvh - 200px)" : "calc(100vh - 160px)";
+
   return (
     <div>
-      <h1 className="page-title">Conversas</h1>
-      <p className="page-subtitle">Atendimento em tempo real via WhatsApp</p>
+      {!isMobile && (
+        <>
+          <h1 className="page-title">Conversas</h1>
+          <p className="page-subtitle">Atendimento em tempo real via WhatsApp</p>
+        </>
+      )}
 
-      <div style={{ display: "flex", height: "calc(100vh - 160px)", gap: 16 }}>
-        <div className="card" style={{ width: 300, flex: "0 0 300px", padding: 0, overflowY: "auto" }}>
-          {items === null && <div className="empty-state">Carregando...</div>}
-          {items !== null && items.length === 0 && <div className="empty-state">Nenhuma conversa ainda.</div>}
-          {items?.map((c) => (
-            <div
-              key={c.id}
-              onClick={() => setSelectedId(c.id)}
-              style={{
-                padding: "12px 14px",
-                borderBottom: "1px solid var(--border-soft)",
-                cursor: "pointer",
-                background: c.id === selectedId ? "var(--accent-bg)" : "transparent",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                <span style={{ fontWeight: 600, fontSize: 13.5 }}>{c.userName || c.userPhone}</span>
-                {statusBadge(c.status)}
-              </div>
+      <div style={{ display: "flex", height: chatHeight, gap: 16 }}>
+        {showList && (
+          <div className="card" style={{ width: isMobile ? "100%" : 300, flex: isMobile ? 1 : "0 0 300px", padding: 0, overflowY: "auto" }}>
+            {items === null && <div className="empty-state">Carregando...</div>}
+            {items !== null && items.length === 0 && <div className="empty-state">Nenhuma conversa ainda.</div>}
+            {items?.map((c) => (
               <div
+                key={c.id}
+                onClick={() => setSelectedId(c.id)}
                 style={{
-                  fontSize: 12,
-                  color: "var(--text-muted)",
-                  marginTop: 3,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
+                  padding: "14px",
+                  borderBottom: "1px solid var(--border-soft)",
+                  cursor: "pointer",
+                  background: c.id === selectedId ? "var(--accent-bg)" : "transparent",
                 }}
               >
-                {c.lastMessage || "—"}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="card" style={{ flex: 1, display: "flex", flexDirection: "column", padding: 0 }}>
-          {!conversation && (
-            <div className="empty-state" style={{ margin: "auto" }}>
-              Selecione uma conversa
-            </div>
-          )}
-          {conversation && (
-            <>
-              <div
-                style={{
-                  padding: "14px 18px",
-                  borderBottom: "1px solid var(--border)",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 600 }}>{conversation.userName || conversation.userPhone}</div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{conversation.userPhone}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13.5 }}>{c.userName || c.userPhone}</span>
+                  {statusBadge(c.status)}
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn btn-secondary" onClick={handleToggleStatus}>
-                    {conversation.status === "human" ? "Devolver para IA" : "Assumir conversa"}
-                  </button>
-                  {conversation.status !== "closed" && (
-                    <button className="btn-danger" style={{ borderRadius: 10, padding: "9px 14px", fontSize: 13.5, fontWeight: 600 }} onClick={handleClose}>
-                      Encerrar
-                    </button>
-                  )}
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-muted)",
+                    marginTop: 3,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {c.lastMessage || "—"}
                 </div>
               </div>
+            ))}
+          </div>
+        )}
 
-              <div style={{ flex: 1, overflowY: "auto", padding: 18, display: "flex", flexDirection: "column", gap: 10 }}>
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    style={{
-                      maxWidth: "70%",
-                      alignSelf: m.role === "user" ? "flex-start" : "flex-end",
-                      background: m.role === "user" ? "#fff" : "var(--accent)",
-                      color: m.role === "user" ? "var(--text)" : "#fff",
-                      border: m.role === "user" ? "1px solid var(--border)" : "none",
-                      borderRadius: 14,
-                      padding: "8px 12px",
-                      fontSize: 13.5,
-                    }}
-                  >
-                    {m.content}
+        {showThread && (
+          <div className="card" style={{ flex: 1, display: "flex", flexDirection: "column", padding: 0 }}>
+            {!conversation && (
+              <div className="empty-state" style={{ margin: "auto" }}>
+                Selecione uma conversa
+              </div>
+            )}
+            {conversation && (
+              <>
+                <div
+                  style={{
+                    padding: "14px 18px",
+                    borderBottom: "1px solid var(--border)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                    {isMobile && (
+                      <button className="mobile-icon-btn" style={{ marginLeft: -8 }} onClick={() => setSelectedId(null)}>
+                        <ArrowLeftIcon />
+                      </button>
+                    )}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{conversation.userName || conversation.userPhone}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{conversation.userPhone}</div>
+                    </div>
                   </div>
-                ))}
-                <div ref={bottomRef} />
-              </div>
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    <button className="btn btn-secondary" onClick={handleToggleStatus}>
+                      {conversation.status === "human" ? (isMobile ? "IA" : "Devolver para IA") : isMobile ? "Assumir" : "Assumir conversa"}
+                    </button>
+                    {conversation.status !== "closed" && !isMobile && (
+                      <button className="btn-danger" style={{ borderRadius: 10, padding: "9px 14px", fontSize: 13.5, fontWeight: 600 }} onClick={handleClose}>
+                        Encerrar
+                      </button>
+                    )}
+                  </div>
+                </div>
 
-              <form onSubmit={handleSend} style={{ display: "flex", gap: 10, padding: 14, borderTop: "1px solid var(--border)" }}>
-                <input
-                  className="input"
-                  placeholder="Digite uma mensagem..."
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                />
-                <button className="btn" type="submit" disabled={sending || !input.trim()}>
-                  Enviar
-                </button>
-              </form>
-            </>
-          )}
-        </div>
+                <div style={{ flex: 1, overflowY: "auto", padding: 18, display: "flex", flexDirection: "column", gap: 10 }}>
+                  {messages.map((m) => (
+                    <div
+                      key={m.id}
+                      style={{
+                        maxWidth: "78%",
+                        alignSelf: m.role === "user" ? "flex-start" : "flex-end",
+                        background: m.role === "user" ? "var(--surface)" : "var(--accent)",
+                        color: m.role === "user" ? "var(--text)" : "#fff",
+                        border: m.role === "user" ? "1px solid var(--border)" : "none",
+                        borderRadius: 14,
+                        padding: "8px 12px",
+                        fontSize: 13.5,
+                      }}
+                    >
+                      {m.content}
+                    </div>
+                  ))}
+                  <div ref={bottomRef} />
+                </div>
+
+                <form onSubmit={handleSend} style={{ display: "flex", gap: 10, padding: 14, borderTop: "1px solid var(--border)" }}>
+                  <input
+                    className="input"
+                    placeholder="Digite uma mensagem..."
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                  />
+                  <button className="btn" type="submit" disabled={sending || !input.trim()}>
+                    Enviar
+                  </button>
+                </form>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {error && (

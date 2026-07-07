@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { FormSheet } from "../components/FormSheet";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 
 interface Patient {
@@ -13,6 +15,7 @@ interface Patient {
 const EMPTY_FORM = { name: "", phone: "", email: "" };
 
 export function Pacientes() {
+  const isMobile = useIsMobile();
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [filter, setFilter] = useState<"todos" | "novos">("todos");
@@ -97,6 +100,32 @@ export function Pacientes() {
     return true;
   });
 
+  const formFields = (
+    <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
+      {isMobile && <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{editingId ? "Editar paciente" : "Novo paciente"}</div>}
+      <div>
+        <label className="field-label">Nome</label>
+        <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      </div>
+      <div>
+        <label className="field-label">Telefone</label>
+        <input className="input" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+      </div>
+      <div>
+        <label className="field-label">E-mail</label>
+        <input className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button className="btn" type="submit" disabled={saving}>
+          {saving ? "Salvando..." : "Salvar"}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={() => setShowForm(false)}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 22 }}>
@@ -116,32 +145,16 @@ export function Pacientes() {
 
       {error && <div className="error-text">{error}</div>}
 
-      {showForm && (
-        <form className="card" onSubmit={handleSubmit} style={{ marginBottom: 20, display: "grid", gap: 12, maxWidth: 420 }}>
-          <div>
-            <label className="field-label">Nome</label>
-            <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </div>
-          <div>
-            <label className="field-label">Telefone</label>
-            <input className="input" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          </div>
-          <div>
-            <label className="field-label">E-mail</label>
-            <input className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button className="btn" type="submit" disabled={saving}>
-              {saving ? "Salvando..." : "Salvar"}
-            </button>
-            <button className="btn btn-secondary" type="button" onClick={() => setShowForm(false)}>
-              Cancelar
-            </button>
-          </div>
-        </form>
+      {!isMobile && showForm && (
+        <div className="card" style={{ marginBottom: 20, maxWidth: 420 }}>
+          {formFields}
+        </div>
       )}
+      <FormSheet open={isMobile && showForm} onClose={() => setShowForm(false)}>
+        {formFields}
+      </FormSheet>
 
-      <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)", maxWidth: 420 }}>
+      <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)", maxWidth: isMobile ? undefined : 420 }}>
         <div className="card">
           <div className="kpi-value">{stats.total}</div>
           <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Total cadastrados</div>
@@ -153,10 +166,10 @@ export function Pacientes() {
       </div>
 
       <div className="card" style={{ padding: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 14, borderBottom: "1px solid var(--border-soft)" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, padding: 14, borderBottom: "1px solid var(--border-soft)" }}>
           <input
             className="input"
-            style={{ maxWidth: 300 }}
+            style={{ maxWidth: isMobile ? "100%" : 300 }}
             placeholder="Buscar por nome, telefone ou e-mail"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -170,54 +183,82 @@ export function Pacientes() {
           </div>
         </div>
 
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Paciente</th>
-              <th>Telefone</th>
-              <th>Cadastrado em</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items === null && (
-              <tr>
-                <td colSpan={4} className="empty-state">Carregando...</td>
-              </tr>
-            )}
-            {items !== null && filtered.length === 0 && (
-              <tr>
-                <td colSpan={4} className="empty-state">Nenhum paciente encontrado.</td>
-              </tr>
-            )}
+        {items === null && <div className="empty-state">Carregando...</div>}
+        {items !== null && filtered.length === 0 && <div className="empty-state">Nenhum paciente encontrado.</div>}
+
+        {items !== null && filtered.length > 0 && isMobile && (
+          <div>
             {filtered.map((p) => {
               const initials = p.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
               return (
-                <tr key={p.id}>
-                  <td style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div key={p.id} className="mobile-list-item">
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <span className="avatar" style={{ background: "var(--accent-bg)", color: "var(--accent-dark)" }}>
                       {initials}
                     </span>
-                    <div>
+                    <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 600 }}>{p.name}</div>
                       {p.email && <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{p.email}</div>}
                     </div>
-                  </td>
-                  <td>{p.phone}</td>
-                  <td>{new Date(p.created_at).toLocaleDateString("pt-BR")}</td>
-                  <td style={{ display: "flex", gap: 6 }}>
-                    <button className="btn btn-secondary" onClick={() => startEdit(p)}>
+                  </div>
+                  <div className="mobile-list-row">
+                    <span>{p.phone}</span>
+                    <span>desde {new Date(p.created_at).toLocaleDateString("pt-BR")}</span>
+                  </div>
+                  <div className="mobile-list-actions">
+                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => startEdit(p)}>
                       Editar
                     </button>
-                    <button className="btn-danger" style={{ borderRadius: 8, padding: "6px 12px", fontSize: 12.5 }} onClick={() => handleDelete(p)}>
+                    <button className="btn-danger" style={{ flex: 1, borderRadius: 10, fontSize: 13 }} onClick={() => handleDelete(p)}>
                       Excluir
                     </button>
-                  </td>
-                </tr>
+                  </div>
+                </div>
               );
             })}
-          </tbody>
-        </table>
+          </div>
+        )}
+
+        {items !== null && filtered.length > 0 && !isMobile && (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Paciente</th>
+                <th>Telefone</th>
+                <th>Cadastrado em</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p) => {
+                const initials = p.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+                return (
+                  <tr key={p.id}>
+                    <td style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span className="avatar" style={{ background: "var(--accent-bg)", color: "var(--accent-dark)" }}>
+                        {initials}
+                      </span>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{p.name}</div>
+                        {p.email && <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{p.email}</div>}
+                      </div>
+                    </td>
+                    <td>{p.phone}</td>
+                    <td>{new Date(p.created_at).toLocaleDateString("pt-BR")}</td>
+                    <td style={{ display: "flex", gap: 6 }}>
+                      <button className="btn btn-secondary" onClick={() => startEdit(p)}>
+                        Editar
+                      </button>
+                      <button className="btn-danger" style={{ borderRadius: 8, padding: "6px 12px", fontSize: 12.5 }} onClick={() => handleDelete(p)}>
+                        Excluir
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

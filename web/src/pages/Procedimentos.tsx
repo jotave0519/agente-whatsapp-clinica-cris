@@ -1,4 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
+import { FormSheet } from "../components/FormSheet";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 
 interface ProcedureItem {
@@ -13,6 +15,7 @@ interface ProcedureItem {
 const EMPTY_FORM = { name: "", price: "", description: "", duration_minutes: "", active: true };
 
 export function Procedimentos() {
+  const isMobile = useIsMobile();
   const [items, setItems] = useState<ProcedureItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -87,6 +90,42 @@ export function Procedimentos() {
     }
   }
 
+  const procedureFormFields = (
+    <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
+      {isMobile && <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{editingId ? "Editar procedimento" : "Novo procedimento"}</div>}
+      <div>
+        <label className="field-label">Nome</label>
+        <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      </div>
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <label className="field-label">Preço (R$)</label>
+          <input className="input" type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label className="field-label">Duração (min)</label>
+          <input className="input" type="number" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} />
+        </div>
+      </div>
+      <div>
+        <label className="field-label">Descrição</label>
+        <input className="input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+      </div>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5 }}>
+        <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
+        Ativo
+      </label>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button className="btn" type="submit" disabled={saving}>
+          {saving ? "Salvando..." : "Salvar"}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={() => setShowForm(false)}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 22 }}>
@@ -104,45 +143,19 @@ export function Procedimentos() {
 
       {error && <div className="error-text">{error}</div>}
 
-      {showForm && (
-        <form className="card" onSubmit={handleSubmit} style={{ marginBottom: 20, display: "grid", gap: 12, maxWidth: 480 }}>
-          <div>
-            <label className="field-label">Nome</label>
-            <input className="input" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label className="field-label">Preço (R$)</label>
-              <input className="input" type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label className="field-label">Duração (min)</label>
-              <input className="input" type="number" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} />
-            </div>
-          </div>
-          <div>
-            <label className="field-label">Descrição</label>
-            <input className="input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          </div>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5 }}>
-            <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
-            Ativo
-          </label>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button className="btn" type="submit" disabled={saving}>
-              {saving ? "Salvando..." : "Salvar"}
-            </button>
-            <button className="btn btn-secondary" type="button" onClick={() => setShowForm(false)}>
-              Cancelar
-            </button>
-          </div>
-        </form>
+      {!isMobile && showForm && (
+        <div className="card" style={{ marginBottom: 20, maxWidth: 480 }}>
+          {procedureFormFields}
+        </div>
       )}
+      <FormSheet open={isMobile && showForm} onClose={() => setShowForm(false)}>
+        {procedureFormFields}
+      </FormSheet>
 
       {items === null && <div className="empty-state">Carregando...</div>}
       {items !== null && items.length === 0 && <div className="empty-state">Nenhum procedimento encontrado.</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 16 }}>
         {(items || []).map((p) => (
           <div key={p.id} className="card" style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 }}>

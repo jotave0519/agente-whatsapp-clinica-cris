@@ -1,3 +1,4 @@
+import { CONTEXT_EXPIRY_MINUTES } from "../config/conversationPolicy";
 import { env } from "../config/env";
 import { createMessage } from "../integrations/anthropicClient";
 import * as conversationRepository from "../repositories/conversationRepository";
@@ -16,6 +17,22 @@ export interface EngineResult {
 }
 
 /**
+ * Uma conversa e considerada expirada (contexto de atendimento encerrado) se
+ * foi fechada explicitamente (manualmente ou pelo cron de inatividade) ou se
+ * o cliente ficou tempo demais sem responder - mesmo que por algum motivo o
+ * cron de inatividade nao tenha rodado a tempo (ex: deploy, instabilidade).
+ * O historico de mensagens NUNCA e apagado por isso, so a etapa do fluxo
+ * (state/state_data) e reiniciada para MENU, para nao presumir que o cliente
+ * ainda quer concluir um agendamento abandonado ha dias.
+ */
+function isConversationStale(conversation: Conversation): boolean {
+  if (conversation.status === "closed") return true;
+  if (!conversation.last_user_message_at) return false;
+  const elapsedMs = Date.now() - new Date(conversation.last_user_message_at).getTime();
+  return elapsedMs > CONTEXT_EXPIRY_MINUTES * 60 * 1000;
+}
+
+/**
  * Ponto de entrada: processa uma mensagem do cliente dentro da etapa atual da
  * conversa, chamando a Claude apenas com o prompt e as ferramentas daquela
  * etapa especifica (nunca o conjunto completo), e persiste a transicao de
@@ -25,12 +42,25 @@ export async function runTurn(user: User, conversation: Conversation, userMessag
   logger.info(SCOPE, "runTurn: inicio", {
     userId: user.id,
     conversationId: conversation.id,
+    status: conversation.status,
     state: conversation.state,
+    lastUserMessageAt: conversation.last_user_message_at,
     userMessage,
   });
 
+  const stale = isConversationStale(conversation);
+  if (stale && conversation.state !== "MENU") {
+    logger.info(SCOPE, "Contexto de atendimento expirado - reiniciando fluxo para MENU (historico preservado)", {
+      conversationId: conversation.id,
+      previousState: conversation.state,
+      previousStateData: conversation.state_data,
+    });
+    await conversationRepository.updateConversationFlow(conversation.id, "MENU", {});
+    conversation = { ...conversation, state: "MENU", state_data: {} };
+  }
+
   const priorMessages = await conversationRepository.listMessages(conversation.id);
-  const isFirstMessage = priorMessages.length === 0;
+  const isFirstMessage = priorMessages.length === 0 || stale;
   await conversationRepository.addMessage(conversation.id, "user", userMessage);
 
   const currentStep = getStep(conversation.state);
@@ -53,7 +83,12 @@ export async function runTurn(user: User, conversation: Conversation, userMessag
     return finalize(conversation, result);
   }
 
-  const history: any[] = priorMessages.map((m) => ({ role: m.role, content: m.content }));
+  // Se o contexto expirou, o historico anterior fica preservado no banco (a CRM
+  // continua mostrando a conversa completa), mas NAO entra no contexto ativo do
+  // modelo: caso contrario a Claude pode "ler" a intencao antiga (ex: "quero
+  // agendar um botox") no historico e retomar o fluxo sozinha, mesmo com o
+  // estado ja reiniciado para MENU - foi exatamente esse o bug observado.
+  const history: any[] = stale ? [] : priorMessages.map((m) => ({ role: m.role, content: m.content }));
   history.push({ role: "user", content: userMessage });
 
   let workingConversation = conversation;

@@ -1,8 +1,6 @@
+import { CLOSE_AFTER_MINUTES, NUDGE_AFTER_MINUTES } from "../config/conversationPolicy";
 import * as conversationRepository from "../repositories/conversationRepository";
 import { sendWhatsAppMessage } from "../integrations/evolutionApiClient";
-
-const NUDGE_AFTER_MINUTES = 5;
-const CLOSE_AFTER_MINUTES = 5; // + NUDGE_AFTER_MINUTES = 10min desde a ultima mensagem do cliente
 
 const NUDGE_TEXT =
   "😊 Oi! Estou por aqui.\n\nSe ainda desejar continuar seu atendimento, é só responder esta mensagem.";

@@ -48,11 +48,12 @@ export async function sendMessage(req: Request, res: Response): Promise<void> {
 
     logger.info(SCOPE, "Enviando mensagem manual via CRM", { staffId: req.staff?.id, conversationId: conversation.id });
     await sendWhatsAppMessage(conversation.userPhone, content);
+    // Nao altera conversation.status: enviar uma mensagem manual nao e, por si so, uma
+    // transferencia para atendimento humano. Isso so acontece via acao explicita (o toggle
+    // "Assumir conversa" na tela, que chama updateStatus) ou via request_human_handoff da IA.
+    // Sem essa separacao, uma unica mensagem manual desligava a IA silenciosamente ate alguem
+    // notar e devolver a conversa manualmente.
     const message = await conversationRepository.addMessage(conversation.id, "assistant", content);
-
-    if (conversation.status !== "human") {
-      await conversationRepository.updateConversationStatus(conversation.id, "human");
-    }
 
     res.status(201).json(message);
   } catch (err: any) {

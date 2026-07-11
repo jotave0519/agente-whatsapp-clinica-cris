@@ -36,10 +36,12 @@ export async function handleWhatsAppWebhook(req: Request, res: Response): Promis
     const wasClosed = conversation.status === "closed";
     await conversationRepository.touchUserActivity(conversation.id, wasClosed);
     if (wasClosed) {
-      conversation.status = "ai";
-      logger.info(SCOPE, "Conversa estava encerrada por inatividade - reaberta", { conversationId: conversation.id });
+      logger.info(SCOPE, "Conversa estava encerrada - sera reaberta e o fluxo de atendimento reiniciado", { conversationId: conversation.id });
     }
 
+    // Nao sobrescrevemos conversation.status em memoria mesmo apos reabrir no banco:
+    // o engine usa o status original ("closed") para saber que o contexto expirou e
+    // reiniciar o fluxo. Isso e seguro aqui porque "closed" nunca e igual a "human".
     if (conversation.status === "human") {
       logger.info(SCOPE, "Conversa em atendimento humano - mensagem apenas registrada", { conversationId: conversation.id });
       await conversationRepository.addMessage(conversation.id, "user", text);

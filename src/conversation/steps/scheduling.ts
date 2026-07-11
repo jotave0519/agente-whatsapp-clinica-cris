@@ -183,10 +183,13 @@ export const dateStep: StepDefinition = {
   instructions: (ctx) => {
     const { procedure, name } = ctx.conversation.state_data;
     return (
-      `Etapa: falta a data desejada (procedimento: ${procedure}, paciente: ${name}). Se a ultima mensagem ja contem uma data, ` +
-      'chame provide_date com a data no formato YYYY-MM-DD, resolvendo termos relativos ("hoje", "amanha", "depois de amanha", ' +
-      'nomes de dias da semana como "segunda", "proxima sexta", "semana que vem" etc) usando a data atual e o dia da semana informados ' +
-      "no topo destas instrucoes. Nunca peça para o cliente digitar em formato DD/MM. Caso a mensagem nao contenha uma data, pergunte (apenas) a data desejada."
+      `Etapa: falta a data desejada (procedimento: ${procedure}, paciente: ${name}). Se a ultima mensagem ja contem QUALQUER referencia temporal ` +
+      '- "hoje", "amanha", "depois de amanha", nome de dia da semana ("segunda", "quarta-feira"), "proxima sexta", "semana que vem", ' +
+      '"inicio/fim da semana" etc - resolva mentalmente para uma data exata usando a data atual e o dia da semana informados no topo destas ' +
+      "instrucoes (dia da semana sozinho = a proxima ocorrencia desse dia a partir de hoje) e chame provide_date DIRETO com o resultado no " +
+      'formato YYYY-MM-DD. NUNCA responda coisas como "pode confirmar a data?", "digite no formato DD/MM", "não consegui entender" ou ' +
+      '"pode repetir a data?" quando o cliente ja disse um dia da semana ou termo relativo claro - isso so deve ser perguntado se a mensagem ' +
+      "realmente nao contiver nenhuma referencia de data. Caso a mensagem nao contenha uma data, pergunte (apenas) a data desejada."
     );
   },
   tools: [

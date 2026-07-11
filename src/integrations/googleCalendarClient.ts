@@ -122,10 +122,13 @@ async function calendarRequest<T = unknown>(
   path: string,
   options: { params?: Record<string, unknown>; data?: unknown } = {}
 ): Promise<T> {
-  const accessToken = await getAccessToken();
   logger.info(SCOPE, `Chamando ${method.toUpperCase()} ${path}`, { params: options.params });
 
+  // Inclui a renovacao do access token dentro do bloco retentado - uma falha
+  // transitoria de rede ao renovar o token nao deve ser diferente de uma
+  // falha transitoria na chamada em si.
   const doRequest = async () => {
+    const accessToken = await getAccessToken();
     const response = await axios.request<T>({
       method,
       url: `${CALENDAR_API_BASE}${path}`,
@@ -141,7 +144,8 @@ async function calendarRequest<T = unknown>(
     // So GET e retentado automaticamente (idempotente por natureza) - retentar
     // POST/PATCH/DELETE poderia duplicar/alterar dados em caso de falha
     // transitoria na resposta apos a escrita ja ter sido aplicada no Calendar.
-    return method === "get" ? await withRetry(doRequest, 1) : await doRequest();
+    // 2 tentativas extras (3 no total) antes de desistir de uma consulta.
+    return method === "get" ? await withRetry(doRequest, 2) : await doRequest();
   } catch (err) {
     logger.error(SCOPE, `Falha em ${method.toUpperCase()} ${path}`, err);
     throw err;

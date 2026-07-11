@@ -79,9 +79,11 @@ export const selectStep: StepDefinition = {
 export const dateStep: StepDefinition = {
   id: "RESCHEDULING_DATE",
   instructions: (ctx) =>
-    `Etapa: falta a nova data desejada para remarcar (procedimento: ${ctx.conversation.state_data.procedure}). Se a mensagem ja contem uma data, ` +
-    'chame provide_date com a data no formato YYYY-MM-DD, resolvendo termos relativos ("amanha", dias da semana, "semana que vem" etc) usando ' +
-    "a data atual e o dia da semana informados no topo destas instrucoes. Caso contrario, pergunte (apenas) a nova data.",
+    `Etapa: falta a nova data desejada para remarcar (procedimento: ${ctx.conversation.state_data.procedure}). Se a mensagem ja contem QUALQUER ` +
+    'referencia temporal ("amanha", nome de dia da semana, "proxima sexta", "semana que vem" etc), resolva mentalmente para uma data exata ' +
+    "usando a data atual e o dia da semana informados no topo destas instrucoes (dia da semana sozinho = a proxima ocorrencia a partir de hoje) " +
+    'e chame provide_date DIRETO no formato YYYY-MM-DD. NUNCA peça para confirmar/repetir a data ou digitar em DD/MM quando o cliente ja disse ' +
+    "um dia da semana ou termo relativo claro. Caso a mensagem realmente nao contenha nenhuma data, pergunte (apenas) a nova data.",
   tools: [
     {
       name: "provide_date",

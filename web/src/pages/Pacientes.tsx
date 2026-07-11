@@ -189,7 +189,8 @@ export function Pacientes() {
         {items !== null && filtered.length > 0 && isMobile && (
           <div>
             {filtered.map((p) => {
-              const initials = p.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+              const displayName = p.name || "Contato sem nome";
+              const initials = (p.name ? p.name.split(" ").map((w) => w[0]).slice(0, 2).join("") : "?").toUpperCase();
               return (
                 <div key={p.id} className="mobile-list-item">
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -197,7 +198,7 @@ export function Pacientes() {
                       {initials}
                     </span>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600 }}>{p.name}</div>
+                      <div style={{ fontWeight: 600 }}>{displayName}</div>
                       {p.email && <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{p.email}</div>}
                     </div>
                   </div>
@@ -231,7 +232,8 @@ export function Pacientes() {
             </thead>
             <tbody>
               {filtered.map((p) => {
-                const initials = p.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+                const displayName = p.name || "Contato sem nome";
+              const initials = (p.name ? p.name.split(" ").map((w) => w[0]).slice(0, 2).join("") : "?").toUpperCase();
                 return (
                   <tr key={p.id}>
                     <td style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -239,7 +241,7 @@ export function Pacientes() {
                         {initials}
                       </span>
                       <div>
-                        <div style={{ fontWeight: 600 }}>{p.name}</div>
+                        <div style={{ fontWeight: 600 }}>{displayName}</div>
                         {p.email && <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{p.email}</div>}
                       </div>
                     </td>

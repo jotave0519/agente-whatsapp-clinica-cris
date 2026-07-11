@@ -26,7 +26,7 @@ export async function createUser(phone: string, name: string): Promise<User> {
 export async function findOrCreateUser(phone: string, fallbackName: string): Promise<User> {
   const existing = await findUserByPhone(phone);
   if (existing) return existing;
-  return createUser(phone, fallbackName || phone);
+  return createUser(phone, fallbackName || "");
 }
 
 export async function count(): Promise<number> {

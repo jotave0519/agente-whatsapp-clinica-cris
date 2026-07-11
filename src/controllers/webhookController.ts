@@ -23,8 +23,12 @@ export async function handleWhatsAppWebhook(req: Request, res: Response): Promis
   logger.info(SCOPE, "Mensagem recebida", { phone, text, pushName });
 
   try {
-    const user = await getOrCreateUserByPhone(phone, pushName);
-    logger.info(SCOPE, "Usuario resolvido", { userId: user.id, phone: user.phone, name: user.name });
+    // Nunca usar o pushName do WhatsApp como nome do paciente (pode vir vazio,
+    // com apelido, emoji ou nome de empresa) - o nome real e sempre capturado
+    // explicitamente no fluxo de agendamento (SCHEDULING_NAME) e persistido em
+    // users.name. Cliente novo nasce com name: "".
+    const user = await getOrCreateUserByPhone(phone);
+    logger.info(SCOPE, "Usuario resolvido", { userId: user.id, phone: user.phone, name: user.name, pushName });
 
     const conversation = await conversationRepository.findOrCreateActiveConversation(user.id);
     logger.info(SCOPE, "Conversa resolvida", {

@@ -7,6 +7,7 @@ import { FlowContext, StepDefinition, StepResult, ToolHandler } from "../types";
 import { ABANDON_TOOL, abandonFlow } from "./shared";
 
 const SCOPE = "conversation.rescheduling";
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const beginRescheduling: ToolHandler = async (ctx) => {
   logger.info(SCOPE, "Buscando agendamentos ativos", { conversationId: ctx.conversation.id, userId: ctx.user.id });
@@ -79,7 +80,8 @@ export const dateStep: StepDefinition = {
   id: "RESCHEDULING_DATE",
   instructions: (ctx) =>
     `Etapa: falta a nova data desejada para remarcar (procedimento: ${ctx.conversation.state_data.procedure}). Se a mensagem ja contem uma data, ` +
-    "chame provide_date com a data no formato YYYY-MM-DD. Caso contrario, pergunte (apenas) a nova data.",
+    'chame provide_date com a data no formato YYYY-MM-DD, resolvendo termos relativos ("amanha", dias da semana, "semana que vem" etc) usando ' +
+    "a data atual e o dia da semana informados no topo destas instrucoes. Caso contrario, pergunte (apenas) a nova data.",
   tools: [
     {
       name: "provide_date",
@@ -91,14 +93,38 @@ export const dateStep: StepDefinition = {
   handlers: {
     provide_date: async (ctx, input) => {
       const baseData = ctx.conversation.state_data;
+
+      if (!ISO_DATE.test(input.date) || isNaN(Date.parse(input.date))) {
+        logger.warn(SCOPE, "Data invalida recebida do modelo, nao consultando o Calendar", { conversationId: ctx.conversation.id, date: input.date });
+        return {
+          nextStep: "RESCHEDULING_DATE",
+          data: baseData,
+          message:
+            `A data "${input.date}" nao esta num formato valido (YYYY-MM-DD). Resolva a data que o cliente quis dizer usando a data atual e o ` +
+            "dia da semana informados no topo destas instrucoes, e chame provide_date novamente com o formato correto. Nao mencione esse erro ao cliente.",
+        };
+      }
+
       const durationMinutes = baseData.durationMinutes ?? 30;
       logger.info(SCOPE, "Consultando disponibilidade para remarcacao", { conversationId: ctx.conversation.id, date: input.date, durationMinutes });
       const slots = await schedulingService.checkAvailability(input.date, durationMinutes);
       logger.info(SCOPE, "Disponibilidade recebida", { date: input.date, slotCount: slots.length });
 
       if (slots.length === 0) {
+        const alternative = await schedulingService.findNextAvailable(input.date, durationMinutes);
+        if (alternative) {
+          logger.info(SCOPE, "Sugerindo data alternativa", { requestedDate: input.date, alternativeDate: alternative.date });
+          return {
+            nextStep: "RESCHEDULING_DATE",
+            data: baseData,
+            message:
+              `Nenhum horario livre em ${input.date}. Porem ha disponibilidade em ${alternative.date}: ${describeSlots(alternative.slots)}. ` +
+              "Informe ao cliente que a data pedida esta cheia e ofereca essa data alternativa com os horarios, perguntando se algum serve. " +
+              "Se aceitar, chame provide_date de novo com a data alternativa.",
+          };
+        }
         const guidance = await aiKnowledgeService.getMessageTemplate("no_slot_found");
-        return { nextStep: "RESCHEDULING_DATE", data: baseData, message: `Nenhum horario livre em ${input.date}. ${guidance}` };
+        return { nextStep: "RESCHEDULING_DATE", data: baseData, message: `Nenhum horario livre em ${input.date} nem nos proximos dias. ${guidance}` };
       }
 
       const data: FlowStateData = { ...baseData, date: input.date, availableSlots: slots.slice(0, 6) };
@@ -182,9 +208,14 @@ export async function confirmRescheduling(ctx: FlowContext): Promise<StepResult>
 
 export const confirmStep: StepDefinition = {
   id: "RESCHEDULING_CONFIRM",
-  instructions: (ctx) =>
-    `Etapa: aguardando confirmacao final da remarcacao para ${ctx.conversation.state_data.selectedStart}. Peça confirmação explícita. ` +
-    "Se ja confirmou, chame confirm_rescheduling.",
+  instructions: (ctx) => {
+    const { selectedStart, procedure } = ctx.conversation.state_data;
+    return (
+      `Etapa: aguardando confirmacao final da remarcacao (procedimento: ${procedure}, novo horario: ${selectedStart ? `${formatDate(selectedStart)} as ${formatTime(selectedStart)}` : selectedStart}). ` +
+      "Monte um resumo curto com 📅 [data] e 🕒 [horario] antes de perguntar algo como \"Posso confirmar essa remarcação?\". " +
+      "Se ja confirmou, chame confirm_rescheduling."
+    );
+  },
   tools: [
     {
       name: "confirm_rescheduling",

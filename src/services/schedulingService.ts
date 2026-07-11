@@ -7,6 +7,28 @@ export async function checkAvailability(date: string, durationMinutes?: number):
   return googleCalendar.checkAvailability(date, durationMinutes);
 }
 
+/**
+ * Quando a data pedida nao tem vaga, procura o proximo dia (ate
+ * maxDaysForward dias a frente) que tenha horarios livres, para a IA poder
+ * sugerir uma alternativa concreta em vez de so pedir outra data.
+ */
+export async function findNextAvailable(
+  afterDate: string,
+  durationMinutes?: number,
+  maxDaysForward = 7
+): Promise<{ date: string; slots: string[] } | null> {
+  const cursor = new Date(`${afterDate}T12:00:00-03:00`);
+  for (let i = 1; i <= maxDaysForward; i += 1) {
+    cursor.setDate(cursor.getDate() + 1);
+    const candidateDate = cursor.toISOString().slice(0, 10);
+    const slots = await checkAvailability(candidateDate, durationMinutes);
+    if (slots.length > 0) {
+      return { date: candidateDate, slots: slots.slice(0, 6) };
+    }
+  }
+  return null;
+}
+
 export async function createAppointment(params: {
   userId: string;
   name: string;

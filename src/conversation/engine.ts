@@ -148,7 +148,15 @@ export async function runTurn(user: User, conversation: Conversation, userMessag
               output = result.message;
             } catch (err) {
               logger.error(SCOPE, `Excecao ao executar ferramenta ${block.name}`, err);
-              output = `Erro ao executar ${block.name}: ${(err as Error).message}`;
+              // Nunca repassar err.message (texto tecnico) para o tool_result - o
+              // modelo poderia parafrasear/vazar isso pro cliente. Em vez disso, uma
+              // instrucao segura, seguindo a REGRA CRITICA de nao mencionar detalhes
+              // tecnicos em GLOBAL_RULES.
+              const fallback = await aiKnowledgeService.getMessageTemplate("generic_error");
+              output =
+                `Ocorreu um problema tecnico interno ao tentar concluir essa acao. NAO mencione detalhes tecnicos, codigos ou nomes de ` +
+                "sistemas ao cliente. Peca desculpas de forma natural e sugira tentar novamente em instantes (repetir a informacao ou " +
+                `tentar de novo daqui a pouco). Exemplo de tom: "${fallback}"`;
             }
           }
 

@@ -1,6 +1,7 @@
 import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as schedulingService from "../../services/schedulingService";
 import * as settingsRepository from "../../repositories/settingsRepository";
+import * as userRepository from "../../repositories/userRepository";
 import { FlowStateData } from "../../types";
 import { logger } from "../../utils/logger";
 import { describeSlots, formatDate, formatTime } from "../prompt";
@@ -8,24 +9,54 @@ import { FlowContext, StepDefinition, StepResult, ToolHandler } from "../types";
 import { ABANDON_TOOL, abandonFlow, looksLikeFullName } from "./shared";
 
 const SCOPE = "conversation.scheduling";
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Consulta disponibilidade real no Google Calendar para a data informada.
  * Usada tanto pela etapa SCHEDULING_DATE quanto por begin_scheduling quando
  * o cliente ja informa a data na mesma mensagem que inicia o fluxo.
+ *
+ * Valida o formato da data ANTES de consultar o Calendar: se o modelo nao
+ * resolveu corretamente uma expressao como "segunda" para uma data ISO, isso
+ * evita um erro tecnico (Invalid time value) vazando para o tool_result -
+ * devolve uma instrucao para o proprio modelo corrigir, sem tocar a API.
  */
 export async function provideDate(ctx: FlowContext, baseData: FlowStateData, date: string): Promise<StepResult> {
+  if (!ISO_DATE.test(date) || isNaN(Date.parse(date))) {
+    logger.warn(SCOPE, "Data invalida recebida do modelo, nao consultando o Calendar", { conversationId: ctx.conversation.id, date });
+    return {
+      nextStep: "SCHEDULING_DATE",
+      data: baseData,
+      message:
+        `A data "${date}" nao esta num formato valido (YYYY-MM-DD). Resolva a data que o cliente quis dizer usando a data ` +
+        "atual e o dia da semana informados no topo destas instrucoes, e chame provide_date novamente com o formato correto. " +
+        "Nao mencione esse erro ao cliente.",
+    };
+  }
+
   const durationMinutes = baseData.durationMinutes ?? 30;
   logger.info(SCOPE, "Consultando disponibilidade", { conversationId: ctx.conversation.id, date, durationMinutes });
   const slots = await schedulingService.checkAvailability(date, durationMinutes);
   logger.info(SCOPE, "Disponibilidade recebida", { date, slotCount: slots.length });
 
   if (slots.length === 0) {
+    const alternative = await schedulingService.findNextAvailable(date, durationMinutes);
+    if (alternative) {
+      logger.info(SCOPE, "Sugerindo data alternativa", { requestedDate: date, alternativeDate: alternative.date });
+      return {
+        nextStep: "SCHEDULING_DATE",
+        data: baseData,
+        message:
+          `Nenhum horario livre em ${date}. Porem ha disponibilidade em ${alternative.date}: ${describeSlots(alternative.slots)}. ` +
+          "Informe ao cliente que a data pedida esta cheia e ofereca essa data alternativa com os horarios (formato HH:MM), perguntando se algum serve. " +
+          "Se o cliente aceitar um desses horarios, chame provide_date de novo com a data alternativa para registrar oficialmente e seguir para a escolha do horario.",
+      };
+    }
     const guidance = await aiKnowledgeService.getMessageTemplate("no_slot_found");
     return {
       nextStep: "SCHEDULING_DATE",
       data: baseData,
-      message: `Nenhum horario livre em ${date}. ${guidance}`,
+      message: `Nenhum horario livre em ${date} nem nos proximos dias. ${guidance}`,
     };
   }
 
@@ -39,8 +70,10 @@ export async function provideDate(ctx: FlowContext, baseData: FlowStateData, dat
 
 /**
  * Inicia (ou reinicia, no caso de troca de fluxo em outra etapa) o fluxo de
- * agendamento. Reaproveita o nome ja cadastrado do cliente (ctx.user.name)
- * quando ele parece completo, para nao perguntar de novo algo ja conhecido.
+ * agendamento. O cadastro do paciente (nome) vem ANTES do procedimento -
+ * reflete como uma recepcionista de verdade conduziria: primeiro sabe quem e
+ * a pessoa, depois o que ela quer. Reaproveita o nome ja cadastrado
+ * (ctx.user.name) quando ele parece completo, para nao perguntar de novo.
  */
 export const beginScheduling: ToolHandler = async (ctx, input) => {
   const data: FlowStateData = {};
@@ -48,12 +81,10 @@ export const beginScheduling: ToolHandler = async (ctx, input) => {
   if (input.name) data.name = input.name;
   logger.info(SCOPE, "Iniciando fluxo de agendamento", { conversationId: ctx.conversation.id, input });
 
-  if (!data.procedure) {
-    return { nextStep: "SCHEDULING_PROCEDURE", data, message: "Fluxo de agendamento iniciado. Peça (apenas) qual procedimento o cliente deseja agendar." };
+  if (data.procedure) {
+    const duration = await aiKnowledgeService.findProcedureDuration(data.procedure);
+    if (duration) data.durationMinutes = duration;
   }
-
-  const duration = await aiKnowledgeService.findProcedureDuration(data.procedure);
-  if (duration) data.durationMinutes = duration;
 
   if (!data.name && looksLikeFullName(ctx.user.name)) {
     data.name = ctx.user.name;
@@ -61,7 +92,15 @@ export const beginScheduling: ToolHandler = async (ctx, input) => {
   }
 
   if (!data.name) {
-    return { nextStep: "SCHEDULING_NAME", data, message: `Procedimento registrado: ${data.procedure}. Peça o nome completo do paciente.` };
+    return {
+      nextStep: "SCHEDULING_NAME",
+      data,
+      message: "Fluxo de agendamento iniciado. Peça o nome completo do paciente para realizar o cadastro (explique rapidamente o motivo).",
+    };
+  }
+
+  if (!data.procedure) {
+    return { nextStep: "SCHEDULING_PROCEDURE", data, message: `Nome já conhecido (${data.name}), não precisa perguntar de novo. Pergunte qual procedimento o cliente deseja, ou se prefere uma avaliação.` };
   }
   if (input.date) {
     return provideDate(ctx, data, input.date);
@@ -71,14 +110,15 @@ export const beginScheduling: ToolHandler = async (ctx, input) => {
 
 export const procedureStep: StepDefinition = {
   id: "SCHEDULING_PROCEDURE",
-  instructions: () =>
-    "Etapa: falta saber qual procedimento o cliente quer agendar. Se a ultima mensagem ja contem o procedimento " +
-    "(ex: Botox, preenchimento, limpeza de pele, avaliacao), chame provide_procedure com esse valor. Caso contrario, " +
-    "pergunte (apenas) qual procedimento ele deseja agendar. Nao explique o procedimento nem informe preco aqui.",
+  instructions: (ctx) =>
+    `Etapa: falta saber qual procedimento o paciente (${ctx.conversation.state_data.name}) quer agendar. Se a ultima mensagem ja contem o procedimento ` +
+    "(ex: Botox, preenchimento, limpeza de pele) ou uma preferencia por avaliacao, chame provide_procedure com esse valor. Caso contrario, pergunte algo como " +
+    '"Você já sabe qual procedimento deseja realizar ou prefere agendar uma avaliação para a Dra. indicar o tratamento mais adequado?". ' +
+    "Nao explique o procedimento nem informe preco aqui.",
   tools: [
     {
       name: "provide_procedure",
-      description: "Registra o procedimento que o cliente quer agendar.",
+      description: "Registra o procedimento (ou 'avaliacao') que o cliente quer agendar.",
       input_schema: { type: "object", properties: { procedure: { type: "string" } }, required: ["procedure"] },
     },
     ABANDON_TOOL,
@@ -89,10 +129,7 @@ export const procedureStep: StepDefinition = {
       const duration = await aiKnowledgeService.findProcedureDuration(input.procedure);
       if (duration) data.durationMinutes = duration;
       logger.info(SCOPE, "Procedimento registrado", { conversationId: ctx.conversation.id, procedure: input.procedure, durationMinutes: data.durationMinutes });
-      if (data.name) {
-        return { nextStep: "SCHEDULING_DATE", data, message: `Procedimento registrado: ${input.procedure}. Nome ja conhecido. Peça a data desejada.` };
-      }
-      return { nextStep: "SCHEDULING_NAME", data, message: `Procedimento registrado: ${input.procedure}. Peça o nome completo do paciente.` };
+      return { nextStep: "SCHEDULING_DATE", data, message: `Procedimento registrado: ${input.procedure}. Peça a data desejada.` };
     },
     abandon_flow: abandonFlow,
   },
@@ -100,13 +137,13 @@ export const procedureStep: StepDefinition = {
 
 export const nameStep: StepDefinition = {
   id: "SCHEDULING_NAME",
-  instructions: (ctx) =>
-    `Etapa: falta o nome completo do paciente (procedimento: ${ctx.conversation.state_data.procedure}). ` +
-    "Se a ultima mensagem ja contem o nome, chame provide_name. Caso contrario, pergunte (apenas) o nome completo.",
+  instructions: () =>
+    "Etapa: falta o nome completo do paciente para o cadastro. Se a ultima mensagem ja contem o nome, chame provide_name. Caso contrario, " +
+    'pergunte de forma natural, explicando o motivo - ex: "Antes de continuarmos, poderia me informar seu nome completo para realizar seu cadastro? 😊".',
   tools: [
     {
       name: "provide_name",
-      description: "Registra o nome completo do paciente informado pelo cliente.",
+      description: "Registra o nome completo do paciente informado pelo cliente e salva no cadastro.",
       input_schema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
     },
     ABANDON_TOOL,
@@ -123,9 +160,19 @@ export const nameStep: StepDefinition = {
             "explique de forma natural que falta o sobrenome para completar o cadastro e peça só isso.",
         };
       }
+
+      await userRepository.updatePatient(ctx.user.id, { name: input.name });
+      logger.info(SCOPE, "Nome registrado e persistido no cadastro", { conversationId: ctx.conversation.id, userId: ctx.user.id, name: input.name });
+
       const data: FlowStateData = { ...ctx.conversation.state_data, name: input.name };
-      logger.info(SCOPE, "Nome registrado", { conversationId: ctx.conversation.id, name: input.name });
-      return { nextStep: "SCHEDULING_DATE", data, message: `Nome registrado: ${input.name}. Peça a data desejada.` };
+      if (data.procedure) {
+        return { nextStep: "SCHEDULING_DATE", data, message: `Nome registrado: ${input.name}. Procedimento já conhecido (${data.procedure}), não precisa perguntar de novo. Peça a data desejada.` };
+      }
+      return {
+        nextStep: "SCHEDULING_PROCEDURE",
+        data,
+        message: `Nome registrado: ${input.name}. Pergunte se já sabe qual procedimento deseja ou prefere agendar uma avaliação.`,
+      };
     },
     abandon_flow: abandonFlow,
   },
@@ -137,8 +184,9 @@ export const dateStep: StepDefinition = {
     const { procedure, name } = ctx.conversation.state_data;
     return (
       `Etapa: falta a data desejada (procedimento: ${procedure}, paciente: ${name}). Se a ultima mensagem ja contem uma data, ` +
-      'chame provide_date com a data no formato YYYY-MM-DD (resolva termos relativos como "amanha"/"segunda" usando a data atual informada). ' +
-      "Caso contrario, pergunte (apenas) a data desejada."
+      'chame provide_date com a data no formato YYYY-MM-DD, resolvendo termos relativos ("hoje", "amanha", "depois de amanha", ' +
+      'nomes de dias da semana como "segunda", "proxima sexta", "semana que vem" etc) usando a data atual e o dia da semana informados ' +
+      "no topo destas instrucoes. Nunca peça para o cliente digitar em formato DD/MM. Caso a mensagem nao contenha uma data, pergunte (apenas) a data desejada."
     );
   },
   tools: [
@@ -237,11 +285,14 @@ export async function confirmScheduling(ctx: FlowContext): Promise<StepResult> {
 
 export const confirmStep: StepDefinition = {
   id: "SCHEDULING_CONFIRM",
-  instructions: (ctx) => {
+  instructions: async (ctx) => {
     const { name, procedure, selectedStart } = ctx.conversation.state_data;
+    const settings = await settingsRepository.getClinicSettings();
     return (
-      `Etapa: aguardando confirmacao final. Dados: nome=${name}, procedimento=${procedure}, horario=${selectedStart}. ` +
-      "Repita esses dados e peça confirmação explícita. Se o cliente ja confirmou claramente, chame confirm_scheduling. Nunca chame sem confirmacao explicita."
+      `Etapa: aguardando confirmacao final. Dados: nome=${name}, procedimento=${procedure}, horario=${selectedStart ? `${formatDate(selectedStart)} as ${formatTime(selectedStart)}` : selectedStart}, ` +
+      `local=${settings.name}${settings.address ? `, ${settings.address}` : ""}. Monte um resumo nesse formato antes de pedir confirmação (adapte o texto ao redor, mas mantenha os emojis e a estrutura):\n` +
+      `📅 [dia da semana, data]\n🕒 [horario]\n👤 [nome do paciente]\n📍 [nome da clinica e endereco]\n\n` +
+      'Pergunte algo como "Posso confirmar esse horário?" logo depois. Se o cliente ja confirmou claramente, chame confirm_scheduling. Nunca chame sem confirmacao explicita.'
     );
   },
   tools: [

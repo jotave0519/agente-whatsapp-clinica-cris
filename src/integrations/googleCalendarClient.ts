@@ -3,6 +3,7 @@ import axios from "axios";
 import { env } from "../config/env";
 import * as businessHoursService from "../services/businessHoursService";
 import { logger } from "../utils/logger";
+import { withRetry } from "../utils/retry";
 
 // Cliente REST feito com axios (em vez da lib "googleapis") porque o gaxios/node-fetch
 // interno da lib apresenta "Premature close" ao ler respostas gzip neste ambiente.
@@ -124,7 +125,7 @@ async function calendarRequest<T = unknown>(
   const accessToken = await getAccessToken();
   logger.info(SCOPE, `Chamando ${method.toUpperCase()} ${path}`, { params: options.params });
 
-  try {
+  const doRequest = async () => {
     const response = await axios.request<T>({
       method,
       url: `${CALENDAR_API_BASE}${path}`,
@@ -134,6 +135,13 @@ async function calendarRequest<T = unknown>(
       timeout: 30_000,
     });
     return response.data;
+  };
+
+  try {
+    // So GET e retentado automaticamente (idempotente por natureza) - retentar
+    // POST/PATCH/DELETE poderia duplicar/alterar dados em caso de falha
+    // transitoria na resposta apos a escrita ja ter sido aplicada no Calendar.
+    return method === "get" ? await withRetry(doRequest, 1) : await doRequest();
   } catch (err) {
     logger.error(SCOPE, `Falha em ${method.toUpperCase()} ${path}`, err);
     throw err;

@@ -31,7 +31,7 @@ const DEFAULT_TEMPLATES: Record<string, string> = {
     "Oi, {{patientName}}! Passando para lembrar da sua consulta de {{procedure}} amanha, dia {{date}} as {{time}}, aqui na clinica ({{address}}).\n\nPode confirmar sua presenca respondendo *SIM*? Se precisar remarcar, e so avisar por aqui.",
   generic_error: "Desculpe, tive um problema para responder agora. Nossa equipe vai te retornar em breve.",
   welcome_message:
-    "Cumprimente o cliente pelo nome (se souber) de forma calorosa e acolhedora, e apresente as opcoes principais: agendar avaliacao, remarcar, cancelar, conhecer tratamentos ou falar com atendente.",
+    "Cumprimente de forma calorosa e profissional, dando as boas-vindas a clinica e se apresentando brevemente como a assistente virtual. Pergunte como pode ajudar hoje. Nao liste opcoes numeradas nem mencione um menu - deixe a conversa fluir naturalmente a partir da resposta do cliente.",
   no_slot_found: "Informe educadamente que nao ha horarios livres na data pedida e peca outra data ao cliente.",
 };
 

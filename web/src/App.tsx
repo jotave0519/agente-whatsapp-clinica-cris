@@ -10,6 +10,7 @@ import { Conversas } from "./pages/Conversas";
 import { Dashboard } from "./pages/Dashboard";
 import { Estoque } from "./pages/Estoque";
 import { Financeiro } from "./pages/Financeiro";
+import { InteligenciaIA } from "./pages/InteligenciaIA";
 import { Login } from "./pages/Login";
 import { Pacientes } from "./pages/Pacientes";
 import { Procedimentos } from "./pages/Procedimentos";
@@ -40,6 +41,7 @@ export function App() {
                 <Route path="/estoque" element={<Estoque />} />
                 <Route path="/usuarios" element={<Usuarios />} />
                 <Route path="/whatsapp" element={<WhatsApp />} />
+                <Route path="/inteligencia-ia" element={<InteligenciaIA />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />
               </Route>
             </Route>

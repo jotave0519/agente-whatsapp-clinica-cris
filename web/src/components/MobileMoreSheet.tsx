@@ -8,6 +8,7 @@ const ITEMS = [
   { to: "/estoque", label: "Estoque" },
   { to: "/usuarios", label: "Usuários" },
   { to: "/whatsapp", label: "WhatsApp" },
+  { to: "/inteligencia-ia", label: "Inteligência da IA" },
   { to: "/configuracoes", label: "Configurações" },
 ];
 

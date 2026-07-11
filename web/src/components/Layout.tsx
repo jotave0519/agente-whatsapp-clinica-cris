@@ -29,6 +29,10 @@ const NAV_GROUPS = [
     label: "Integrações",
     items: [{ to: "/whatsapp", label: "WhatsApp" }],
   },
+  {
+    label: "Inteligência Artificial",
+    items: [{ to: "/inteligencia-ia", label: "Inteligência da IA" }],
+  },
 ];
 
 export function Layout() {

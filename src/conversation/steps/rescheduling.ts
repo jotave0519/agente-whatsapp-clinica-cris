@@ -4,7 +4,7 @@ import { FlowStateData } from "../../types";
 import { logger } from "../../utils/logger";
 import { describeCandidates, describeSlots, formatDate, formatTime } from "../prompt";
 import { FlowContext, StepDefinition, StepResult, ToolHandler } from "../types";
-import { ABANDON_TOOL, abandonFlow } from "./shared";
+import { ABANDON_TOOL, abandonFlow, sampleSlotsAcrossDay } from "./shared";
 
 const SCOPE = "conversation.rescheduling";
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -83,7 +83,9 @@ export const dateStep: StepDefinition = {
     'referencia temporal ("amanha", nome de dia da semana, "proxima sexta", "semana que vem" etc), resolva mentalmente para uma data exata ' +
     "usando a data atual e o dia da semana informados no topo destas instrucoes (dia da semana sozinho = a proxima ocorrencia a partir de hoje) " +
     'e chame provide_date DIRETO no formato YYYY-MM-DD. NUNCA peça para confirmar/repetir a data ou digitar em DD/MM quando o cliente ja disse ' +
-    "um dia da semana ou termo relativo claro. Caso a mensagem realmente nao contenha nenhuma data, pergunte (apenas) a nova data.",
+    "um dia da semana ou termo relativo claro. SEMPRE priorize a informacao mais recente: se voce ja sugeriu ou consultou uma data antes e o " +
+    "cliente mencionar uma data diferente, esqueca a anterior e chame provide_date com a nova - nunca insista na data anterior. Caso a mensagem " +
+    "realmente nao contenha nenhuma data, pergunte (apenas) a nova data.",
   tools: [
     {
       name: "provide_date",
@@ -122,14 +124,15 @@ export const dateStep: StepDefinition = {
             message:
               `Nenhum horario livre em ${input.date}. Porem ha disponibilidade em ${alternative.date}: ${describeSlots(alternative.slots)}. ` +
               "Informe ao cliente que a data pedida esta cheia e ofereca essa data alternativa com os horarios, perguntando se algum serve. " +
-              "Se aceitar, chame provide_date de novo com a data alternativa.",
+              "Se aceitar, chame provide_date de novo com a data alternativa. Se em vez disso pedir OUTRA data, ignore essa sugestao e chame " +
+              "provide_date com a nova data pedida.",
           };
         }
         const guidance = await aiKnowledgeService.getMessageTemplate("no_slot_found");
         return { nextStep: "RESCHEDULING_DATE", data: baseData, message: `Nenhum horario livre em ${input.date} nem nos proximos dias. ${guidance}` };
       }
 
-      const data: FlowStateData = { ...baseData, date: input.date, availableSlots: slots.slice(0, 6) };
+      const data: FlowStateData = { ...baseData, date: input.date, availableSlots: sampleSlotsAcrossDay(slots) };
       return {
         nextStep: "RESCHEDULING_TIME",
         data,
@@ -145,12 +148,18 @@ export const timeStep: StepDefinition = {
   instructions: (ctx) =>
     `Etapa: falta escolher o novo horario. Opcoes disponiveis: ${describeSlots(
       ctx.conversation.state_data.availableSlots
-    )}. Apresente-as numeradas e pergunte qual prefere. Se ja escolheu, chame select_time com o NUMERO da opcao (index, comecando em 1).`,
+    )}. Apresente-as numeradas e pergunte qual prefere. Se ja escolheu, chame select_time com o NUMERO da opcao (index, comecando em 1). Se em vez ` +
+    "disso o cliente mudar de ideia e pedir outra data/dia da semana diferente, esqueca as opcoes atuais e chame provide_date com a nova data resolvida.",
   tools: [
     {
       name: "select_time",
       description: "Registra o novo horario escolhido pelo cliente, pelo numero da opcao apresentada (1, 2, 3...).",
       input_schema: { type: "object", properties: { index: { type: "integer", description: "Numero da opcao escolhida, comecando em 1" } }, required: ["index"] },
+    },
+    {
+      name: "provide_date",
+      description: "Usado quando o cliente muda de ideia sobre a data enquanto escolhia o horario - registra a nova data e consulta a disponibilidade real.",
+      input_schema: { type: "object", properties: { date: { type: "string", description: "YYYY-MM-DD" } }, required: ["date"] },
     },
     ABANDON_TOOL,
   ],
@@ -176,6 +185,7 @@ export const timeStep: StepDefinition = {
         message: `Horario selecionado: ${formatDate(start)} as ${formatTime(start)}. Repita os dados e peça confirmação explícita.`,
       };
     },
+    provide_date: dateStep.handlers.provide_date,
     abandon_flow: abandonFlow,
   },
 };

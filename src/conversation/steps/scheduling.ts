@@ -6,7 +6,7 @@ import { FlowStateData } from "../../types";
 import { logger } from "../../utils/logger";
 import { describeSlots, formatDate, formatTime } from "../prompt";
 import { FlowContext, StepDefinition, StepResult, ToolHandler } from "../types";
-import { ABANDON_TOOL, abandonFlow, looksLikeFullName } from "./shared";
+import { ABANDON_TOOL, abandonFlow, looksLikeFullName, sampleSlotsAcrossDay } from "./shared";
 
 const SCOPE = "conversation.scheduling";
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -49,7 +49,9 @@ export async function provideDate(ctx: FlowContext, baseData: FlowStateData, dat
         message:
           `Nenhum horario livre em ${date}. Porem ha disponibilidade em ${alternative.date}: ${describeSlots(alternative.slots)}. ` +
           "Informe ao cliente que a data pedida esta cheia e ofereca essa data alternativa com os horarios (formato HH:MM), perguntando se algum serve. " +
-          "Se o cliente aceitar um desses horarios, chame provide_date de novo com a data alternativa para registrar oficialmente e seguir para a escolha do horario.",
+          "Se o cliente aceitar um desses horarios, chame provide_date de novo com a data alternativa para registrar oficialmente e seguir para a escolha do horario. " +
+          "Se em vez disso o cliente pedir OUTRA data diferente (a que voce sugeriu ou a original), IGNORE completamente essa sugestao e chame provide_date " +
+          "com a nova data que ele pediu - nunca insista ou volte a mencionar uma data que o cliente nao escolheu.",
       };
     }
     const guidance = await aiKnowledgeService.getMessageTemplate("no_slot_found");
@@ -60,7 +62,7 @@ export async function provideDate(ctx: FlowContext, baseData: FlowStateData, dat
     };
   }
 
-  const data: FlowStateData = { ...baseData, date, availableSlots: slots.slice(0, 6) };
+  const data: FlowStateData = { ...baseData, date, availableSlots: sampleSlotsAcrossDay(slots) };
   return {
     nextStep: "SCHEDULING_TIME",
     data,
@@ -184,12 +186,15 @@ export const dateStep: StepDefinition = {
     const { procedure, name } = ctx.conversation.state_data;
     return (
       `Etapa: falta a data desejada (procedimento: ${procedure}, paciente: ${name}). Se a ultima mensagem ja contem QUALQUER referencia temporal ` +
-      '- "hoje", "amanha", "depois de amanha", nome de dia da semana ("segunda", "quarta-feira"), "proxima sexta", "semana que vem", ' +
-      '"inicio/fim da semana" etc - resolva mentalmente para uma data exata usando a data atual e o dia da semana informados no topo destas ' +
-      "instrucoes (dia da semana sozinho = a proxima ocorrencia desse dia a partir de hoje) e chame provide_date DIRETO com o resultado no " +
-      'formato YYYY-MM-DD. NUNCA responda coisas como "pode confirmar a data?", "digite no formato DD/MM", "não consegui entender" ou ' +
-      '"pode repetir a data?" quando o cliente ja disse um dia da semana ou termo relativo claro - isso so deve ser perguntado se a mensagem ' +
-      "realmente nao contiver nenhuma referencia de data. Caso a mensagem nao contenha uma data, pergunte (apenas) a data desejada."
+      '- "hoje", "amanha", "depois de amanha", nome de dia da semana ("segunda", "quarta-feira", "sabado", "domingo"), "proxima sexta", ' +
+      '"semana que vem", "inicio/fim da semana" etc - resolva mentalmente para uma data exata usando a data atual e o dia da semana informados ' +
+      "no topo destas instrucoes (dia da semana sozinho = a proxima ocorrencia desse dia a partir de hoje, mesmo que seja o mesmo dia da semana " +
+      "de hoje - nesse caso e o dia da semana que vem) e chame provide_date DIRETO com o resultado no formato YYYY-MM-DD. " +
+      'NUNCA responda coisas como "pode confirmar a data?", "digite no formato DD/MM", "não consegui entender" ou "pode repetir a data?" quando ' +
+      "o cliente ja disse um dia da semana ou termo relativo claro - isso so deve ser perguntado se a mensagem realmente nao contiver nenhuma " +
+      "referencia de data. SEMPRE priorize a informacao mais recente do cliente: se voce ja sugeriu ou consultou uma data antes nesta conversa e " +
+      "o cliente agora mencionar uma data ou dia da semana DIFERENTE, esqueca completamente a data anterior (sugerida ou pedida) e chame " +
+      "provide_date com a nova data - nunca insista ou volte a oferecer a data anterior."
     );
   },
   tools: [
@@ -212,12 +217,19 @@ export const timeStep: StepDefinition = {
     `Etapa: falta escolher o horario. Opcoes disponiveis (ja consultadas no Google Calendar): ${describeSlots(
       ctx.conversation.state_data.availableSlots
     )}. Apresente essas opcoes numeradas ao cliente (formato HH:MM) e pergunte qual ele prefere. Se o cliente ja ` +
-    "escolheu (por numero, horario ou descricao como \"o das 10h\"), chame select_time com o NUMERO da opcao (index, comecando em 1).",
+    "escolheu (por numero, horario ou descricao como \"o das 10h\"), chame select_time com o NUMERO da opcao (index, comecando em 1). " +
+    "Se em vez de escolher um horario o cliente mudar de ideia e pedir OUTRA data/dia da semana diferente, esqueca as opcoes atuais e chame " +
+    "provide_date com a nova data resolvida (mesma logica de resolucao de data das outras etapas).",
   tools: [
     {
       name: "select_time",
       description: "Registra o horario escolhido pelo cliente, pelo numero da opcao apresentada (1, 2, 3...).",
       input_schema: { type: "object", properties: { index: { type: "integer", description: "Numero da opcao escolhida, comecando em 1" } }, required: ["index"] },
+    },
+    {
+      name: "provide_date",
+      description: "Usado quando o cliente muda de ideia sobre a data enquanto escolhia o horario - registra a nova data e consulta a disponibilidade real.",
+      input_schema: { type: "object", properties: { date: { type: "string", description: "YYYY-MM-DD" } }, required: ["date"] },
     },
     ABANDON_TOOL,
   ],
@@ -243,6 +255,7 @@ export const timeStep: StepDefinition = {
         message: `Horario selecionado: ${formatDate(start)} as ${formatTime(start)}. Repita os dados (nome, procedimento, data, horario) e peça confirmação explícita ao cliente.`,
       };
     },
+    provide_date: async (ctx, input) => provideDate(ctx, ctx.conversation.state_data, input.date),
     abandon_flow: abandonFlow,
   },
 };

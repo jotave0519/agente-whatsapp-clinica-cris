@@ -1,6 +1,9 @@
 import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import { logger } from "../../utils/logger";
+import { sampleSlotsAcrossDay } from "../../utils/slots";
 import { ToolHandler, ToolSchema } from "../types";
+
+export { sampleSlotsAcrossDay };
 
 export const ABANDON_TOOL: ToolSchema = {
   name: "abandon_flow",

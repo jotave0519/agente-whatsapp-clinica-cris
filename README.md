@@ -17,7 +17,8 @@ Sistema de atendimento inteligente via WhatsApp, construído no framework **WAT*
 3. **Agendamento, remarcação e cancelamento** — via Google Calendar (agenda visual) + Supabase (`schedules`, registro estruturado).
 4. **Lembretes e confirmações** — rotina diária automática.
 5. **Atendimento humano** — a IA transfere a conversa (`request_human_handoff`) quando solicitado ou quando não consegue ajudar; a equipe assume pelo próprio WhatsApp.
-6. **CRM web** (Fases 1, 2, 3, tela WhatsApp e rodada de refinamento) — login (Supabase Auth), Dashboard (saudação, KPIs, gráfico de faturamento, resumo financeiro), Agenda (grade horária semanal/dia, criação manual de agendamento, remarcar/cancelar por clique), Pacientes, Conversas, Procedimentos, **Financeiro**, **Estoque**, **Usuários**, **Configurações** (dados da clínica + horário de atendimento + preferência de tema) e **WhatsApp** — todos lendo/escrevendo nas mesmas tabelas e serviços do agente, nunca duplicando lógica. CRUD completo (criar/editar/ativar-desativar/excluir, conforme o caso) em Pacientes, Usuários, Procedimentos, Estoque, Financeiro e Conversas. Suporte a **Dark Mode** (paleta própria, não é inversão automática) com preferência salva por dispositivo. O horário de atendimento salvo em Configurações é a fonte real usada pela IA (FAQ e disponibilidade de horários no WhatsApp). Fiel ao protótipo do Claude Design (`CRM Clinica.dc.html`).
+6. **CRM web** (Fases 1, 2, 3, tela WhatsApp e rodadas de refinamento) — login (Supabase Auth), Dashboard (saudação, KPIs, gráfico de faturamento, resumo financeiro), Agenda (grade horária semanal/dia, criação manual de agendamento, remarcar/cancelar por clique), Pacientes, Conversas, Procedimentos, **Financeiro**, **Estoque**, **Usuários**, **Configurações** e **WhatsApp** — todos lendo/escrevendo nas mesmas tabelas e serviços do agente, nunca duplicando lógica. CRUD completo (criar/editar/ativar-desativar/excluir, conforme o caso) em Pacientes, Usuários, Procedimentos, Estoque, Financeiro e Conversas. Suporte a **Dark Mode** (paleta própria, não é inversão automática) com preferência salva por dispositivo. Fiel ao protótipo do Claude Design (`CRM Clinica.dc.html`).
+7. **Configurações > Inteligência da IA** — base de conhecimento da IA 100% administrável pelo CRM, sem precisar mexer em código: Informações da Clínica (dados + "sobre a clínica"), Mensagens automáticas (todo texto enviado pela IA fora do que ela gera livremente), FAQ Inteligente (perguntas/respostas consultadas antes de responder o cliente), Procedimentos (duração real usada para calcular o evento no Google Calendar, orientações pré/pós), Horários da clínica (grade semanal + intervalo de almoço + feriados/bloqueios/dias especiais) e Regras da IA (tempo máximo de contexto de um agendamento incompleto). Tudo lido em runtime via `src/services/aiKnowledgeService.ts`, com fallback seguro para o texto original se o banco falhar.
 
 ## Stack
 Node.js + TypeScript, Express, Supabase (PostgreSQL), Google Calendar API, Evolution API (WhatsApp via Baileys), Claude (Anthropic API).
@@ -68,7 +69,7 @@ Endpoint de health check: `GET /health`.
    npm run staff:create -- --email dra@clinica.com --password "senha-forte" --name "Dra. Cristiane Zangelmi" [--role admin|recepcionista|profissional]
    ```
    (`--role` é opcional, default `admin`. Não há convite por e-mail pela própria tela do CRM — usuários adicionais são criados por este script.)
-2b. Rodar também [006_transactions.sql](supabase/migrations/006_transactions.sql), [007_inventory.sql](supabase/migrations/007_inventory.sql), [008_clinic_settings.sql](supabase/migrations/008_clinic_settings.sql) e [009_staff_active.sql](supabase/migrations/009_staff_active.sql) (Fase 3 — Financeiro, Estoque, Configurações e desativação de usuários).
+2b. Rodar também [006_transactions.sql](supabase/migrations/006_transactions.sql), [007_inventory.sql](supabase/migrations/007_inventory.sql), [008_clinic_settings.sql](supabase/migrations/008_clinic_settings.sql), [009_staff_active.sql](supabase/migrations/009_staff_active.sql), [010_automation_flags.sql](supabase/migrations/010_automation_flags.sql), [011_schedule_notes_patient_fields.sql](supabase/migrations/011_schedule_notes_patient_fields.sql) e [012_ai_knowledge.sql](supabase/migrations/012_ai_knowledge.sql) (Fase 3, refinamentos e a base de conhecimento administrável da IA — Configurações > Inteligência da IA no CRM).
 3. Instalar e configurar o frontend para desenvolvimento local:
    ```
    cd web
@@ -138,6 +139,8 @@ web/                               # CRM web (Vite + React + TS)
     components/Layout.tsx, Topbar.tsx, ProtectedRoute.tsx, NewAppointmentModal.tsx, icons.tsx
     pages/Login.tsx, Dashboard.tsx, Agenda.tsx, Pacientes.tsx, Conversas.tsx, Procedimentos.tsx,
     pages/Financeiro.tsx, Estoque.tsx, Usuarios.tsx, Configuracoes.tsx, WhatsApp.tsx
+    pages/configuracoesIA/                # Configuracoes > Inteligencia da IA (base de conhecimento da IA)
+      InformacoesClinica.tsx, MensagensAutomaticas.tsx, FaqInteligente.tsx, HorariosClinica.tsx, RegrasIA.tsx
 scripts/
   googleAuthSetup.ts               # setup unico do OAuth do Google
   createStaffAdmin.ts              # cria o primeiro usuario admin do CRM
@@ -153,8 +156,13 @@ supabase/migrations/
   009_staff_active.sql             # staff.active (desativar acesso sem apagar a conta)
   010_automation_flags.sql         # clinic_settings.reminders_enabled / inactivity_nudge_enabled (tela WhatsApp)
   011_schedule_notes_patient_fields.sql # schedules.notes + users.active/email (agendamento manual, CRUD de pacientes)
+  012_ai_knowledge.sql             # base de conhecimento da IA: campos extras de clinic_settings, faq_items,
+                                    # message_templates, lunch_start/end + business_hour_exceptions, campos de
+                                    # procedimento (notes/pre_instructions/post_instructions). Ver Configuracoes > Inteligencia da IA no CRM.
 workflows/
-  atendimento_faq.md              # persona, dados da clinica, tratamentos, valores, objecoes, menu
+  atendimento_faq.md              # HISTORICO - ate a migracao 012 este arquivo era a fonte da IA (persona, dados
+                                    # da clinica, tratamentos, valores, objecoes); agora tudo vem do banco via
+                                    # src/services/aiKnowledgeService.ts, editavel pelo CRM
   agendamento_consultas.md        # fluxo de marcar/remarcar/cancelar consultas
   lembretes_confirmacoes.md       # fluxo de lembretes automaticos
 .env                              # chaves e configuracao (nao versionar)

@@ -3,6 +3,7 @@ import { parseIncomingWebhook, sendWhatsAppMessage } from "../integrations/evolu
 import { getOrCreateUserByPhone } from "../services/userService";
 import * as conversationRepository from "../repositories/conversationRepository";
 import * as conversationEngine from "../conversation/engine";
+import * as aiKnowledgeService from "../services/aiKnowledgeService";
 import { logger } from "../utils/logger";
 
 const SCOPE = "webhookController";
@@ -60,10 +61,8 @@ export async function handleWhatsAppWebhook(req: Request, res: Response): Promis
   } catch (err) {
     logger.error(SCOPE, `Erro ao processar mensagem de ${phone}`, err);
     try {
-      await sendWhatsAppMessage(
-        phone,
-        "Desculpe, tive um problema para responder agora. Nossa equipe vai te retornar em breve."
-      );
+      const errorText = await aiKnowledgeService.getMessageTemplate("generic_error");
+      await sendWhatsAppMessage(phone, errorText);
     } catch (sendErr) {
       logger.error(SCOPE, `Falha tambem ao enviar mensagem de erro para ${phone}`, sendErr);
     }

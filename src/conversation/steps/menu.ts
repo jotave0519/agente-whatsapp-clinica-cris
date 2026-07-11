@@ -1,4 +1,4 @@
-import * as businessHoursService from "../../services/businessHoursService";
+import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as schedulingService from "../../services/schedulingService";
 import { logger } from "../../utils/logger";
 import { clinicInfoText } from "../prompt";
@@ -21,14 +21,15 @@ export const menuStep: StepDefinition = {
       "informar preco: se o cliente disser \"quero agendar Botox\", va direto para o agendamento.\n";
 
     if (ctx.isFirstMessage) {
+      const welcomeGuidance = await aiKnowledgeService.getMessageTemplate("welcome_message");
       text +=
         "Esta e a primeira mensagem deste cliente na conversa: cumprimente-o pelo nome (se souber) e apresente " +
         "as opcoes principais (1. Agendar avaliacao, 2. Remarcar agendamento, 3. Cancelar agendamento, " +
-        "4. Conhecer nossos tratamentos, 5. Falar com um atendente), mas tambem entenda linguagem natural livremente.\n";
+        "4. Conhecer nossos tratamentos, 5. Falar com um atendente), mas tambem entenda linguagem natural livremente. " +
+        `Orientacao de tom para a saudacao: ${welcomeGuidance}\n`;
     }
 
-    const hoursLabel = await businessHoursService.describeWeeklyHoursLabel();
-    return text + "\n\n---\n\n" + clinicInfoText(hoursLabel);
+    return text + "\n\n---\n\n" + (await clinicInfoText());
   },
   tools: [
     ...SWITCH_TOOLS,

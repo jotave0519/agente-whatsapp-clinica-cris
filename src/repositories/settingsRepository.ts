@@ -15,6 +15,17 @@ export async function updateClinicSettings(
     address: string | null;
     reminders_enabled: boolean;
     inactivity_nudge_enabled: boolean;
+    responsible_name: string | null;
+    specialty: string | null;
+    city: string | null;
+    state: string | null;
+    zip_code: string | null;
+    whatsapp: string | null;
+    instagram: string | null;
+    website: string | null;
+    general_notes: string | null;
+    about_text: string | null;
+    context_expiry_minutes: number;
   }>
 ): Promise<ClinicSettings> {
   const { data, error } = await getSupabaseClient()

@@ -19,6 +19,9 @@ export async function create(params: {
   price?: number | null;
   description?: string | null;
   duration_minutes?: number | null;
+  notes?: string | null;
+  pre_instructions?: string | null;
+  post_instructions?: string | null;
   active?: boolean;
 }): Promise<Procedure> {
   const { data, error } = await getSupabaseClient()
@@ -32,7 +35,17 @@ export async function create(params: {
 
 export async function update(
   id: string,
-  params: Partial<{ name: string; category: string | null; price: number | null; description: string | null; duration_minutes: number | null; active: boolean }>
+  params: Partial<{
+    name: string;
+    category: string | null;
+    price: number | null;
+    description: string | null;
+    duration_minutes: number | null;
+    notes: string | null;
+    pre_instructions: string | null;
+    post_instructions: string | null;
+    active: boolean;
+  }>
 ): Promise<Procedure> {
   const { data, error } = await getSupabaseClient()
     .from("procedures")

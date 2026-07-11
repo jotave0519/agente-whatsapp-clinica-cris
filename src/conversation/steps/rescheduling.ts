@@ -1,3 +1,4 @@
+import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as schedulingService from "../../services/schedulingService";
 import { FlowStateData } from "../../types";
 import { logger } from "../../utils/logger";
@@ -96,7 +97,8 @@ export const dateStep: StepDefinition = {
       logger.info(SCOPE, "Disponibilidade recebida", { date: input.date, slotCount: slots.length });
 
       if (slots.length === 0) {
-        return { nextStep: "RESCHEDULING_DATE", data: baseData, message: `Nenhum horario livre em ${input.date}. Peça outra data ao cliente.` };
+        const guidance = await aiKnowledgeService.getMessageTemplate("no_slot_found");
+        return { nextStep: "RESCHEDULING_DATE", data: baseData, message: `Nenhum horario livre em ${input.date}. ${guidance}` };
       }
 
       const data: FlowStateData = { ...baseData, date: input.date, availableSlots: slots.slice(0, 6) };
@@ -166,18 +168,15 @@ export async function confirmRescheduling(ctx: FlowContext): Promise<StepResult>
   try {
     await schedulingService.rescheduleAppointment(scheduleId, selectedStart, durationMinutes);
     logger.info(SCOPE, "Remarcação concluída com sucesso", { conversationId: ctx.conversation.id });
-    return {
-      nextStep: "MENU",
-      data: {},
-      message: `Remarcação confirmada! 😊\n\nSeu novo horário é ${formatDate(selectedStart)} às ${formatTime(selectedStart)}.\n\nPosso ajudar com mais alguma coisa?`,
-    };
+    const message = await aiKnowledgeService.getMessageTemplate("confirm_rescheduling_success", {
+      date: formatDate(selectedStart),
+      time: formatTime(selectedStart),
+    });
+    return { nextStep: "MENU", data: {}, message };
   } catch (err: any) {
     logger.error(SCOPE, "Falha ao remarcar", err);
-    return {
-      nextStep: "RESCHEDULING_CONFIRM",
-      data: ctx.conversation.state_data,
-      message: `Desculpe, tive um problema técnico ao remarcar (${err.message}). Pode tentar novamente em instantes? Se preferir, posso chamar um atendente.`,
-    };
+    const message = await aiKnowledgeService.getMessageTemplate("confirm_rescheduling_failure", { error: err.message });
+    return { nextStep: "RESCHEDULING_CONFIRM", data: ctx.conversation.state_data, message };
   }
 }
 

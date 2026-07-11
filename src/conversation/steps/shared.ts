@@ -1,5 +1,6 @@
-import { ToolHandler, ToolSchema } from "../types";
+import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import { logger } from "../../utils/logger";
+import { ToolHandler, ToolSchema } from "../types";
 
 export const ABANDON_TOOL: ToolSchema = {
   name: "abandon_flow",
@@ -22,9 +23,6 @@ export const abandonFlow: ToolHandler = async (ctx) => {
     conversationId: ctx.conversation.id,
     estadoAnterior: ctx.conversation.state,
   });
-  return {
-    nextStep: "MENU",
-    data: {},
-    message: "Sem problemas, deixei esse atendimento de lado. Posso ajudar com mais alguma coisa?",
-  };
+  const message = await aiKnowledgeService.getMessageTemplate("abandon_flow");
+  return { nextStep: "MENU", data: {}, message };
 };

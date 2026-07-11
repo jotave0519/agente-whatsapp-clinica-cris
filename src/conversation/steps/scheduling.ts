@@ -1,4 +1,6 @@
+import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as schedulingService from "../../services/schedulingService";
+import * as settingsRepository from "../../repositories/settingsRepository";
 import { FlowStateData } from "../../types";
 import { logger } from "../../utils/logger";
 import { describeSlots, formatDate, formatTime } from "../prompt";
@@ -6,7 +8,6 @@ import { FlowContext, StepDefinition, StepResult, ToolHandler } from "../types";
 import { ABANDON_TOOL, abandonFlow, looksLikeFullName } from "./shared";
 
 const SCOPE = "conversation.scheduling";
-const CLINIC_ADDRESS = "Estrada Santa Isabel, 965, Sala 23, Edifício Comercial Arujazinho, Arujá - SP";
 
 /**
  * Consulta disponibilidade real no Google Calendar para a data informada.
@@ -20,7 +21,12 @@ export async function provideDate(ctx: FlowContext, baseData: FlowStateData, dat
   logger.info(SCOPE, "Disponibilidade recebida", { date, slotCount: slots.length });
 
   if (slots.length === 0) {
-    return { nextStep: "SCHEDULING_DATE", data: baseData, message: `Nenhum horario livre em ${date}. Peça outra data ao cliente.` };
+    const guidance = await aiKnowledgeService.getMessageTemplate("no_slot_found");
+    return {
+      nextStep: "SCHEDULING_DATE",
+      data: baseData,
+      message: `Nenhum horario livre em ${date}. ${guidance}`,
+    };
   }
 
   const data: FlowStateData = { ...baseData, date, availableSlots: slots.slice(0, 6) };
@@ -45,6 +51,9 @@ export const beginScheduling: ToolHandler = async (ctx, input) => {
   if (!data.procedure) {
     return { nextStep: "SCHEDULING_PROCEDURE", data, message: "Fluxo de agendamento iniciado. Peça (apenas) qual procedimento o cliente deseja agendar." };
   }
+
+  const duration = await aiKnowledgeService.findProcedureDuration(data.procedure);
+  if (duration) data.durationMinutes = duration;
 
   if (!data.name && looksLikeFullName(ctx.user.name)) {
     data.name = ctx.user.name;
@@ -77,7 +86,9 @@ export const procedureStep: StepDefinition = {
   handlers: {
     provide_procedure: async (ctx, input) => {
       const data: FlowStateData = { ...ctx.conversation.state_data, procedure: input.procedure };
-      logger.info(SCOPE, "Procedimento registrado", { conversationId: ctx.conversation.id, procedure: input.procedure });
+      const duration = await aiKnowledgeService.findProcedureDuration(input.procedure);
+      if (duration) data.durationMinutes = duration;
+      logger.info(SCOPE, "Procedimento registrado", { conversationId: ctx.conversation.id, procedure: input.procedure, durationMinutes: data.durationMinutes });
       if (data.name) {
         return { nextStep: "SCHEDULING_DATE", data, message: `Procedimento registrado: ${input.procedure}. Nome ja conhecido. Peça a data desejada.` };
       }
@@ -209,18 +220,18 @@ export async function confirmScheduling(ctx: FlowContext): Promise<StepResult> {
     });
     logger.info(SCOPE, "Agendamento criado com sucesso", { conversationId: ctx.conversation.id });
 
-    return {
-      nextStep: "MENU",
-      data: {},
-      message: `Agendamento confirmado! 😊\n\n${procedure} em ${formatDate(selectedStart)} às ${formatTime(selectedStart)}.\nEndereço: ${CLINIC_ADDRESS}\n\nPosso ajudar com mais alguma coisa?`,
-    };
+    const settings = await settingsRepository.getClinicSettings();
+    const message = await aiKnowledgeService.getMessageTemplate("confirm_scheduling_success", {
+      procedure,
+      date: formatDate(selectedStart),
+      time: formatTime(selectedStart),
+      address: settings.address || "",
+    });
+    return { nextStep: "MENU", data: {}, message };
   } catch (err: any) {
     logger.error(SCOPE, "Falha ao criar agendamento", err);
-    return {
-      nextStep: "SCHEDULING_CONFIRM",
-      data: ctx.conversation.state_data,
-      message: `Desculpe, tive um problema técnico ao confirmar o agendamento (${err.message}). Pode tentar novamente em instantes? Se preferir, posso chamar um atendente.`,
-    };
+    const message = await aiKnowledgeService.getMessageTemplate("confirm_scheduling_failure", { error: err.message });
+    return { nextStep: "SCHEDULING_CONFIRM", data: ctx.conversation.state_data, message };
   }
 }
 

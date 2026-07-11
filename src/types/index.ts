@@ -89,6 +89,9 @@ export interface Procedure {
   price: number | null;
   description: string | null;
   duration_minutes: number | null;
+  notes: string | null;
+  pre_instructions: string | null;
+  post_instructions: string | null;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -158,6 +161,17 @@ export interface ClinicSettings {
   address: string | null;
   reminders_enabled: boolean;
   inactivity_nudge_enabled: boolean;
+  responsible_name: string | null;
+  specialty: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+  whatsapp: string | null;
+  instagram: string | null;
+  website: string | null;
+  general_notes: string | null;
+  about_text: string | null;
+  context_expiry_minutes: number;
   updated_at: string;
 }
 
@@ -166,5 +180,38 @@ export interface BusinessHourRow {
   enabled: boolean;
   open_time: string;
   close_time: string;
+  lunch_start: string | null;
+  lunch_end: string | null;
+}
+
+export type BusinessHourExceptionType = "holiday" | "block" | "special";
+
+export interface BusinessHourException {
+  id: string;
+  date: string;
+  type: BusinessHourExceptionType;
+  closed: boolean;
+  open_time: string | null;
+  close_time: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MessageTemplate {
+  key: string;
+  label: string;
+  body: string;
+  updated_at: string;
 }
 

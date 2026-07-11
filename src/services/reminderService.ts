@@ -1,22 +1,12 @@
 import * as scheduleRepository from "../repositories/scheduleRepository";
+import * as settingsRepository from "../repositories/settingsRepository";
 import { sendWhatsAppMessage } from "../integrations/evolutionApiClient";
-
-const ADDRESS =
-  "Estrada Santa Isabel, 965, Sala 23, Edificio Comercial Arujazinho, Aruja - SP";
+import * as aiKnowledgeService from "./aiKnowledgeService";
 
 function tomorrowDate(): string {
   const d = new Date();
   d.setDate(d.getDate() + 1);
   return d.toISOString().slice(0, 10);
-}
-
-function buildReminderText(patientName: string, procedure: string, date: string, time: string): string {
-  const [, month, day] = date.split("-");
-  return (
-    `Oi, ${patientName}! Passando para lembrar da sua consulta de ${procedure} ` +
-    `amanha, dia ${day}/${month} as ${time}, aqui na clinica (${ADDRESS}).\n\n` +
-    `Pode confirmar sua presenca respondendo *SIM*? Se precisar remarcar, e so avisar por aqui.`
-  );
 }
 
 export async function sendDailyReminders(): Promise<{ sent: number; skipped: number; failed: number }> {
@@ -27,13 +17,24 @@ export async function sendDailyReminders(): Promise<{ sent: number; skipped: num
   let skipped = 0;
   let failed = 0;
 
+  if (schedules.length === 0) return { sent, skipped, failed };
+
+  const settings = await settingsRepository.getClinicSettings();
+  const [, month, day] = date.split("-");
+
   for (const schedule of schedules) {
     if (!schedule.phone) {
       skipped += 1;
       continue;
     }
 
-    const text = buildReminderText(schedule.patient_name, schedule.procedure, schedule.date, schedule.time);
+    const text = await aiKnowledgeService.getMessageTemplate("appointment_reminder", {
+      patientName: schedule.patient_name,
+      procedure: schedule.procedure,
+      date: `${day}/${month}`,
+      time: schedule.time,
+      address: settings.address || "",
+    });
 
     try {
       await sendWhatsAppMessage(schedule.phone, text);

@@ -1,18 +1,12 @@
-import fs from "fs";
-import path from "path";
+import * as aiKnowledgeService from "../services/aiKnowledgeService";
 
-const WORKFLOWS_DIR = path.join(__dirname, "..", "..", "workflows");
-
-function loadFile(name: string): string {
-  return fs.readFileSync(path.join(WORKFLOWS_DIR, name), "utf-8");
-}
-
-/** Template institucional (persona, dados da clinica, FAQ) - so usado na etapa MENU. */
-const CLINIC_INFO_TEMPLATE = loadFile("atendimento_faq.md");
-
-/** Substitui o placeholder de horario de atendimento pelo valor real (vindo de Configuracoes). */
-export function clinicInfoText(hoursLabel: string): string {
-  return CLINIC_INFO_TEMPLATE.replace("{{HORARIO_ATENDIMENTO}}", hoursLabel);
+/**
+ * Bloco de conhecimento da clinica (dados, procedimentos, horario, FAQ) - so
+ * usado na etapa MENU. Vem inteiramente do banco (Configuracoes > Inteligencia
+ * da IA no CRM), nao ha mais nenhum texto institucional hardcoded aqui.
+ */
+export async function clinicInfoText(): Promise<string> {
+  return aiKnowledgeService.getClinicInfoText();
 }
 
 export const GLOBAL_RULES =

@@ -9,12 +9,24 @@ interface ProcedureItem {
   price: number | null;
   description: string | null;
   duration_minutes: number | null;
+  notes: string | null;
+  pre_instructions: string | null;
+  post_instructions: string | null;
   active: boolean;
 }
 
-const EMPTY_FORM = { name: "", price: "", description: "", duration_minutes: "", active: true };
+const EMPTY_FORM = {
+  name: "",
+  price: "",
+  description: "",
+  duration_minutes: "",
+  notes: "",
+  pre_instructions: "",
+  post_instructions: "",
+  active: true,
+};
 
-export function Procedimentos() {
+export function Procedimentos({ embedded = false }: { embedded?: boolean } = {}) {
   const isMobile = useIsMobile();
   const [items, setItems] = useState<ProcedureItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +61,9 @@ export function Procedimentos() {
       price: p.price != null ? String(p.price) : "",
       description: p.description || "",
       duration_minutes: p.duration_minutes != null ? String(p.duration_minutes) : "",
+      notes: p.notes || "",
+      pre_instructions: p.pre_instructions || "",
+      post_instructions: p.post_instructions || "",
       active: p.active,
     });
     setShowForm(true);
@@ -63,6 +78,9 @@ export function Procedimentos() {
       price: form.price ? Number(form.price) : null,
       description: form.description || null,
       duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
+      notes: form.notes || null,
+      pre_instructions: form.pre_instructions || null,
+      post_instructions: form.post_instructions || null,
       active: form.active,
     };
     try {
@@ -111,6 +129,33 @@ export function Procedimentos() {
         <label className="field-label">Descrição</label>
         <input className="input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
       </div>
+      <div>
+        <label className="field-label">Observações</label>
+        <textarea
+          className="input"
+          rows={2}
+          value={form.notes}
+          onChange={(e) => setForm({ ...form, notes: e.target.value })}
+        />
+      </div>
+      <div>
+        <label className="field-label">Orientações pré-procedimento</label>
+        <textarea
+          className="input"
+          rows={2}
+          value={form.pre_instructions}
+          onChange={(e) => setForm({ ...form, pre_instructions: e.target.value })}
+        />
+      </div>
+      <div>
+        <label className="field-label">Orientações pós-procedimento</label>
+        <textarea
+          className="input"
+          rows={2}
+          value={form.post_instructions}
+          onChange={(e) => setForm({ ...form, post_instructions: e.target.value })}
+        />
+      </div>
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5 }}>
         <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
         Ativo
@@ -129,13 +174,19 @@ export function Procedimentos() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 22 }}>
-        <div>
-          <h1 className="page-title">Procedimentos</h1>
-          <p className="page-subtitle">Catálogo de serviços e protocolos da clínica</p>
-        </div>
+        {embedded ? (
+          <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: 0 }}>
+            Usados pela IA para conhecer duração e orientações de cada procedimento (sem valores).
+          </p>
+        ) : (
+          <div>
+            <h1 className="page-title">Procedimentos</h1>
+            <p className="page-subtitle">Catálogo de serviços e protocolos da clínica</p>
+          </div>
+        )}
         <button
           onClick={startCreate}
-          style={{ display: "flex", alignItems: "center", gap: 7, height: 38, padding: "0 15px", borderRadius: 11, background: "var(--text)", color: "var(--bg)", fontSize: 13.5, fontWeight: 500 }}
+          style={{ display: "flex", alignItems: "center", gap: 7, height: 38, padding: "0 15px", borderRadius: 11, background: "var(--text)", color: "var(--bg)", fontSize: 13.5, fontWeight: 500, flexShrink: 0 }}
         >
           + Novo
         </button>

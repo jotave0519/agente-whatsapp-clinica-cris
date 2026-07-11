@@ -1,3 +1,4 @@
+import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as schedulingService from "../../services/schedulingService";
 import { logger } from "../../utils/logger";
 import { describeCandidates } from "../prompt";
@@ -89,19 +90,12 @@ export async function confirmCancellation(ctx: FlowContext): Promise<StepResult>
   try {
     await schedulingService.cancelAppointment(scheduleId);
     logger.info(SCOPE, "Cancelamento concluído com sucesso", { conversationId: ctx.conversation.id });
-    return {
-      nextStep: "MENU",
-      data: {},
-      message:
-        "Cancelamento confirmado. 💛 Se quiser reagendar quando for melhor pra você, é só me chamar.\n\nPosso ajudar com mais alguma coisa?",
-    };
+    const message = await aiKnowledgeService.getMessageTemplate("confirm_cancellation_success");
+    return { nextStep: "MENU", data: {}, message };
   } catch (err: any) {
     logger.error(SCOPE, "Falha ao cancelar", err);
-    return {
-      nextStep: "CANCELING_CONFIRM",
-      data: ctx.conversation.state_data,
-      message: `Desculpe, tive um problema técnico ao cancelar (${err.message}). Pode tentar novamente em instantes? Se preferir, posso chamar um atendente.`,
-    };
+    const message = await aiKnowledgeService.getMessageTemplate("confirm_cancellation_failure", { error: err.message });
+    return { nextStep: "CANCELING_CONFIRM", data: ctx.conversation.state_data, message };
   }
 }
 

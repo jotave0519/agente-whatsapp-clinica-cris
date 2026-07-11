@@ -1,12 +1,14 @@
 /**
- * Politica de inatividade/expiracao de contexto das conversas do WhatsApp.
- * Fonte unica de verdade usada tanto pelo cron de inatividade
- * (src/services/inactivityService.ts, que envia o nudge e encerra a
- * conversa) quanto pelo motor de conversa (src/conversation/engine.ts, que
- * decide se reinicia o fluxo de atendimento ao retomar uma conversa antiga).
+ * Politica de inatividade das conversas do WhatsApp: apos quantos minutos sem
+ * resposta o cliente recebe um lembrete, e depois disso quanto tempo ate a
+ * conversa ser encerrada automaticamente. Usado por
+ * src/services/inactivityService.ts (cron de inatividade).
+ *
+ * O tempo de expiracao de CONTEXTO de um fluxo de agendamento incompleto (ex:
+ * cliente some no meio de um agendamento e volta dias depois) e um campo
+ * separado e editavel pelo CRM - clinic_settings.context_expiry_minutes, lido
+ * via src/services/aiKnowledgeService.ts::getContextExpiryMinutes() - e nao
+ * depende mais destas constantes.
  */
 export const NUDGE_AFTER_MINUTES = 5;
 export const CLOSE_AFTER_MINUTES = 5;
-
-/** Tempo total sem resposta do cliente apos o qual a conversa e considerada encerrada. */
-export const CONTEXT_EXPIRY_MINUTES = NUDGE_AFTER_MINUTES + CLOSE_AFTER_MINUTES;

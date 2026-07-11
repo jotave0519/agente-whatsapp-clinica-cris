@@ -1,6 +1,8 @@
 import { Router } from "express";
+import { createException, deleteException, listExceptions } from "../controllers/api/businessHourExceptionController";
 import { getConversation, listConversations, sendMessage, updateStatus } from "../controllers/api/conversationController";
 import { getDashboard } from "../controllers/api/dashboardController";
+import { createFaq, deleteFaq, listFaq, updateFaq } from "../controllers/api/faqController";
 import { createTransaction, deleteTransaction, getFinanceOverview, updateTransaction } from "../controllers/api/financeController";
 import {
   createItem,
@@ -10,6 +12,7 @@ import {
   updateItem as updateInventoryItem,
   updateMovement,
 } from "../controllers/api/inventoryController";
+import { listMessageTemplates, updateMessageTemplate } from "../controllers/api/messageTemplateController";
 import { createPatient, deletePatient, getPatient, listPatients, updatePatient } from "../controllers/api/patientController";
 import { createProcedure, deleteProcedure, listProcedures, updateProcedure } from "../controllers/api/procedureController";
 import { cancelSchedule, createSchedule, listSchedules, rescheduleSchedule } from "../controllers/api/scheduleController";
@@ -65,6 +68,18 @@ apiRouter.delete("/staff/:id", requireAdmin, deleteStaff);
 
 apiRouter.get("/settings", getSettings);
 apiRouter.patch("/settings", updateSettings);
+
+apiRouter.get("/faq", listFaq);
+apiRouter.post("/faq", createFaq);
+apiRouter.patch("/faq/:id", updateFaq);
+apiRouter.delete("/faq/:id", deleteFaq);
+
+apiRouter.get("/message-templates", listMessageTemplates);
+apiRouter.patch("/message-templates/:key", updateMessageTemplate);
+
+apiRouter.get("/business-hours/exceptions", listExceptions);
+apiRouter.post("/business-hours/exceptions", createException);
+apiRouter.delete("/business-hours/exceptions/:id", deleteException);
 
 apiRouter.get("/whatsapp/status", getStatus);
 apiRouter.get("/whatsapp/qrcode", getQrCode);

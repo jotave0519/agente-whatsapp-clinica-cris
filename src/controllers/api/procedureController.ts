@@ -16,14 +16,24 @@ export async function listProcedures(_req: Request, res: Response): Promise<void
 
 export async function createProcedure(req: Request, res: Response): Promise<void> {
   try {
-    const { name, category, price, description, duration_minutes, active } = req.body;
+    const { name, category, price, description, duration_minutes, notes, pre_instructions, post_instructions, active } = req.body;
     if (!name) {
       res.status(400).json({ error: "name e obrigatorio." });
       return;
     }
 
     logger.info(SCOPE, "Criando procedimento via CRM", { staffId: req.staff?.id, name });
-    const procedure = await procedureRepository.create({ name, category, price, description, duration_minutes, active });
+    const procedure = await procedureRepository.create({
+      name,
+      category,
+      price,
+      description,
+      duration_minutes,
+      notes,
+      pre_instructions,
+      post_instructions,
+      active,
+    });
     res.status(201).json(procedure);
   } catch (err) {
     logger.error(SCOPE, "Erro ao criar procedimento", err);

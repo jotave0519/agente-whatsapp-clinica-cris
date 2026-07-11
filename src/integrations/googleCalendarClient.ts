@@ -144,18 +144,22 @@ function eventsPath(suffix = ""): string {
   return `/calendars/${encodeURIComponent(env.googleCalendarId)}/events${suffix}`;
 }
 
-async function dayBounds(date: string): Promise<{ start: Date; end: Date; enabled: boolean }> {
+async function dayBounds(date: string): Promise<{ start: Date; end: Date; enabled: boolean; lunch: { start: Date; end: Date } | null }> {
   const hours = await businessHoursService.getDayHours(date);
   const start = new Date(`${date}T${hours.open}:00-03:00`);
   const end = new Date(`${date}T${hours.close}:00-03:00`);
-  return { start, end, enabled: hours.enabled };
+  const lunch =
+    hours.lunchStart && hours.lunchEnd
+      ? { start: new Date(`${date}T${hours.lunchStart}:00-03:00`), end: new Date(`${date}T${hours.lunchEnd}:00-03:00`) }
+      : null;
+  return { start, end, enabled: hours.enabled, lunch };
 }
 
 export async function checkAvailability(
   date: string,
   durationMinutes: number = DEFAULT_SLOT_MINUTES
 ): Promise<string[]> {
-  const { start, end, enabled } = await dayBounds(date);
+  const { start, end, enabled, lunch } = await dayBounds(date);
   if (!enabled) return [];
 
   const data = await calendarRequest<{ items?: CalendarEvent[] }>("get", eventsPath(), {
@@ -165,6 +169,10 @@ export async function checkAvailability(
   const busy = (data.items || [])
     .filter((e) => e.start?.dateTime && e.end?.dateTime)
     .map((e) => ({ start: new Date(e.start!.dateTime!), end: new Date(e.end!.dateTime!) }));
+
+  // Intervalo de almoco (se configurado) entra como um bloco "ocupado"
+  // sintetico, junto com os eventos reais do Calendar.
+  if (lunch) busy.push(lunch);
 
   const slots: string[] = [];
   const slotMs = durationMinutes * 60 * 1000;

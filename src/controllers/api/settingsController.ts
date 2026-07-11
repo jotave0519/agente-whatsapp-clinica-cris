@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as settingsRepository from "../../repositories/settingsRepository";
+import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as businessHoursService from "../../services/businessHoursService";
 import { logger } from "../../utils/logger";
 
@@ -26,6 +27,7 @@ export async function updateSettings(req: Request, res: Response): Promise<void>
     ]);
 
     if (businessHours) businessHoursService.invalidateCache();
+    if (clinic) aiKnowledgeService.invalidateCache();
 
     res.json({ clinic: updatedClinic, businessHours: updatedHours });
   } catch (err) {

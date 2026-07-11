@@ -1,7 +1,7 @@
-import { CONTEXT_EXPIRY_MINUTES } from "../config/conversationPolicy";
 import { env } from "../config/env";
 import { createMessage } from "../integrations/anthropicClient";
 import * as conversationRepository from "../repositories/conversationRepository";
+import * as aiKnowledgeService from "../services/aiKnowledgeService";
 import { Conversation, User } from "../types";
 import { logger } from "../utils/logger";
 import { isAbandon, isConfirmation } from "./confirmations";
@@ -25,11 +25,12 @@ export interface EngineResult {
  * (state/state_data) e reiniciada para MENU, para nao presumir que o cliente
  * ainda quer concluir um agendamento abandonado ha dias.
  */
-function isConversationStale(conversation: Conversation): boolean {
+async function isConversationStale(conversation: Conversation): Promise<boolean> {
   if (conversation.status === "closed") return true;
   if (!conversation.last_user_message_at) return false;
+  const contextExpiryMinutes = await aiKnowledgeService.getContextExpiryMinutes();
   const elapsedMs = Date.now() - new Date(conversation.last_user_message_at).getTime();
-  return elapsedMs > CONTEXT_EXPIRY_MINUTES * 60 * 1000;
+  return elapsedMs > contextExpiryMinutes * 60 * 1000;
 }
 
 /**
@@ -48,7 +49,7 @@ export async function runTurn(user: User, conversation: Conversation, userMessag
     userMessage,
   });
 
-  const stale = isConversationStale(conversation);
+  const stale = await isConversationStale(conversation);
   if (stale && conversation.state !== "MENU") {
     logger.info(SCOPE, "Contexto de atendimento expirado - reiniciando fluxo para MENU (historico preservado)", {
       conversationId: conversation.id,

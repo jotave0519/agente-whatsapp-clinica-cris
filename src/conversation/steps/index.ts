@@ -4,10 +4,23 @@ import { cancellationSteps } from "./cancellation";
 import { menuStep } from "./menu";
 import { reschedulingSteps } from "./rescheduling";
 import { schedulingSteps } from "./scheduling";
+import { SWITCH_HANDLERS, SWITCH_TOOLS } from "./switchFlow";
 
 const ALL_STEPS: StepDefinition[] = [menuStep, ...schedulingSteps, ...reschedulingSteps, ...cancellationSteps];
 
-const STEP_MAP = new Map<ConversationFlowState, StepDefinition>(ALL_STEPS.map((step) => [step.id, step]));
+// Fora do MENU, toda etapa tambem ganha as ferramentas de troca de fluxo
+// (begin_scheduling/begin_rescheduling/begin_cancellation): sem isso o
+// cliente nao tem como pedir algo diferente no meio de um atendimento em
+// andamento. O MENU ja inclui essas ferramentas nativamente (steps/menu.ts),
+// entao fica de fora da mesclagem para nao duplicar.
+const STEP_MAP = new Map<ConversationFlowState, StepDefinition>(
+  ALL_STEPS.map((step) => [
+    step.id,
+    step.id === "MENU"
+      ? step
+      : { ...step, tools: [...step.tools, ...SWITCH_TOOLS], handlers: { ...step.handlers, ...SWITCH_HANDLERS } },
+  ])
+);
 
 const REQUIRED_STATES: ConversationFlowState[] = [
   "MENU",
@@ -41,10 +54,12 @@ export function getStep(state: ConversationFlowState): StepDefinition {
 }
 
 /**
- * Identifica a unica ferramenta de acao de uma etapa (ignorando abandon_flow),
- * usada pelo fast-path deterministico de confirmacao no engine.
+ * Identifica a unica ferramenta de acao "primaria" de uma etapa (ignorando
+ * abandon_flow e as ferramentas de troca de fluxo begin_*, que agora toda
+ * etapa nao-MENU tambem expoe), usada pelo fast-path deterministico de
+ * confirmacao no engine.
  */
 export function getPrimaryToolName(step: StepDefinition): string | null {
-  const candidates = step.tools.filter((tool) => tool.name !== "abandon_flow");
+  const candidates = step.tools.filter((tool) => tool.name !== "abandon_flow" && !tool.name.startsWith("begin_"));
   return candidates.length === 1 ? candidates[0].name : null;
 }

@@ -2,8 +2,8 @@ import * as schedulingService from "../../services/schedulingService";
 import { FlowStateData } from "../../types";
 import { logger } from "../../utils/logger";
 import { describeSlots, formatDate, formatTime } from "../prompt";
-import { FlowContext, StepDefinition, StepResult } from "../types";
-import { ABANDON_TOOL, abandonFlow } from "./shared";
+import { FlowContext, StepDefinition, StepResult, ToolHandler } from "../types";
+import { ABANDON_TOOL, abandonFlow, looksLikeFullName } from "./shared";
 
 const SCOPE = "conversation.scheduling";
 const CLINIC_ADDRESS = "Estrada Santa Isabel, 965, Sala 23, Edifício Comercial Arujazinho, Arujá - SP";
@@ -30,6 +30,35 @@ export async function provideDate(ctx: FlowContext, baseData: FlowStateData, dat
     message: `Horarios disponiveis em ${date}: ${describeSlots(data.availableSlots)}. Apresente essas opcoes numeradas (formato HH:MM) e pergunte qual o cliente prefere.`,
   };
 }
+
+/**
+ * Inicia (ou reinicia, no caso de troca de fluxo em outra etapa) o fluxo de
+ * agendamento. Reaproveita o nome ja cadastrado do cliente (ctx.user.name)
+ * quando ele parece completo, para nao perguntar de novo algo ja conhecido.
+ */
+export const beginScheduling: ToolHandler = async (ctx, input) => {
+  const data: FlowStateData = {};
+  if (input.procedure) data.procedure = input.procedure;
+  if (input.name) data.name = input.name;
+  logger.info(SCOPE, "Iniciando fluxo de agendamento", { conversationId: ctx.conversation.id, input });
+
+  if (!data.procedure) {
+    return { nextStep: "SCHEDULING_PROCEDURE", data, message: "Fluxo de agendamento iniciado. Peça (apenas) qual procedimento o cliente deseja agendar." };
+  }
+
+  if (!data.name && looksLikeFullName(ctx.user.name)) {
+    data.name = ctx.user.name;
+    logger.info(SCOPE, "Nome ja cadastrado reaproveitado", { conversationId: ctx.conversation.id, name: ctx.user.name });
+  }
+
+  if (!data.name) {
+    return { nextStep: "SCHEDULING_NAME", data, message: `Procedimento registrado: ${data.procedure}. Peça o nome completo do paciente.` };
+  }
+  if (input.date) {
+    return provideDate(ctx, data, input.date);
+  }
+  return { nextStep: "SCHEDULING_DATE", data, message: `Procedimento registrado: ${data.procedure}. Nome já conhecido (${data.name}), não precisa perguntar de novo. Peça a data desejada.` };
+};
 
 export const procedureStep: StepDefinition = {
   id: "SCHEDULING_PROCEDURE",
@@ -73,6 +102,16 @@ export const nameStep: StepDefinition = {
   ],
   handlers: {
     provide_name: async (ctx, input) => {
+      if (!looksLikeFullName(input.name)) {
+        logger.info(SCOPE, "Nome incompleto informado, permanecendo na etapa", { conversationId: ctx.conversation.id, name: input.name });
+        return {
+          nextStep: "SCHEDULING_NAME",
+          data: ctx.conversation.state_data,
+          message:
+            `O cliente informou "${input.name}", que parece incompleto (falta sobrenome). NAO repita a pergunta anterior de forma identica: ` +
+            "explique de forma natural que falta o sobrenome para completar o cadastro e peça só isso.",
+        };
+      }
       const data: FlowStateData = { ...ctx.conversation.state_data, name: input.name };
       logger.info(SCOPE, "Nome registrado", { conversationId: ctx.conversation.id, name: input.name });
       return { nextStep: "SCHEDULING_DATE", data, message: `Nome registrado: ${input.name}. Peça a data desejada.` };

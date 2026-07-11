@@ -1,12 +1,9 @@
 import * as businessHoursService from "../../services/businessHoursService";
 import * as schedulingService from "../../services/schedulingService";
-import { FlowStateData } from "../../types";
 import { logger } from "../../utils/logger";
 import { clinicInfoText } from "../prompt";
 import { FlowContext, StepDefinition } from "../types";
-import { beginCancellation } from "./cancellation";
-import { beginRescheduling } from "./rescheduling";
-import { provideDate } from "./scheduling";
+import { SWITCH_HANDLERS, SWITCH_TOOLS } from "./switchFlow";
 
 const SCOPE = "conversation.menu";
 
@@ -34,30 +31,7 @@ export const menuStep: StepDefinition = {
     return text + "\n\n---\n\n" + clinicInfoText(hoursLabel);
   },
   tools: [
-    {
-      name: "begin_scheduling",
-      description:
-        "Inicia o fluxo de agendamento. Chame IMEDIATAMENTE ao perceber que o cliente quer agendar algo, mesmo sem " +
-        "saber ainda o procedimento, nome ou data - esses dados serao perguntados nas proximas etapas se nao informados aqui.",
-      input_schema: {
-        type: "object",
-        properties: {
-          procedure: { type: "string", description: "Procedimento de interesse, se ja mencionado nesta mensagem (ex: Botox, avaliacao)" },
-          name: { type: "string", description: "Nome completo do paciente, se ja informado nesta mensagem" },
-          date: { type: "string", description: "Data desejada (YYYY-MM-DD), se ja informada nesta mensagem" },
-        },
-      },
-    },
-    {
-      name: "begin_rescheduling",
-      description: "Inicia o fluxo de remarcacao de um agendamento existente do cliente atual.",
-      input_schema: { type: "object", properties: {} },
-    },
-    {
-      name: "begin_cancellation",
-      description: "Inicia o fluxo de cancelamento de um agendamento existente do cliente atual.",
-      input_schema: { type: "object", properties: {} },
-    },
+    ...SWITCH_TOOLS,
     {
       name: "confirm_appointment",
       description: "Marca um agendamento como confirmado pelo paciente (ex: em resposta a um lembrete de consulta).",
@@ -70,25 +44,7 @@ export const menuStep: StepDefinition = {
     },
   ],
   handlers: {
-    begin_scheduling: async (ctx, input) => {
-      const data: FlowStateData = {};
-      if (input.procedure) data.procedure = input.procedure;
-      if (input.name) data.name = input.name;
-      logger.info(SCOPE, "Iniciando fluxo de agendamento", { conversationId: ctx.conversation.id, input });
-
-      if (!data.procedure) {
-        return { nextStep: "SCHEDULING_PROCEDURE", data, message: "Fluxo de agendamento iniciado. Peça (apenas) qual procedimento o cliente deseja agendar." };
-      }
-      if (!data.name) {
-        return { nextStep: "SCHEDULING_NAME", data, message: `Procedimento registrado: ${data.procedure}. Peça o nome completo do paciente.` };
-      }
-      if (input.date) {
-        return provideDate(ctx, data, input.date);
-      }
-      return { nextStep: "SCHEDULING_DATE", data, message: "Nome ja registrado. Peça a data desejada." };
-    },
-    begin_rescheduling: beginRescheduling,
-    begin_cancellation: beginCancellation,
+    ...SWITCH_HANDLERS,
     confirm_appointment: async (ctx, input) => {
       logger.info(SCOPE, "Confirmando presenca (pos-lembrete)", { conversationId: ctx.conversation.id, scheduleId: input.schedule_id });
       await schedulingService.confirmAppointment(input.schedule_id);

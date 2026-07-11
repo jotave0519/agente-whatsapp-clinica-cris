@@ -182,8 +182,11 @@ async function buildSystemPrompt(step: StepDefinition, ctx: FlowContext): Promis
     step.id === "MENU"
       ? ""
       : "Voce esta no meio de um atendimento de agendamento/remarcacao/cancelamento EM ANDAMENTO. " +
-        "E PROIBIDO voltar ao menu principal, listar as opcoes novamente, ou mudar de assunto antes de concluir esta operacao. " +
-        "Se o cliente pedir claramente para parar ou desistir deste fluxo, chame abandon_flow. Fora isso, siga apenas a etapa atual abaixo:\n\n";
+        "E PROIBIDO voltar ao menu principal, listar as opcoes novamente, ou desviar para conversa fora do assunto antes de concluir esta operacao. " +
+        "EXCECAO: se o cliente pedir claramente uma acao diferente de agendamento/remarcacao/cancelamento (ex: pede para marcar outra consulta " +
+        "no meio de uma remarcacao, ou quer cancelar no meio de um agendamento), chame AGORA a ferramenta begin_scheduling, begin_rescheduling ou " +
+        "begin_cancellation correspondente para trocar de fluxo - o progresso desta etapa atual sera descartado. " +
+        "Se o cliente so quiser parar, sem pedir outra coisa no lugar, chame abandon_flow. Fora essas duas situacoes, siga apenas a etapa atual abaixo:\n\n";
 
   return header + guardrail + (await step.instructions(ctx));
 }

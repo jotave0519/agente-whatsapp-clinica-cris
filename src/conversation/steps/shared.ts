@@ -7,6 +7,16 @@ export const ABANDON_TOOL: ToolSchema = {
   input_schema: { type: "object", properties: {} },
 };
 
+/**
+ * Checagem deterministica de nome completo (>=2 palavras), usada tanto para
+ * validar o que o cliente digita quanto para decidir se o nome ja cadastrado
+ * em ctx.user.name pode ser reaproveitado sem perguntar de novo.
+ */
+export function looksLikeFullName(name: string | undefined | null): boolean {
+  if (!name) return false;
+  return name.trim().split(/\s+/).filter(Boolean).length >= 2;
+}
+
 export const abandonFlow: ToolHandler = async (ctx) => {
   logger.info("conversation.shared", "Fluxo abandonado a pedido do cliente", {
     conversationId: ctx.conversation.id,

@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as scheduleRepository from "../../repositories/scheduleRepository";
 import * as transactionRepository from "../../repositories/transactionRepository";
+import * as financeService from "../../services/financeService";
 import { Transaction } from "../../types";
 import { logger } from "../../utils/logger";
 
@@ -12,10 +13,6 @@ function toDateStr(d: Date): string {
 
 function sum(transactions: Transaction[]): number {
   return transactions.reduce((acc, t) => acc + Number(t.amount), 0);
-}
-
-function monthLabel(d: Date): string {
-  return d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
 }
 
 function parseReferenceMonth(raw: unknown): Date {
@@ -33,12 +30,11 @@ export async function getFinanceOverview(req: Request, res: Response): Promise<v
     const reference = parseReferenceMonth(req.query.month);
     const monthStart = toDateStr(new Date(reference.getFullYear(), reference.getMonth(), 1));
     const monthEnd = toDateStr(new Date(reference.getFullYear(), reference.getMonth() + 1, 0));
-    const sixMonthsAgoStart = toDateStr(new Date(reference.getFullYear(), reference.getMonth() - 5, 1));
     const ninetyDaysAgo = toDateStr(new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000));
 
-    const [monthTransactions, sixMonthTransactions, recentSchedules] = await Promise.all([
+    const [monthTransactions, bars, recentSchedules] = await Promise.all([
       transactionRepository.listByDateRange(monthStart, monthEnd),
-      transactionRepository.listByDateRange(sixMonthsAgoStart, monthEnd),
+      financeService.getMonthlyFinanceSeries(6, reference),
       scheduleRepository.findByDateRange(ninetyDaysAgo, toDateStr(now)),
     ]);
 
@@ -47,19 +43,6 @@ export async function getFinanceOverview(req: Request, res: Response): Promise<v
     const receitaTotal = sum(receitasMes.filter((t) => t.status === "pago"));
     const despesaTotal = sum(despesasMes);
     const pendentes = sum(receitasMes.filter((t) => t.status === "pendente"));
-
-    const bars: { label: string; in: number; out: number }[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const monthDate = new Date(reference.getFullYear(), reference.getMonth() - i, 1);
-      const start = toDateStr(monthDate);
-      const end = toDateStr(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0));
-      const monthTx = sixMonthTransactions.filter((t) => t.occurred_on >= start && t.occurred_on <= end);
-      bars.push({
-        label: monthLabel(monthDate),
-        in: sum(monthTx.filter((t) => t.type === "receita" && t.status === "pago")),
-        out: sum(monthTx.filter((t) => t.type === "despesa")),
-      });
-    }
 
     const procCounts = new Map<string, number>();
     const patientCounts = new Map<string, number>();

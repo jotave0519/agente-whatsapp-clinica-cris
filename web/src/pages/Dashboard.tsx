@@ -5,6 +5,7 @@ import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 import { ArrowRightIcon, TrendingUpIcon } from "../components/icons";
 import { NewAppointmentFab } from "../components/NewAppointmentFab";
+import { RevenueChart } from "../components/RevenueChart";
 
 interface DashboardData {
   kpis: { activePatients: number; appointmentsThisMonth: number; revenueThisMonth: number; conversationsWaiting: number };
@@ -58,7 +59,6 @@ export function Dashboard() {
   const name = session?.user.email?.split("@")[0] || "";
   const today = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const chartData = isMobile ? data.revenueChart.slice(-6) : data.revenueChart;
-  const maxRevenue = Math.max(1, ...chartData.map((r) => r.value));
 
   const kpiCards = [
     { label: "Pacientes ativos", value: String(data.kpis.activePatients) },
@@ -108,21 +108,7 @@ export function Dashboard() {
               este mês
             </span>
           </div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 140 }}>
-            {chartData.map((r) => (
-              <div key={r.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                <div
-                  style={{
-                    width: "60%",
-                    height: `${Math.max(4, (r.value / maxRevenue) * 100)}%`,
-                    background: r.value > 0 ? "var(--accent)" : "var(--border)",
-                    borderRadius: "4px 4px 0 0",
-                  }}
-                />
-                <span style={{ fontSize: 10.5, color: "var(--text-faint)", textTransform: "capitalize" }}>{r.label}</span>
-              </div>
-            ))}
-          </div>
+          <RevenueChart data={chartData} />
         </div>
 
         <div className="card" style={{ display: "flex", flexDirection: "column" }}>

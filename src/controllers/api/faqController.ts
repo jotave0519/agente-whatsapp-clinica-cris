@@ -4,6 +4,10 @@ import { logger } from "../../utils/logger";
 
 const SCOPE = "api.faq";
 
+function isDuplicateQuestion(err: any): boolean {
+  return err?.code === "23505";
+}
+
 export async function listFaq(_req: Request, res: Response): Promise<void> {
   try {
     const items = await faqRepository.listAll();
@@ -26,6 +30,10 @@ export async function createFaq(req: Request, res: Response): Promise<void> {
     const item = await faqRepository.create({ question, answer, active, sort_order });
     res.status(201).json(item);
   } catch (err) {
+    if (isDuplicateQuestion(err)) {
+      res.status(409).json({ error: "Essa pergunta já está cadastrada." });
+      return;
+    }
     logger.error(SCOPE, "Erro ao criar FAQ", err);
     res.status(500).json({ error: "Erro ao criar FAQ." });
   }
@@ -37,6 +45,10 @@ export async function updateFaq(req: Request, res: Response): Promise<void> {
     const item = await faqRepository.update(req.params.id, req.body);
     res.json(item);
   } catch (err) {
+    if (isDuplicateQuestion(err)) {
+      res.status(409).json({ error: "Essa pergunta já está cadastrada." });
+      return;
+    }
     logger.error(SCOPE, "Erro ao atualizar FAQ", err);
     res.status(500).json({ error: "Erro ao atualizar FAQ." });
   }

@@ -38,7 +38,8 @@ export async function createStaff(req: Request, res: Response): Promise<void> {
     logger.info(SCOPE, "Criando staff via CRM", { adminId: req.staff?.id, email, role });
     const { data, error } = await getSupabaseClient().auth.admin.createUser({ email, password, email_confirm: true });
     if (error || !data.user) {
-      res.status(400).json({ error: error?.message || "Erro ao criar usuario no Supabase Auth." });
+      logger.error(SCOPE, "Erro ao criar usuario no Supabase Auth", error);
+      res.status(400).json({ error: "Nao foi possivel criar o usuario. Verifique os dados informados." });
       return;
     }
 
@@ -60,7 +61,8 @@ export async function deleteStaff(req: Request, res: Response): Promise<void> {
     logger.info(SCOPE, "Excluindo staff via CRM", { adminId: req.staff?.id, targetId: req.params.id });
     const { error } = await getSupabaseClient().auth.admin.deleteUser(req.params.id);
     if (error) {
-      res.status(400).json({ error: error.message });
+      logger.error(SCOPE, "Erro ao excluir usuario no Supabase Auth", error);
+      res.status(400).json({ error: "Nao foi possivel excluir o usuario." });
       return;
     }
     res.json({ status: "deleted" });

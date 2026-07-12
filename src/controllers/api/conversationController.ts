@@ -56,9 +56,9 @@ export async function sendMessage(req: Request, res: Response): Promise<void> {
     const message = await conversationRepository.addMessage(conversation.id, "assistant", content);
 
     res.status(201).json(message);
-  } catch (err: any) {
+  } catch (err) {
     logger.error(SCOPE, "Erro ao enviar mensagem", err);
-    res.status(500).json({ error: `Erro ao enviar mensagem: ${err.message}` });
+    res.status(500).json({ error: "Erro ao enviar mensagem." });
   }
 }
 

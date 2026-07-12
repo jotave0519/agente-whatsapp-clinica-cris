@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import * as inventoryRepository from "../../repositories/inventoryRepository";
 import * as inventoryService from "../../services/inventoryService";
 import { InventoryItem } from "../../types";
+import { AppError } from "../../utils/appError";
 import { logger } from "../../utils/logger";
 
 const SCOPE = "api.inventory";
@@ -118,7 +119,11 @@ export async function createMovement(req: Request, res: Response): Promise<void>
     res.status(201).json(result);
   } catch (err) {
     logger.error(SCOPE, "Erro ao registrar movimentacao de estoque", err);
-    res.status(400).json({ error: (err as Error).message || "Erro ao registrar movimentacao." });
+    if (err instanceof AppError) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    res.status(500).json({ error: "Erro ao registrar movimentacao." });
   }
 }
 
@@ -135,6 +140,10 @@ export async function updateMovement(req: Request, res: Response): Promise<void>
     res.json(result);
   } catch (err) {
     logger.error(SCOPE, "Erro ao editar movimentacao de estoque", err);
-    res.status(400).json({ error: (err as Error).message || "Erro ao editar movimentacao." });
+    if (err instanceof AppError) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    res.status(500).json({ error: "Erro ao editar movimentacao." });
   }
 }

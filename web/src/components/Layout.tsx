@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAppointmentModal } from "../context/AppointmentModalContext";
 import { useAuth } from "../context/AuthContext";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { canAccessPage } from "../lib/permissions";
 import { MobileHeader } from "./MobileHeader";
 import { MobileTabBar } from "./MobileTabBar";
 import { Topbar } from "./Topbar";
@@ -36,13 +37,18 @@ const NAV_GROUPS = [
 ];
 
 export function Layout() {
-  const { session, signOut } = useAuth();
+  const { session, staff, signOut } = useAuth();
   const { open: openNewAppointment } = useAppointmentModal();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
   const email = session?.user.email || "";
   const initials = email.slice(0, 2).toUpperCase();
+
+  const visibleNavGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => canAccessPage(staff?.role, item.to)),
+  })).filter((group) => group.items.length > 0);
 
   if (isMobile) {
     return (
@@ -70,7 +76,7 @@ export function Layout() {
         </div>
 
         <nav style={{ flex: 1, overflowY: "auto" }}>
-          {NAV_GROUPS.map((group) => (
+          {visibleNavGroups.map((group) => (
             <div key={group.label} style={{ marginBottom: 16 }}>
               <div className="sidebar-group-label">{group.label}</div>
               {group.items.map((item) => (

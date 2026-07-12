@@ -1,3 +1,4 @@
+import { CalendarUnavailableError } from "../../integrations/googleCalendarClient";
 import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as schedulingService from "../../services/schedulingService";
 import * as settingsRepository from "../../repositories/settingsRepository";
@@ -6,7 +7,7 @@ import { FlowStateData } from "../../types";
 import { logger } from "../../utils/logger";
 import { describeSlots, formatDate, formatTime } from "../prompt";
 import { FlowContext, StepDefinition, StepResult, ToolHandler } from "../types";
-import { ABANDON_TOOL, abandonFlow, looksLikeFullName, sampleSlotsAcrossDay } from "./shared";
+import { ABANDON_TOOL, CALENDAR_UNAVAILABLE_INSTRUCTION, SLOT_TAKEN_INSTRUCTION, abandonFlow, looksLikeFullName, sampleSlotsAcrossDay } from "./shared";
 
 const SCOPE = "conversation.scheduling";
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -36,11 +37,23 @@ export async function provideDate(ctx: FlowContext, baseData: FlowStateData, dat
 
   const durationMinutes = baseData.durationMinutes ?? 30;
   logger.info(SCOPE, "Consultando disponibilidade", { conversationId: ctx.conversation.id, date, durationMinutes });
-  const slots = await schedulingService.checkAvailability(date, durationMinutes);
+  let slots: string[];
+  try {
+    slots = await schedulingService.checkAvailability(date, durationMinutes);
+  } catch (err) {
+    logger.error(SCOPE, "Falha ao consultar disponibilidade no Calendar", err);
+    return { nextStep: "SCHEDULING_DATE", data: baseData, message: CALENDAR_UNAVAILABLE_INSTRUCTION };
+  }
   logger.info(SCOPE, "Disponibilidade recebida", { date, slotCount: slots.length });
 
   if (slots.length === 0) {
-    const alternative = await schedulingService.findNextAvailable(date, durationMinutes);
+    let alternative;
+    try {
+      alternative = await schedulingService.findNextAvailable(date, durationMinutes);
+    } catch (err) {
+      logger.error(SCOPE, "Falha ao buscar proxima data disponivel no Calendar", err);
+      return { nextStep: "SCHEDULING_DATE", data: baseData, message: CALENDAR_UNAVAILABLE_INSTRUCTION };
+    }
     if (alternative) {
       logger.info(SCOPE, "Sugerindo data alternativa", { requestedDate: date, alternativeDate: alternative.date });
       return {
@@ -261,7 +274,7 @@ export const timeStep: StepDefinition = {
 };
 
 export async function confirmScheduling(ctx: FlowContext): Promise<StepResult> {
-  const { name, procedure, selectedStart, durationMinutes } = ctx.conversation.state_data;
+  const { name, procedure, selectedStart, durationMinutes, date } = ctx.conversation.state_data;
 
   if (!name || !procedure || !selectedStart) {
     logger.warn(SCOPE, "confirmScheduling chamado sem dados completos", ctx.conversation.state_data);
@@ -274,6 +287,29 @@ export async function confirmScheduling(ctx: FlowContext): Promise<StepResult> {
 
   logger.info(SCOPE, "Criando agendamento", { conversationId: ctx.conversation.id, name, procedure, selectedStart });
   try {
+    // Revalida a disponibilidade bem antes de criar o evento: reduz a janela de corrida em que
+    // dois clientes escolhem o mesmo horario quase ao mesmo tempo (o Google Calendar nao oferece
+    // reserva atomica, entao isso nao elimina 100% da corrida, so a reduz ao round-trip da API).
+    if (date) {
+      const freshSlots = await schedulingService.checkAvailability(date, durationMinutes);
+      if (!freshSlots.includes(selectedStart)) {
+        logger.warn(SCOPE, "Horario nao esta mais disponivel (conflito de concorrencia)", { conversationId: ctx.conversation.id, selectedStart });
+        const newData: FlowStateData = { ...ctx.conversation.state_data, availableSlots: sampleSlotsAcrossDay(freshSlots), selectedStart: undefined };
+        if (freshSlots.length > 0) {
+          return {
+            nextStep: "SCHEDULING_TIME",
+            data: newData,
+            message: `${SLOT_TAKEN_INSTRUCTION} Em seguida apresente as novas opções disponíveis: ${describeSlots(newData.availableSlots)}.`,
+          };
+        }
+        return {
+          nextStep: "SCHEDULING_DATE",
+          data: newData,
+          message: `${SLOT_TAKEN_INSTRUCTION} Não há mais horários livres em ${date}; peça ao cliente para escolher outra data.`,
+        };
+      }
+    }
+
     await schedulingService.createAppointment({
       userId: ctx.user.id,
       name,
@@ -292,9 +328,13 @@ export async function confirmScheduling(ctx: FlowContext): Promise<StepResult> {
       address: settings.address || "",
     });
     return { nextStep: "MENU", data: {}, message };
-  } catch (err: any) {
+  } catch (err) {
+    if (err instanceof CalendarUnavailableError) {
+      logger.error(SCOPE, "Falha ao criar agendamento (Calendar indisponivel)", err);
+      return { nextStep: "SCHEDULING_CONFIRM", data: ctx.conversation.state_data, message: CALENDAR_UNAVAILABLE_INSTRUCTION };
+    }
     logger.error(SCOPE, "Falha ao criar agendamento", err);
-    const message = await aiKnowledgeService.getMessageTemplate("confirm_scheduling_failure", { error: err.message });
+    const message = await aiKnowledgeService.getMessageTemplate("confirm_scheduling_failure", { error: "tente novamente em instantes" });
     return { nextStep: "SCHEDULING_CONFIRM", data: ctx.conversation.state_data, message };
   }
 }

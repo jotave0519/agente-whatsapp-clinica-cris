@@ -12,6 +12,7 @@ import {
   updateItem as updateInventoryItem,
   updateMovement,
 } from "../controllers/api/inventoryController";
+import { getMe } from "../controllers/api/meController";
 import { listMessageTemplates, updateMessageTemplate } from "../controllers/api/messageTemplateController";
 import { createPatient, deletePatient, getPatient, listPatients, updatePatient } from "../controllers/api/patientController";
 import { createProcedure, deleteProcedure, listProcedures, updateProcedure } from "../controllers/api/procedureController";
@@ -21,65 +22,74 @@ import { createStaff, deleteStaff, listStaff, updateStaff } from "../controllers
 import { disconnect, getQrCode, getStatus } from "../controllers/api/whatsappController";
 import { requireAdmin } from "../middleware/requireAdmin";
 import { requireAuth } from "../middleware/requireAuth";
+import { requireRole } from "../middleware/requireRole";
 
 export const apiRouter = Router();
 
 apiRouter.use(requireAuth);
 
-apiRouter.get("/dashboard", getDashboard);
+// Perfis: admin (acesso total), recepcionista (atendimento do dia a dia -
+// agenda/pacientes/conversas/whatsapp), profissional (so consulta agenda/
+// pacientes). Nenhuma rota administrativa fica liberada so por estar
+// autenticado - ver auditoria de seguranca.
+const staffOrAbove = requireRole("admin", "recepcionista");
+
+apiRouter.get("/me", getMe);
+
+apiRouter.get("/dashboard", requireAdmin, getDashboard);
 
 apiRouter.get("/patients", listPatients);
 apiRouter.get("/patients/:id", getPatient);
-apiRouter.post("/patients", createPatient);
-apiRouter.patch("/patients/:id", updatePatient);
-apiRouter.delete("/patients/:id", deletePatient);
+apiRouter.post("/patients", staffOrAbove, createPatient);
+apiRouter.patch("/patients/:id", staffOrAbove, updatePatient);
+apiRouter.delete("/patients/:id", staffOrAbove, deletePatient);
 
 apiRouter.get("/schedules", listSchedules);
-apiRouter.post("/schedules", createSchedule);
-apiRouter.delete("/schedules/:id", cancelSchedule);
+apiRouter.post("/schedules", staffOrAbove, createSchedule);
+apiRouter.delete("/schedules/:id", staffOrAbove, cancelSchedule);
 
-apiRouter.get("/conversations", listConversations);
-apiRouter.get("/conversations/:id", getConversation);
-apiRouter.post("/conversations/:id/messages", sendMessage);
-apiRouter.patch("/conversations/:id/status", updateStatus);
+apiRouter.get("/conversations", staffOrAbove, listConversations);
+apiRouter.get("/conversations/:id", staffOrAbove, getConversation);
+apiRouter.post("/conversations/:id/messages", staffOrAbove, sendMessage);
+apiRouter.patch("/conversations/:id/status", staffOrAbove, updateStatus);
 
 apiRouter.get("/procedures", listProcedures);
-apiRouter.post("/procedures", createProcedure);
-apiRouter.patch("/procedures/:id", updateProcedure);
-apiRouter.delete("/procedures/:id", deleteProcedure);
+apiRouter.post("/procedures", requireAdmin, createProcedure);
+apiRouter.patch("/procedures/:id", requireAdmin, updateProcedure);
+apiRouter.delete("/procedures/:id", requireAdmin, deleteProcedure);
 
-apiRouter.get("/finance", getFinanceOverview);
-apiRouter.post("/finance/transactions", createTransaction);
-apiRouter.patch("/finance/transactions/:id", updateTransaction);
-apiRouter.delete("/finance/transactions/:id", deleteTransaction);
+apiRouter.get("/finance", requireAdmin, getFinanceOverview);
+apiRouter.post("/finance/transactions", requireAdmin, createTransaction);
+apiRouter.patch("/finance/transactions/:id", requireAdmin, updateTransaction);
+apiRouter.delete("/finance/transactions/:id", requireAdmin, deleteTransaction);
 
-apiRouter.get("/inventory", listInventory);
-apiRouter.post("/inventory/items", createItem);
-apiRouter.patch("/inventory/items/:id", updateInventoryItem);
-apiRouter.delete("/inventory/items/:id", deleteItem);
-apiRouter.post("/inventory/movements", createMovement);
-apiRouter.patch("/inventory/movements/:id", updateMovement);
+apiRouter.get("/inventory", requireAdmin, listInventory);
+apiRouter.post("/inventory/items", requireAdmin, createItem);
+apiRouter.patch("/inventory/items/:id", requireAdmin, updateInventoryItem);
+apiRouter.delete("/inventory/items/:id", requireAdmin, deleteItem);
+apiRouter.post("/inventory/movements", requireAdmin, createMovement);
+apiRouter.patch("/inventory/movements/:id", requireAdmin, updateMovement);
 
 apiRouter.get("/staff", requireAdmin, listStaff);
 apiRouter.post("/staff", requireAdmin, createStaff);
 apiRouter.patch("/staff/:id", requireAdmin, updateStaff);
 apiRouter.delete("/staff/:id", requireAdmin, deleteStaff);
 
-apiRouter.get("/settings", getSettings);
-apiRouter.patch("/settings", updateSettings);
+apiRouter.get("/settings", requireAdmin, getSettings);
+apiRouter.patch("/settings", requireAdmin, updateSettings);
 
-apiRouter.get("/faq", listFaq);
-apiRouter.post("/faq", createFaq);
-apiRouter.patch("/faq/:id", updateFaq);
-apiRouter.delete("/faq/:id", deleteFaq);
+apiRouter.get("/faq", requireAdmin, listFaq);
+apiRouter.post("/faq", requireAdmin, createFaq);
+apiRouter.patch("/faq/:id", requireAdmin, updateFaq);
+apiRouter.delete("/faq/:id", requireAdmin, deleteFaq);
 
-apiRouter.get("/message-templates", listMessageTemplates);
-apiRouter.patch("/message-templates/:key", updateMessageTemplate);
+apiRouter.get("/message-templates", requireAdmin, listMessageTemplates);
+apiRouter.patch("/message-templates/:key", requireAdmin, updateMessageTemplate);
 
-apiRouter.get("/business-hours/exceptions", listExceptions);
-apiRouter.post("/business-hours/exceptions", createException);
-apiRouter.delete("/business-hours/exceptions/:id", deleteException);
+apiRouter.get("/business-hours/exceptions", requireAdmin, listExceptions);
+apiRouter.post("/business-hours/exceptions", requireAdmin, createException);
+apiRouter.delete("/business-hours/exceptions/:id", requireAdmin, deleteException);
 
-apiRouter.get("/whatsapp/status", getStatus);
-apiRouter.get("/whatsapp/qrcode", getQrCode);
+apiRouter.get("/whatsapp/status", staffOrAbove, getStatus);
+apiRouter.get("/whatsapp/qrcode", staffOrAbove, getQrCode);
 apiRouter.post("/whatsapp/disconnect", requireAdmin, disconnect);

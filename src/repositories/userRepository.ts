@@ -53,7 +53,13 @@ export async function listAll(params: { search?: string; limit?: number; offset?
     .range(offset, offset + limit - 1);
 
   if (params.search) {
-    query = query.or(`name.ilike.%${params.search}%,phone.ilike.%${params.search}%,email.ilike.%${params.search}%`);
+    // O valor precisa ser envolvido em aspas duplas (com backslash/aspas internos escapados)
+    // para o PostgREST tratar virgula/parenteses no texto de busca como parte do valor, e nao
+    // como separador de outra clausula do .or() - caso contrario o usuario poderia injetar
+    // filtros adicionais digitando esses caracteres na busca.
+    const escaped = params.search.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const term = `"%${escaped}%"`;
+    query = query.or(`name.ilike.${term},phone.ilike.${term},email.ilike.${term}`);
   }
 
   const { data, error, count } = await query;

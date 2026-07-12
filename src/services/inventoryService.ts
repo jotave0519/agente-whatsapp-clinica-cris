@@ -1,5 +1,6 @@
 import * as inventoryRepository from "../repositories/inventoryRepository";
 import { InventoryItem, InventoryMovementType } from "../types";
+import { AppError } from "../utils/appError";
 
 export async function registerMovement(params: {
   itemId: string;
@@ -9,16 +10,16 @@ export async function registerMovement(params: {
   createdBy?: string | null;
 }): Promise<{ item: InventoryItem }> {
   if (params.quantity <= 0) {
-    throw new Error("Quantidade da movimentacao precisa ser maior que zero.");
+    throw new AppError("Quantidade da movimentacao precisa ser maior que zero.");
   }
 
   const item = await inventoryRepository.findItemById(params.itemId);
-  if (!item) throw new Error(`Item de estoque nao encontrado: ${params.itemId}`);
+  if (!item) throw new AppError(`Item de estoque nao encontrado: ${params.itemId}`);
 
   const delta = params.type === "entrada" ? params.quantity : -params.quantity;
   const newQuantity = Number(item.quantity) + delta;
   if (newQuantity < 0) {
-    throw new Error(`Estoque insuficiente para "${item.name}" (disponivel: ${item.quantity}).`);
+    throw new AppError(`Estoque insuficiente para "${item.name}" (disponivel: ${item.quantity}).`);
   }
 
   await inventoryRepository.createMovement(params);
@@ -32,14 +33,14 @@ export async function editMovement(
   params: { type: InventoryMovementType; quantity: number; note?: string | null }
 ): Promise<{ item: InventoryItem }> {
   if (params.quantity <= 0) {
-    throw new Error("Quantidade da movimentacao precisa ser maior que zero.");
+    throw new AppError("Quantidade da movimentacao precisa ser maior que zero.");
   }
 
   const movement = await inventoryRepository.findMovementById(movementId);
-  if (!movement) throw new Error(`Movimentacao nao encontrada: ${movementId}`);
+  if (!movement) throw new AppError(`Movimentacao nao encontrada: ${movementId}`);
 
   const item = await inventoryRepository.findItemById(movement.item_id);
-  if (!item) throw new Error(`Item de estoque nao encontrado: ${movement.item_id}`);
+  if (!item) throw new AppError(`Item de estoque nao encontrado: ${movement.item_id}`);
 
   // Reverte o efeito da movimentacao original e aplica o efeito da versao editada,
   // recalculando o saldo do item a partir do valor atual (nao do zero).
@@ -48,7 +49,7 @@ export async function editMovement(
   const newItemQuantity = Number(item.quantity) - oldDelta + newDelta;
 
   if (newItemQuantity < 0) {
-    throw new Error(`Essa alteracao deixaria o estoque de "${item.name}" negativo (resultado: ${newItemQuantity}).`);
+    throw new AppError(`Essa alteracao deixaria o estoque de "${item.name}" negativo (resultado: ${newItemQuantity}).`);
   }
 
   await inventoryRepository.updateMovement(movementId, params);

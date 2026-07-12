@@ -5,6 +5,15 @@ import { ToolHandler, ToolSchema } from "../types";
 
 export { sampleSlotsAcrossDay };
 
+/** Usada quando o Google Calendar esta indisponivel (rede/timeout/auth) - nunca expor o erro tecnico ao cliente. */
+export const CALENDAR_UNAVAILABLE_INSTRUCTION =
+  'Diga exatamente esta frase ao cliente, sem parafrasear nem adicionar detalhes tecnicos: "Estou com dificuldade para consultar nossa agenda ' +
+  'neste momento. Posso pedir para nossa equipe confirmar esse horário com você." Nao mencione Google Calendar, erro, codigo ou qualquer termo tecnico.';
+
+/** Usada quando uma revalidacao no momento da confirmacao mostra que o horario escolhido acabou de ser ocupado por outra pessoa. */
+export const SLOT_TAKEN_INSTRUCTION =
+  'Diga exatamente esta frase ao cliente: "Enquanto conversávamos esse horário acabou de ser ocupado. Vou verificar outra opção disponível."';
+
 export const ABANDON_TOOL: ToolSchema = {
   name: "abandon_flow",
   description: "Aborta o fluxo atual (agendamento/remarcacao/cancelamento) e volta ao atendimento geral, a pedido explicito do cliente.",

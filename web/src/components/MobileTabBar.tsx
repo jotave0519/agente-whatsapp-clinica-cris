@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { canAccessPage } from "../lib/permissions";
 import { CalendarIcon, HomeIcon, MessageCircleIcon, MoreIcon, UsersIcon } from "./icons";
 import { MobileMoreSheet } from "./MobileMoreSheet";
 
@@ -15,12 +17,14 @@ const TABS = [
 export function MobileTabBar() {
   const [showMore, setShowMore] = useState(false);
   const location = useLocation();
+  const { staff } = useAuth();
+  const visibleTabs = TABS.filter((tab) => canAccessPage(staff?.role, tab.to));
   const isSecondaryActive = SECONDARY_PATHS.some((p) => location.pathname.startsWith(p));
 
   return (
     <>
       <nav className="mobile-tabbar">
-        {TABS.map((tab) => (
+        {visibleTabs.map((tab) => (
           <NavLink
             key={tab.to}
             to={tab.to}

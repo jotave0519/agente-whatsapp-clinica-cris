@@ -4,6 +4,7 @@ import * as userRepository from "../../repositories/userRepository";
 import * as clinicCancellationService from "../../services/clinicCancellationService";
 import * as schedulingService from "../../services/schedulingService";
 import { getOrCreateUserByPhone } from "../../services/userService";
+import { AppError } from "../../utils/appError";
 import { logger } from "../../utils/logger";
 
 const SCOPE = "api.schedule";
@@ -59,9 +60,13 @@ export async function createSchedule(req: Request, res: Response): Promise<void>
       notes,
     });
     res.status(201).json(schedule);
-  } catch (err: any) {
+  } catch (err) {
     logger.error(SCOPE, "Erro ao criar agendamento", err);
-    res.status(500).json({ error: `Erro ao criar agendamento: ${err.message}` });
+    if (err instanceof AppError) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    res.status(500).json({ error: "Erro ao criar agendamento." });
   }
 }
 
@@ -87,8 +92,12 @@ export async function cancelSchedule(req: Request, res: Response): Promise<void>
     } catch (notifyErr) {
       logger.error(SCOPE, "Falha ao notificar cliente sobre cancelamento", notifyErr);
     }
-  } catch (err: any) {
+  } catch (err) {
     logger.error(SCOPE, "Erro ao cancelar agendamento", err);
-    res.status(500).json({ error: `Erro ao cancelar agendamento: ${err.message}` });
+    if (err instanceof AppError) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    res.status(500).json({ error: "Erro ao cancelar agendamento." });
   }
 }

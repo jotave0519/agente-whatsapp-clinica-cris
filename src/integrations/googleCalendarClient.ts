@@ -15,6 +15,20 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const TOKEN_REFRESH_BUFFER_MS = 60_000;
 const SCOPE = "googleCalendarClient";
 
+/**
+ * Marca qualquer falha de comunicacao com o Google Calendar (rede, timeout,
+ * auth, credenciais ausentes) para que as etapas da conversa possam mostrar
+ * uma mensagem especifica e segura ao cliente em vez do erro tecnico bruto.
+ */
+export class CalendarUnavailableError extends Error {
+  original: unknown;
+  constructor(original: unknown) {
+    super("Google Calendar indisponivel");
+    this.name = "CalendarUnavailableError";
+    this.original = original;
+  }
+}
+
 export interface CalendarEvent {
   id: string;
   summary?: string;
@@ -148,7 +162,7 @@ async function calendarRequest<T = unknown>(
     return method === "get" ? await withRetry(doRequest, 2) : await doRequest();
   } catch (err) {
     logger.error(SCOPE, `Falha em ${method.toUpperCase()} ${path}`, err);
-    throw err;
+    throw new CalendarUnavailableError(err);
   }
 }
 

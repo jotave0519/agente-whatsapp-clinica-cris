@@ -1,10 +1,11 @@
+import { CalendarUnavailableError } from "../../integrations/googleCalendarClient";
 import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as schedulingService from "../../services/schedulingService";
 import { FlowStateData } from "../../types";
 import { logger } from "../../utils/logger";
 import { describeCandidates, describeSlots, formatDate, formatTime } from "../prompt";
 import { FlowContext, StepDefinition, StepResult, ToolHandler } from "../types";
-import { ABANDON_TOOL, abandonFlow, sampleSlotsAcrossDay } from "./shared";
+import { ABANDON_TOOL, CALENDAR_UNAVAILABLE_INSTRUCTION, SLOT_TAKEN_INSTRUCTION, abandonFlow, sampleSlotsAcrossDay } from "./shared";
 
 const SCOPE = "conversation.rescheduling";
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -111,11 +112,23 @@ export const dateStep: StepDefinition = {
 
       const durationMinutes = baseData.durationMinutes ?? 30;
       logger.info(SCOPE, "Consultando disponibilidade para remarcacao", { conversationId: ctx.conversation.id, date: input.date, durationMinutes });
-      const slots = await schedulingService.checkAvailability(input.date, durationMinutes);
+      let slots: string[];
+      try {
+        slots = await schedulingService.checkAvailability(input.date, durationMinutes);
+      } catch (err) {
+        logger.error(SCOPE, "Falha ao consultar disponibilidade no Calendar", err);
+        return { nextStep: "RESCHEDULING_DATE", data: baseData, message: CALENDAR_UNAVAILABLE_INSTRUCTION };
+      }
       logger.info(SCOPE, "Disponibilidade recebida", { date: input.date, slotCount: slots.length });
 
       if (slots.length === 0) {
-        const alternative = await schedulingService.findNextAvailable(input.date, durationMinutes);
+        let alternative;
+        try {
+          alternative = await schedulingService.findNextAvailable(input.date, durationMinutes);
+        } catch (err) {
+          logger.error(SCOPE, "Falha ao buscar proxima data disponivel no Calendar", err);
+          return { nextStep: "RESCHEDULING_DATE", data: baseData, message: CALENDAR_UNAVAILABLE_INSTRUCTION };
+        }
         if (alternative) {
           logger.info(SCOPE, "Sugerindo data alternativa", { requestedDate: input.date, alternativeDate: alternative.date });
           return {
@@ -191,7 +204,7 @@ export const timeStep: StepDefinition = {
 };
 
 export async function confirmRescheduling(ctx: FlowContext): Promise<StepResult> {
-  const { scheduleId, selectedStart, durationMinutes } = ctx.conversation.state_data;
+  const { scheduleId, selectedStart, durationMinutes, date } = ctx.conversation.state_data;
 
   if (!scheduleId || !selectedStart) {
     logger.warn(SCOPE, "confirmRescheduling chamado sem dados completos", ctx.conversation.state_data);
@@ -204,6 +217,28 @@ export async function confirmRescheduling(ctx: FlowContext): Promise<StepResult>
 
   logger.info(SCOPE, "Atualizando agendamento", { conversationId: ctx.conversation.id, scheduleId, selectedStart });
   try {
+    // Revalida a disponibilidade antes de aplicar a remarcacao, pelo mesmo motivo do agendamento
+    // normal: reduz a janela em que outro cliente ocupou esse horario enquanto se conversava.
+    if (date) {
+      const freshSlots = await schedulingService.checkAvailability(date, durationMinutes);
+      if (!freshSlots.includes(selectedStart)) {
+        logger.warn(SCOPE, "Novo horario nao esta mais disponivel (conflito de concorrencia)", { conversationId: ctx.conversation.id, selectedStart });
+        const newData: FlowStateData = { ...ctx.conversation.state_data, availableSlots: sampleSlotsAcrossDay(freshSlots), selectedStart: undefined };
+        if (freshSlots.length > 0) {
+          return {
+            nextStep: "RESCHEDULING_TIME",
+            data: newData,
+            message: `${SLOT_TAKEN_INSTRUCTION} Em seguida apresente as novas opções disponíveis: ${describeSlots(newData.availableSlots)}.`,
+          };
+        }
+        return {
+          nextStep: "RESCHEDULING_DATE",
+          data: newData,
+          message: `${SLOT_TAKEN_INSTRUCTION} Não há mais horários livres em ${date}; peça ao cliente para escolher outra data.`,
+        };
+      }
+    }
+
     await schedulingService.rescheduleAppointment(scheduleId, selectedStart, durationMinutes);
     logger.info(SCOPE, "Remarcação concluída com sucesso", { conversationId: ctx.conversation.id });
     const message = await aiKnowledgeService.getMessageTemplate("confirm_rescheduling_success", {
@@ -211,9 +246,13 @@ export async function confirmRescheduling(ctx: FlowContext): Promise<StepResult>
       time: formatTime(selectedStart),
     });
     return { nextStep: "MENU", data: {}, message };
-  } catch (err: any) {
+  } catch (err) {
+    if (err instanceof CalendarUnavailableError) {
+      logger.error(SCOPE, "Falha ao remarcar (Calendar indisponivel)", err);
+      return { nextStep: "RESCHEDULING_CONFIRM", data: ctx.conversation.state_data, message: CALENDAR_UNAVAILABLE_INSTRUCTION };
+    }
     logger.error(SCOPE, "Falha ao remarcar", err);
-    const message = await aiKnowledgeService.getMessageTemplate("confirm_rescheduling_failure", { error: err.message });
+    const message = await aiKnowledgeService.getMessageTemplate("confirm_rescheduling_failure", { error: "tente novamente em instantes" });
     return { nextStep: "RESCHEDULING_CONFIRM", data: ctx.conversation.state_data, message };
   }
 }

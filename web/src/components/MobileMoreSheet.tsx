@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { canAccessPage } from "../lib/permissions";
 import { LogOutIcon, XIcon } from "./icons";
 
 const ITEMS = [
@@ -17,7 +18,8 @@ interface Props {
 }
 
 export function MobileMoreSheet({ onClose }: Props) {
-  const { session, signOut } = useAuth();
+  const { session, staff, signOut } = useAuth();
+  const visibleItems = ITEMS.filter((item) => canAccessPage(staff?.role, item.to));
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -30,7 +32,7 @@ export function MobileMoreSheet({ onClose }: Props) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {ITEMS.map((item) => (
+          {visibleItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

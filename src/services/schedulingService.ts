@@ -1,6 +1,7 @@
 import * as googleCalendar from "../integrations/googleCalendarClient";
 import * as scheduleRepository from "../repositories/scheduleRepository";
 import { Schedule } from "../types";
+import { AppError } from "../utils/appError";
 import { sampleSlotsAcrossDay } from "../utils/slots";
 import { toSaoPauloDateTimeParts } from "../utils/timezone";
 
@@ -72,8 +73,8 @@ export async function rescheduleAppointment(
   durationMinutes?: number
 ): Promise<Schedule> {
   const schedule = await scheduleRepository.findScheduleById(scheduleId);
-  if (!schedule) throw new Error(`Agendamento nao encontrado: ${scheduleId}`);
-  if (!schedule.google_event_id) throw new Error(`Agendamento sem evento no Google Calendar: ${scheduleId}`);
+  if (!schedule) throw new AppError(`Agendamento nao encontrado: ${scheduleId}`);
+  if (!schedule.google_event_id) throw new AppError(`Agendamento sem evento no Google Calendar: ${scheduleId}`);
 
   await googleCalendar.updateEvent(schedule.google_event_id, newStart, durationMinutes);
 
@@ -88,7 +89,7 @@ export async function confirmAppointment(scheduleId: string): Promise<void> {
 
 export async function cancelAppointment(scheduleId: string): Promise<Schedule> {
   const schedule = await scheduleRepository.findScheduleById(scheduleId);
-  if (!schedule) throw new Error(`Agendamento nao encontrado: ${scheduleId}`);
+  if (!schedule) throw new AppError(`Agendamento nao encontrado: ${scheduleId}`);
 
   if (schedule.google_event_id) {
     await googleCalendar.cancelEvent(schedule.google_event_id);

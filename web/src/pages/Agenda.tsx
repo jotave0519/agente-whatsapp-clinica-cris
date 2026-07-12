@@ -55,6 +55,8 @@ export function Agenda() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ScheduleItem | null>(null);
   const [rescheduling, setRescheduling] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
   const [newDate, setNewDate] = useState("");
   const [newTime, setNewTime] = useState("");
   const [acting, setActing] = useState(false);
@@ -110,11 +112,12 @@ export function Agenda() {
 
   async function handleCancel() {
     if (!selected) return;
-    if (!window.confirm(`Cancelar o agendamento de ${selected.patient_name}?`)) return;
     setActing(true);
     try {
-      await api.delete(`/schedules/${selected.id}`);
+      await api.delete(`/schedules/${selected.id}`, { reason: cancelReason.trim() || undefined });
       setSelected(null);
+      setCancelling(false);
+      setCancelReason("");
       loadSchedules();
     } catch (e: any) {
       setError(e.message);
@@ -184,6 +187,8 @@ export function Agenda() {
               onClick={() => {
                 setSelected(it);
                 setRescheduling(false);
+                setCancelling(false);
+                setCancelReason("");
                 setNewDate(it.date);
                 setNewTime(it.time);
               }}
@@ -215,7 +220,14 @@ export function Agenda() {
   function renderActionSheet() {
     if (!selected) return null;
     return (
-      <div className="modal-overlay" onClick={() => setSelected(null)}>
+      <div
+        className="modal-overlay"
+        onClick={() => {
+          setSelected(null);
+          setCancelling(false);
+          setCancelReason("");
+        }}
+      >
         <div className="modal-card" style={{ maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{selected.patient_name}</div>
           <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>{selected.procedure}</div>
@@ -224,7 +236,37 @@ export function Agenda() {
           </div>
           {selected.notes && <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>Obs: {selected.notes}</div>}
 
-          {rescheduling ? (
+          {cancelling ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              <div>
+                <label className="field-label">Motivo do cancelamento (opcional)</label>
+                <textarea
+                  className="input"
+                  rows={3}
+                  placeholder="Ex: Imprevisto na agenda, problema interno, necessidade de reagendar..."
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                />
+                <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 6 }}>
+                  O cliente será avisado automaticamente pelo WhatsApp e a IA vai oferecer remarcar. Se deixar em branco, só informamos que houve um
+                  imprevisto.
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <button className="btn btn-secondary" onClick={() => setCancelling(false)}>
+                  Voltar
+                </button>
+                <button
+                  className="btn-danger"
+                  style={{ borderRadius: 10, padding: "9px 16px", fontSize: 13.5, fontWeight: 600 }}
+                  disabled={acting}
+                  onClick={handleCancel}
+                >
+                  {acting ? "Cancelando..." : "Confirmar cancelamento"}
+                </button>
+              </div>
+            </div>
+          ) : rescheduling ? (
             <div style={{ display: "grid", gap: 10 }}>
               <div style={{ display: "flex", gap: 10 }}>
                 <input className="input" type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
@@ -241,13 +283,20 @@ export function Agenda() {
             </div>
           ) : (
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button className="btn-danger" style={{ borderRadius: 10, padding: "9px 16px", fontSize: 13.5, fontWeight: 600 }} disabled={acting} onClick={handleCancel}>
+              <button className="btn-danger" style={{ borderRadius: 10, padding: "9px 16px", fontSize: 13.5, fontWeight: 600 }} disabled={acting} onClick={() => setCancelling(true)}>
                 Cancelar consulta
               </button>
               <button className="btn btn-secondary" onClick={() => setRescheduling(true)}>
                 Remarcar
               </button>
-              <button className="btn" onClick={() => setSelected(null)}>
+              <button
+                className="btn"
+                onClick={() => {
+                  setSelected(null);
+                  setCancelling(false);
+                  setCancelReason("");
+                }}
+              >
                 Fechar
               </button>
             </div>

@@ -1,12 +1,19 @@
 import { ConversationFlowState } from "../../types";
 import { StepDefinition } from "../types";
 import { cancellationSteps } from "./cancellation";
+import { clinicCancellationSteps } from "./clinicCancellation";
 import { menuStep } from "./menu";
 import { reschedulingSteps } from "./rescheduling";
 import { schedulingSteps } from "./scheduling";
 import { SWITCH_HANDLERS, SWITCH_TOOLS } from "./switchFlow";
 
-const ALL_STEPS: StepDefinition[] = [menuStep, ...schedulingSteps, ...reschedulingSteps, ...cancellationSteps];
+const ALL_STEPS: StepDefinition[] = [
+  menuStep,
+  ...schedulingSteps,
+  ...reschedulingSteps,
+  ...cancellationSteps,
+  ...clinicCancellationSteps,
+];
 
 // Fora do MENU, toda etapa tambem ganha as ferramentas de troca de fluxo
 // (begin_scheduling/begin_rescheduling/begin_cancellation): sem isso o
@@ -35,6 +42,7 @@ const REQUIRED_STATES: ConversationFlowState[] = [
   "RESCHEDULING_CONFIRM",
   "CANCELING_SELECT",
   "CANCELING_CONFIRM",
+  "CLINIC_CANCELLED_OFFER",
 ];
 
 // Falha rapido e alto na inicializacao do processo, em vez de se comportar de

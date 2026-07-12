@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as scheduleRepository from "../../repositories/scheduleRepository";
 import * as userRepository from "../../repositories/userRepository";
+import * as clinicCancellationService from "../../services/clinicCancellationService";
 import * as schedulingService from "../../services/schedulingService";
 import { getOrCreateUserByPhone } from "../../services/userService";
 import { logger } from "../../utils/logger";
@@ -85,9 +86,19 @@ export async function rescheduleSchedule(req: Request, res: Response): Promise<v
 export async function cancelSchedule(req: Request, res: Response): Promise<void> {
   try {
     const { id } = req.params;
-    logger.info(SCOPE, "Cancelando agendamento via CRM", { staffId: req.staff?.id, scheduleId: id });
+    const reason: string | undefined = req.body?.reason;
+    logger.info(SCOPE, "Cancelando agendamento via CRM", { staffId: req.staff?.id, scheduleId: id, hasReason: !!reason });
     const schedule = await schedulingService.cancelAppointment(id);
     res.json(schedule);
+
+    // Nao bloqueia a resposta ao CRM: o agendamento ja foi cancelado com
+    // sucesso, uma falha ao notificar o cliente (ex: WhatsApp instavel) nao
+    // deve aparecer como erro de cancelamento para a equipe.
+    try {
+      await clinicCancellationService.notifyAndOfferReschedule(schedule, reason);
+    } catch (notifyErr) {
+      logger.error(SCOPE, "Falha ao notificar cliente sobre cancelamento", notifyErr);
+    }
   } catch (err: any) {
     logger.error(SCOPE, "Erro ao cancelar agendamento", err);
     res.status(500).json({ error: `Erro ao cancelar agendamento: ${err.message}` });

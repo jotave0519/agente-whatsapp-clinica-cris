@@ -89,14 +89,25 @@ export async function runTurn(user: User, conversation: Conversation, userMessag
   // modelo: caso contrario a Claude pode "ler" a intencao antiga (ex: "quero
   // agendar um botox") no historico e retomar o fluxo sozinha, mesmo com o
   // estado ja reiniciado para MENU - foi exatamente esse o bug observado.
-  const history: any[] = stale ? [] : priorMessages.map((m) => ({ role: m.role, content: m.content }));
-  history.push({ role: "user", content: userMessage });
+  function buildHistory(): any[] {
+    const h: any[] = stale ? [] : priorMessages.map((m) => ({ role: m.role, content: m.content }));
+    h.push({ role: "user", content: userMessage });
+    return h;
+  }
 
-  let workingConversation = conversation;
-  let handoffRequested = false;
-
-  try {
+  /**
+   * Loop de chamadas a Claude para uma unica tentativa de atendimento, a
+   * partir de `startingConversation`. Extraido para poder ser chamado uma
+   * segunda vez (com o estado resetado) se a primeira tentativa falhar - ver
+   * runTurn(). Cada chamada monta seu proprio historico do zero (nunca reusa
+   * entradas parciais de uma tentativa anterior que tenha falhado no meio).
+   */
+  async function runLoop(startingConversation: Conversation): Promise<EngineResult> {
+    const history = buildHistory();
+    let workingConversation = startingConversation;
+    let handoffRequested = false;
     let iteration = 0;
+
     while (true) {
       iteration += 1;
       const step = getStep(workingConversation.state);
@@ -179,9 +190,27 @@ export async function runTurn(user: User, conversation: Conversation, userMessag
       }
       return { reply: finalText, handoffRequested };
     }
+  }
+
+  try {
+    return await runLoop(conversation);
   } catch (err) {
-    logger.error(SCOPE, "runTurn: excecao no loop de conversa com a Claude", err);
-    throw err;
+    // Recuperacao automatica: em vez de desistir na primeira falha, trata
+    // como possivel estado inconsistente/preso, reseta para MENU e tenta mais
+    // uma vez do zero antes de reportar erro ao cliente. A mensagem do
+    // usuario ja foi persistida acima (fora deste bloco), entao a nova
+    // tentativa nao a duplica. Nao ajuda em falhas que independem do estado
+    // (ex: API fora do ar), mas essas tambem nao sao prejudicadas por isso -
+    // so custam uma tentativa extra antes do fallback de erro de sempre.
+    logger.error(SCOPE, "runTurn: excecao no loop de conversa - tentando recuperar reiniciando para MENU", err);
+    try {
+      await conversationRepository.updateConversationFlow(conversation.id, "MENU", {});
+      const recoveredConversation: Conversation = { ...conversation, state: "MENU", state_data: {} };
+      return await runLoop(recoveredConversation);
+    } catch (err2) {
+      logger.error(SCOPE, "runTurn: falha tambem na tentativa de recuperacao", err2);
+      throw err2;
+    }
   }
 }
 

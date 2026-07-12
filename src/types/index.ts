@@ -41,7 +41,8 @@ export type ConversationFlowState =
   | "RESCHEDULING_TIME"
   | "RESCHEDULING_CONFIRM"
   | "CANCELING_SELECT"
-  | "CANCELING_CONFIRM";
+  | "CANCELING_CONFIRM"
+  | "CLINIC_CANCELLED_OFFER";
 
 export interface FlowStateData {
   name?: string;

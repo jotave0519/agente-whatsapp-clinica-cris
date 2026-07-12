@@ -6,6 +6,13 @@ import * as aiKnowledgeService from "./aiKnowledgeService";
 
 const SCOPE = "clinicCancellationService";
 
+function weekdayDateLabel(dateStr: string): string {
+  const date = new Date(`${dateStr}T12:00:00-03:00`);
+  const weekday = date.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long" });
+  const [, month, day] = dateStr.split("-");
+  return `${weekday}, ${day}/${month}`;
+}
+
 /**
  * Disparado quando a PROPRIA CLINICA cancela um agendamento pelo CRM
  * (src/controllers/api/scheduleController.ts::cancelSchedule) - avisa o
@@ -21,15 +28,16 @@ export async function notifyAndOfferReschedule(schedule: Schedule, reason?: stri
     return;
   }
 
-  const [year, month, day] = schedule.date.split("-");
-  const reasonBlock = reason && reason.trim() ? `\n\nMotivo:\n${reason.trim()}` : "";
+  const hasReason = !!(reason && reason.trim());
+  const reasonBlock = hasReason ? `\n\nMotivo: ${reason!.trim()}` : "";
+  const offerQuestion = hasReason ? "Podemos encontrar um novo horário para você? 😊" : "Podemos remarcar um novo horário para você? 😊";
 
   const message = await aiKnowledgeService.getMessageTemplate("clinic_initiated_cancellation", {
     patientName: schedule.patient_name.split(" ")[0],
-    procedure: schedule.procedure,
-    date: `${day}/${month}/${year}`,
+    date: weekdayDateLabel(schedule.date),
     time: schedule.time.slice(0, 5),
     reasonBlock,
+    offerQuestion,
   });
 
   const conversation = await conversationRepository.findOrCreateActiveConversation(schedule.user_id);
@@ -38,7 +46,7 @@ export async function notifyAndOfferReschedule(schedule: Schedule, reason?: stri
     scheduleId: schedule.id,
     conversationId: conversation.id,
     userId: schedule.user_id,
-    hasReason: !!reasonBlock,
+    hasReason,
   });
 
   await sendWhatsAppMessage(schedule.phone, message);

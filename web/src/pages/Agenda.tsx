@@ -54,11 +54,8 @@ export function Agenda() {
   const [items, setItems] = useState<ScheduleItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ScheduleItem | null>(null);
-  const [rescheduling, setRescheduling] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
-  const [newDate, setNewDate] = useState("");
-  const [newTime, setNewTime] = useState("");
   const [acting, setActing] = useState(false);
 
   const weekDays = useMemo(
@@ -126,21 +123,6 @@ export function Agenda() {
     }
   }
 
-  async function handleReschedule() {
-    if (!selected || !newDate || !newTime) return;
-    setActing(true);
-    try {
-      await api.patch(`/schedules/${selected.id}`, { start: `${newDate}T${newTime}:00-03:00` });
-      setSelected(null);
-      setRescheduling(false);
-      loadSchedules();
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setActing(false);
-    }
-  }
-
   function renderHourColumn() {
     return (
       <div style={{ width: 52, flex: "0 0 52px", paddingTop: 6 }}>
@@ -186,11 +168,8 @@ export function Agenda() {
               key={it.id}
               onClick={() => {
                 setSelected(it);
-                setRescheduling(false);
                 setCancelling(false);
                 setCancelReason("");
-                setNewDate(it.date);
-                setNewTime(it.time);
               }}
               style={{
                 position: "absolute",
@@ -238,18 +217,18 @@ export function Agenda() {
 
           {cancelling ? (
             <div style={{ display: "grid", gap: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 500 }}>Deseja realmente cancelar esta consulta?</div>
               <div>
                 <label className="field-label">Motivo do cancelamento (opcional)</label>
                 <textarea
                   className="input"
                   rows={3}
-                  placeholder="Ex: Imprevisto na agenda, problema interno, necessidade de reagendar..."
+                  placeholder="Ex: A doutora precisou atender uma emergência."
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
                 />
                 <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 6 }}>
-                  O cliente será avisado automaticamente pelo WhatsApp e a IA vai oferecer remarcar. Se deixar em branco, só informamos que houve um
-                  imprevisto.
+                  O cliente será avisado automaticamente pelo WhatsApp e a IA vai conduzir a remarcação por lá.
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
@@ -266,28 +245,10 @@ export function Agenda() {
                 </button>
               </div>
             </div>
-          ) : rescheduling ? (
-            <div style={{ display: "grid", gap: 10 }}>
-              <div style={{ display: "flex", gap: 10 }}>
-                <input className="input" type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
-                <input className="input" type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
-              </div>
-              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                <button className="btn btn-secondary" onClick={() => setRescheduling(false)}>
-                  Cancelar
-                </button>
-                <button className="btn" disabled={acting} onClick={handleReschedule}>
-                  Confirmar
-                </button>
-              </div>
-            </div>
           ) : (
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button className="btn-danger" style={{ borderRadius: 10, padding: "9px 16px", fontSize: 13.5, fontWeight: 600 }} disabled={acting} onClick={() => setCancelling(true)}>
                 Cancelar consulta
-              </button>
-              <button className="btn btn-secondary" onClick={() => setRescheduling(true)}>
-                Remarcar
               </button>
               <button
                 className="btn"

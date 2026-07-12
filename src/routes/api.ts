@@ -15,7 +15,7 @@ import {
 import { listMessageTemplates, updateMessageTemplate } from "../controllers/api/messageTemplateController";
 import { createPatient, deletePatient, getPatient, listPatients, updatePatient } from "../controllers/api/patientController";
 import { createProcedure, deleteProcedure, listProcedures, updateProcedure } from "../controllers/api/procedureController";
-import { cancelSchedule, createSchedule, listSchedules, rescheduleSchedule } from "../controllers/api/scheduleController";
+import { cancelSchedule, createSchedule, listSchedules } from "../controllers/api/scheduleController";
 import { getSettings, updateSettings } from "../controllers/api/settingsController";
 import { createStaff, deleteStaff, listStaff, updateStaff } from "../controllers/api/staffController";
 import { disconnect, getQrCode, getStatus } from "../controllers/api/whatsappController";
@@ -36,7 +36,6 @@ apiRouter.delete("/patients/:id", deletePatient);
 
 apiRouter.get("/schedules", listSchedules);
 apiRouter.post("/schedules", createSchedule);
-apiRouter.patch("/schedules/:id", rescheduleSchedule);
 apiRouter.delete("/schedules/:id", cancelSchedule);
 
 apiRouter.get("/conversations", listConversations);

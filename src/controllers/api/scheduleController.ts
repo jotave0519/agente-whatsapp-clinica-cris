@@ -65,23 +65,11 @@ export async function createSchedule(req: Request, res: Response): Promise<void>
   }
 }
 
-export async function rescheduleSchedule(req: Request, res: Response): Promise<void> {
-  try {
-    const { id } = req.params;
-    const { start, durationMinutes } = req.body;
-    if (!start) {
-      res.status(400).json({ error: "start e obrigatorio." });
-      return;
-    }
-
-    logger.info(SCOPE, "Remarcando agendamento via CRM", { staffId: req.staff?.id, scheduleId: id, start });
-    const schedule = await schedulingService.rescheduleAppointment(id, start, durationMinutes);
-    res.json(schedule);
-  } catch (err: any) {
-    logger.error(SCOPE, "Erro ao remarcar agendamento", err);
-    res.status(500).json({ error: `Erro ao remarcar agendamento: ${err.message}` });
-  }
-}
+// Remarcar consultas NAO e mais uma funcao do CRM: toda mudanca de data
+// acontece pela conversa com o paciente no WhatsApp (garante que ele escolha
+// um horario em que pode comparecer). O endpoint de remarcacao foi removido
+// de proposito - src/conversation/steps/rescheduling.ts continua usando
+// schedulingService.rescheduleAppointment() diretamente para o fluxo da IA.
 
 export async function cancelSchedule(req: Request, res: Response): Promise<void> {
   try {

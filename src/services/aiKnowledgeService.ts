@@ -34,7 +34,7 @@ const DEFAULT_TEMPLATES: Record<string, string> = {
     "Cumprimente de forma calorosa e profissional, dando as boas-vindas a clinica e se apresentando brevemente como a assistente virtual. Pergunte como pode ajudar hoje. Nao liste opcoes numeradas nem mencione um menu - deixe a conversa fluir naturalmente a partir da resposta do cliente.",
   no_slot_found: "Informe educadamente que nao ha horarios livres na data pedida e peca outra data ao cliente.",
   clinic_initiated_cancellation:
-    "Olá, {{patientName}}! 😊\n\nPrecisamos informar que, por um imprevisto, infelizmente será necessário cancelar {{procedure}} que estava agendado(a) para {{date}} às {{time}}.{{reasonBlock}}\n\nPedimos desculpas pelo transtorno. 💛\n\nSe desejar, posso encontrar um novo horário para você agora mesmo. Gostaria que eu encontrasse um novo horário?",
+    "Olá, {{patientName}}!\n\nInfelizmente precisaremos cancelar sua consulta que estava marcada para {{date}} às {{time}}.{{reasonBlock}}\n\nPedimos desculpas pelo transtorno.\n\n{{offerQuestion}}",
   clinic_cancellation_decline: "Tudo bem! 😊\n\nQuando desejar agendar novamente, será um prazer atendê-lo.",
 };
 

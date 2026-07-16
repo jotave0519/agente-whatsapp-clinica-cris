@@ -31,6 +31,10 @@ const NAV_GROUPS = [
     items: [{ to: "/whatsapp", label: "WhatsApp" }],
   },
   {
+    label: "Marketing",
+    items: [{ to: "/campanhas-reativacao", label: "Campanhas de Reativação" }],
+  },
+  {
     label: "Inteligência Artificial",
     items: [{ to: "/inteligencia-ia", label: "Inteligência da IA" }],
   },

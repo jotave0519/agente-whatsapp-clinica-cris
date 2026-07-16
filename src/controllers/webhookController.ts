@@ -4,6 +4,7 @@ import { getOrCreateUserByPhone } from "../services/userService";
 import * as conversationRepository from "../repositories/conversationRepository";
 import * as conversationEngine from "../conversation/engine";
 import * as aiKnowledgeService from "../services/aiKnowledgeService";
+import * as reactivationEngine from "../services/reactivationEngine";
 import { logger } from "../utils/logger";
 
 const SCOPE = "webhookController";
@@ -42,6 +43,19 @@ export async function handleWhatsAppWebhook(req: Request, res: Response): Promis
     await conversationRepository.touchUserActivity(conversation.id, wasClosed);
     if (wasClosed) {
       logger.info(SCOPE, "Conversa estava encerrada - sera reaberta e o fluxo de atendimento reiniciado", { conversationId: conversation.id });
+    }
+
+    // Marca "paciente respondeu" a uma campanha de reativacao no instante exato
+    // em que a mensagem chega, independente do que a IA decidir fazer com o
+    // conteudo dela (mesmo se a conversa expirar por inatividade e o fluxo for
+    // reiniciado logo em seguida dentro do runTurn). Isolado em try/catch - uma
+    // falha aqui nunca pode impedir o atendimento normal de continuar.
+    if (conversation.state === "REACTIVATION_RESPONSE" && conversation.state_data.reactivationTargetId) {
+      try {
+        await reactivationEngine.markResponded(conversation.state_data.reactivationTargetId);
+      } catch (err) {
+        logger.error(SCOPE, "Falha ao marcar resposta de campanha de reativacao", err);
+      }
     }
 
     // Nao sobrescrevemos conversation.status em memoria mesmo apos reabrir no banco:

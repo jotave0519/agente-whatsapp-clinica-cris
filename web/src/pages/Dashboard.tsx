@@ -20,6 +20,15 @@ interface DashboardData {
   confirmationsChart: { label: string; confirmed: number; cancelled: number; rescheduled: number }[];
   todayAppointments: { id: string; patient_name: string; procedure: string; time: string; status: string }[];
   recentConversations: { id: string; userName: string | null; userPhone: string; lastMessage: string | null; status: string }[];
+  reactivation: {
+    eligible: number;
+    activeCampaigns: number;
+    messagesToday: number;
+    byStatus: Record<string, number>;
+    responseRate: number;
+    conversionRate: number;
+    recoveredRevenue: number;
+  };
 }
 
 interface FinanceOverview {
@@ -151,6 +160,55 @@ export function Dashboard() {
           <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginTop: 2 }}>Confirmações, cancelamentos e remarcações — últimos 30 dias</div>
         </div>
         <ConfirmationsChart data={isMobile ? data.confirmationsChart.slice(-14) : data.confirmationsChart} />
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <div>
+            <div style={{ fontSize: 14.5, fontWeight: 600 }}>Pacientes em campanha de reativação</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginTop: 2 }}>IA de reativação de pacientes inativos</div>
+          </div>
+          <button style={{ fontSize: 12.5, fontWeight: 500, color: "var(--accent)" }} onClick={() => navigate("/campanhas-reativacao")}>
+            Ver campanhas
+          </button>
+        </div>
+        <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
+          <div className="card">
+            <div className="kpi-value">{data.reactivation.eligible}</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Elegíveis</div>
+          </div>
+          <div className="card">
+            <div className="kpi-value">{data.reactivation.activeCampaigns}</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Campanhas em andamento</div>
+          </div>
+          <div className="card">
+            <div className="kpi-value">{data.reactivation.messagesToday}</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Mensagens hoje</div>
+          </div>
+          <div className="card">
+            <div className="kpi-value">{(data.reactivation.responseRate * 100).toFixed(0)}%</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Taxa de resposta</div>
+          </div>
+          <div className="card">
+            <div className="kpi-value">{(data.reactivation.conversionRate * 100).toFixed(0)}%</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Taxa de conversão</div>
+          </div>
+          <div className="card">
+            <div className="kpi-value">{formatMoneyShort(data.reactivation.recoveredRevenue)}</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Receita recuperada (estimativa)</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 16, marginTop: 14, fontSize: 12.5, color: "var(--text-muted)", flexWrap: "wrap" }}>
+          <span>
+            <strong style={{ color: "var(--green)" }}>{data.reactivation.byStatus.converted || 0}</strong> recuperados
+          </span>
+          <span>
+            <strong style={{ color: "var(--text)" }}>{data.reactivation.byStatus.responded || 0}</strong> responderam
+          </span>
+          <span>
+            <strong style={{ color: "var(--text-faint)" }}>{data.reactivation.byStatus.ignored || 0}</strong> ignoraram
+          </span>
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>

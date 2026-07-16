@@ -1,11 +1,8 @@
 import * as aiKnowledgeService from "../../services/aiKnowledgeService";
-import { logger } from "../../utils/logger";
 import { clinicInfoText } from "../prompt";
 import { FlowContext, StepDefinition } from "../types";
-import { looksLikeFullName } from "./shared";
+import { HUMAN_HANDOFF_TOOL, looksLikeFullName, requestHumanHandoff } from "./shared";
 import { SWITCH_HANDLERS, SWITCH_TOOLS } from "./switchFlow";
-
-const SCOPE = "conversation.menu";
 
 export const menuStep: StepDefinition = {
   id: "MENU",
@@ -40,24 +37,9 @@ export const menuStep: StepDefinition = {
 
     return text + "\n\n---\n\n" + (await clinicInfoText());
   },
-  tools: [
-    ...SWITCH_TOOLS,
-    {
-      name: "request_human_handoff",
-      description: "Encerra o atendimento automatico e sinaliza que um atendente humano deve continuar a conversa.",
-      input_schema: { type: "object", properties: { reason: { type: "string", description: "Motivo do encaminhamento" } }, required: ["reason"] },
-    },
-  ],
+  tools: [...SWITCH_TOOLS, HUMAN_HANDOFF_TOOL],
   handlers: {
     ...SWITCH_HANDLERS,
-    request_human_handoff: async (ctx, input) => {
-      logger.info(SCOPE, "Encaminhando para atendimento humano", { conversationId: ctx.conversation.id, reason: input.reason });
-      return {
-        nextStep: "MENU",
-        data: {},
-        message: JSON.stringify({ status: "handoff_requested", reason: input.reason }),
-        handoffRequested: true,
-      };
-    },
+    request_human_handoff: requestHumanHandoff,
   },
 };

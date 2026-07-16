@@ -170,6 +170,43 @@ export async function findAllByDate(date: string): Promise<Schedule[]> {
   return data || [];
 }
 
+export interface SegmentationRow {
+  user_id: string;
+  procedure: string;
+  status: ScheduleStatus;
+  date: string;
+  created_at: string;
+}
+
+/**
+ * Usado pela varredura diaria de reativacao de pacientes - busca só as
+ * colunas necessárias, paginado explicitamente em blocos de 1000. O
+ * PostgREST tem limite default de 1000 linhas por request e NAO lança erro
+ * ao estourar, só corta silenciosamente - sem essa paginação explícita,
+ * pacientes mais antigos sumiriam da classificação sem aviso nenhum
+ * conforme a tabela crescesse.
+ */
+export async function findAllForSegmentation(): Promise<SegmentationRow[]> {
+  const PAGE_SIZE = 1000;
+  const all: SegmentationRow[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await getSupabaseClient()
+      .from("schedules")
+      .select("user_id, procedure, status, date, created_at")
+      .order("date", { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (error) throw error;
+    all.push(...(data || []));
+    if (!data || data.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+
+  return all;
+}
+
 export async function findSchedulesByDate(date: string): Promise<Schedule[]> {
   const { data, error } = await getSupabaseClient()
     .from("schedules")

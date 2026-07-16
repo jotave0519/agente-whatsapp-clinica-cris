@@ -20,6 +20,22 @@ export const ABANDON_TOOL: ToolSchema = {
   input_schema: { type: "object", properties: {} },
 };
 
+export const HUMAN_HANDOFF_TOOL: ToolSchema = {
+  name: "request_human_handoff",
+  description: "Encerra o atendimento automatico e sinaliza que um atendente humano deve continuar a conversa.",
+  input_schema: { type: "object", properties: { reason: { type: "string", description: "Motivo do encaminhamento" } }, required: ["reason"] },
+};
+
+export const requestHumanHandoff: ToolHandler = async (ctx, input) => {
+  logger.info("conversation.shared", "Encaminhando para atendimento humano", { conversationId: ctx.conversation.id, reason: input.reason });
+  return {
+    nextStep: "MENU",
+    data: {},
+    message: JSON.stringify({ status: "handoff_requested", reason: input.reason }),
+    handoffRequested: true,
+  };
+};
+
 /**
  * Checagem deterministica de nome completo (>=2 palavras), usada tanto para
  * validar o que o cliente digita quanto para decidir se o nome ja cadastrado

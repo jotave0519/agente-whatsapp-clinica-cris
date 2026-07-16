@@ -4,6 +4,7 @@ export interface User {
   phone: string;
   email: string | null;
   active: boolean;
+  do_not_contact: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -66,6 +67,81 @@ export interface ScheduleEvent {
   created_at: string;
 }
 
+export type ReactivationTargetStatus =
+  | "pending"
+  | "awaiting_response"
+  | "responded"
+  | "ignored"
+  | "converted"
+  | "declined"
+  | "excluded"
+  | "failed";
+
+export interface ReactivationCampaign {
+  id: string;
+  name: string;
+  segment_type: string;
+  inactive_days: number;
+  message_style: string;
+  active: boolean;
+  scheduled_start: string | null;
+  scheduled_end: string | null;
+  allowed_weekdays: number[];
+  allowed_hour_start: string;
+  allowed_hour_end: string;
+  max_messages: number;
+  nudge_interval_days: number;
+  daily_send_cap: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReactivationTarget {
+  id: string;
+  campaign_id: string;
+  user_id: string;
+  status: ReactivationTargetStatus;
+  last_procedure: string | null;
+  days_inactive_at_enrollment: number | null;
+  responded_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 'initial' (mensagem inicial) ou 'nudge_N' - mesmo padrao de tier livre do motor de confirmacao. */
+export interface ReactivationMessage {
+  id: string;
+  target_id: string;
+  tier: ReminderTier;
+  scheduled_for: string;
+  status: ReminderStatus;
+  body: string | null;
+  attempts: number;
+  last_error: string | null;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ReactivationEventType =
+  | "target_created"
+  | "message_sent"
+  | "reminder_sent"
+  | "responded"
+  | "declined"
+  | "ignored"
+  | "converted"
+  | "excluded"
+  | "failed";
+
+export interface ReactivationEvent {
+  id: string;
+  target_id: string;
+  event_type: ReactivationEventType;
+  detail: string | null;
+  created_at: string;
+}
+
 export type ConversationStatus = "ai" | "human" | "closed";
 
 export type ConversationFlowState =
@@ -82,7 +158,8 @@ export type ConversationFlowState =
   | "CANCELING_SELECT"
   | "CANCELING_CONFIRM"
   | "CLINIC_CANCELLED_OFFER"
-  | "REMINDER_RESPONSE";
+  | "REMINDER_RESPONSE"
+  | "REACTIVATION_RESPONSE";
 
 export interface FlowStateData {
   name?: string;
@@ -94,6 +171,7 @@ export interface FlowStateData {
   selectedStart?: string;
   scheduleId?: string;
   candidates?: { scheduleId: string; procedure: string; date: string; time: string }[];
+  reactivationTargetId?: string;
 }
 
 export interface Conversation {
@@ -208,6 +286,7 @@ export interface ClinicSettings {
   confirmation_nudges_enabled: boolean;
   confirmation_nudge_count: number;
   confirmation_nudge_interval_hours: number;
+  reactivation_enabled: boolean;
   inactivity_nudge_enabled: boolean;
   responsible_name: string | null;
   specialty: string | null;

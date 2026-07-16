@@ -9,6 +9,7 @@ const ITEMS = [
   { to: "/estoque", label: "Estoque" },
   { to: "/usuarios", label: "Usuários" },
   { to: "/whatsapp", label: "WhatsApp" },
+  { to: "/campanhas-reativacao", label: "Campanhas de Reativação" },
   { to: "/inteligencia-ia", label: "Inteligência da IA" },
   { to: "/configuracoes", label: "Configurações" },
 ];

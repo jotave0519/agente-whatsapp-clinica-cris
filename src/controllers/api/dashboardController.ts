@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import * as conversationRepository from "../../repositories/conversationRepository";
+import * as reactivationMessageRepository from "../../repositories/reactivationMessageRepository";
+import * as reactivationRepository from "../../repositories/reactivationRepository";
 import * as scheduleEventRepository from "../../repositories/scheduleEventRepository";
 import * as scheduleRepository from "../../repositories/scheduleRepository";
 import * as transactionRepository from "../../repositories/transactionRepository";
@@ -49,6 +51,7 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
     const monthEnd = toDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
 
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
     const [
       activePatients,
@@ -60,6 +63,11 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
       monthlySeries,
       awaitingConfirmation,
       confirmationEvents,
+      reactivationEligible,
+      reactivationActiveCampaigns,
+      reactivationMessagesToday,
+      reactivationByStatus,
+      reactivationRecoveredRevenue,
     ] = await Promise.all([
       userRepository.count(),
       scheduleRepository.findSchedulesByDate(today),
@@ -70,6 +78,11 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
       financeService.getMonthlyFinanceSeries(12, now),
       scheduleRepository.countByConfirmationStatus("awaiting"),
       scheduleEventRepository.countByTypeSince(["confirmed", "cancelled", "rescheduled"], thirtyDaysAgo),
+      reactivationRepository.countEligible(),
+      reactivationRepository.countActiveCampaigns(),
+      reactivationMessageRepository.countSentSince(todayStart),
+      reactivationRepository.countAllByStatus(),
+      reactivationRepository.estimateRecoveredRevenue(),
     ]);
 
     const revenueThisMonth = monthTransactions
@@ -78,6 +91,9 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
 
     const revenueChart = monthlySeries.map((m) => ({ label: m.label, value: m.in }));
     const confirmationsChart = buildConfirmationsChart(confirmationEvents, 30);
+
+    const reactivationEverSent = Object.values(reactivationByStatus).reduce((acc, n) => acc + n, 0) - reactivationByStatus.pending;
+    const reactivationResponded = reactivationByStatus.responded + reactivationByStatus.converted + reactivationByStatus.declined;
 
     res.json({
       kpis: {
@@ -91,6 +107,15 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
       confirmationsChart,
       todayAppointments,
       recentConversations,
+      reactivation: {
+        eligible: reactivationEligible,
+        activeCampaigns: reactivationActiveCampaigns,
+        messagesToday: reactivationMessagesToday,
+        byStatus: reactivationByStatus,
+        responseRate: reactivationEverSent > 0 ? reactivationResponded / reactivationEverSent : 0,
+        conversionRate: reactivationEverSent > 0 ? reactivationByStatus.converted / reactivationEverSent : 0,
+        recoveredRevenue: reactivationRecoveredRevenue,
+      },
     });
   } catch (err) {
     logger.error(SCOPE, "Erro ao montar dashboard", err);

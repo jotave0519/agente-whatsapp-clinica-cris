@@ -16,6 +16,14 @@ import { getMe } from "../controllers/api/meController";
 import { listMessageTemplates, updateMessageTemplate } from "../controllers/api/messageTemplateController";
 import { createPatient, deletePatient, getPatient, getPatientHistory, listPatients, updatePatient } from "../controllers/api/patientController";
 import { createProcedure, deleteProcedure, listProcedures, updateProcedure } from "../controllers/api/procedureController";
+import {
+  createCampaign,
+  deleteCampaign,
+  duplicateCampaign,
+  getCampaignStats,
+  listCampaigns,
+  updateCampaign,
+} from "../controllers/api/reactivationController";
 import { cancelSchedule, createSchedule, listSchedules, updateOutcome } from "../controllers/api/scheduleController";
 import { getSettings, updateSettings } from "../controllers/api/settingsController";
 import { createStaff, deleteStaff, listStaff, updateStaff } from "../controllers/api/staffController";
@@ -95,3 +103,10 @@ apiRouter.delete("/business-hours/exceptions/:id", requireAdmin, deleteException
 apiRouter.get("/whatsapp/status", staffOrAbove, getStatus);
 apiRouter.get("/whatsapp/qrcode", staffOrAbove, getQrCode);
 apiRouter.post("/whatsapp/disconnect", requireAdmin, disconnect);
+
+apiRouter.get("/reactivation-campaigns", requireAdmin, listCampaigns);
+apiRouter.post("/reactivation-campaigns", requireAdmin, createCampaign);
+apiRouter.patch("/reactivation-campaigns/:id", requireAdmin, updateCampaign);
+apiRouter.delete("/reactivation-campaigns/:id", requireAdmin, deleteCampaign);
+apiRouter.post("/reactivation-campaigns/:id/duplicate", requireAdmin, duplicateCampaign);
+apiRouter.get("/reactivation-campaigns/:id/stats", requireAdmin, getCampaignStats);

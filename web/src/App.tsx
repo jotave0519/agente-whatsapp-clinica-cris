@@ -5,6 +5,7 @@ import { AppointmentModalProvider } from "./context/AppointmentModalContext";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { Agenda } from "./pages/Agenda";
+import { CampanhasReativacao } from "./pages/CampanhasReativacao";
 import { Configuracoes } from "./pages/Configuracoes";
 import { Conversas } from "./pages/Conversas";
 import { Dashboard } from "./pages/Dashboard";
@@ -43,6 +44,7 @@ export function App() {
                 <Route path="/estoque" element={<Estoque />} />
                 <Route path="/usuarios" element={<Usuarios />} />
                 <Route path="/whatsapp" element={<WhatsApp />} />
+                <Route path="/campanhas-reativacao" element={<CampanhasReativacao />} />
                 <Route path="/inteligencia-ia" element={<InteligenciaIA />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />
               </Route>

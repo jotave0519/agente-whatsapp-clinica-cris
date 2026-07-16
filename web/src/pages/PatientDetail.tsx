@@ -10,6 +10,7 @@ interface Patient {
   name: string;
   phone: string;
   email: string | null;
+  do_not_contact: boolean;
   created_at: string;
 }
 
@@ -61,14 +62,30 @@ export function PatientDetail() {
   const isMobile = useIsMobile();
   const [data, setData] = useState<HistoryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [savingContact, setSavingContact] = useState(false);
 
-  useEffect(() => {
+  function load() {
     if (!id) return;
     api
       .get<HistoryResponse>(`/patients/${id}/history`)
       .then(setData)
       .catch((e) => setError(e.message));
-  }, [id]);
+  }
+
+  useEffect(load, [id]);
+
+  async function toggleDoNotContact() {
+    if (!data) return;
+    setSavingContact(true);
+    try {
+      await api.patch(`/patients/${id}`, { do_not_contact: !data.patient.do_not_contact });
+      load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSavingContact(false);
+    }
+  }
 
   if (error) return <div className="empty-state">{error}</div>;
   if (!data) return <div className="empty-state">Carregando...</div>;
@@ -86,6 +103,11 @@ export function PatientDetail() {
         {patient.phone}
         {patient.email ? ` · ${patient.email}` : ""} · paciente desde {new Date(patient.created_at).toLocaleDateString("pt-BR")}
       </p>
+
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 18 }}>
+        <input type="checkbox" checked={patient.do_not_contact} disabled={savingContact} onChange={toggleDoNotContact} />
+        Não enviar mensagens de reativação/marketing para este paciente
+      </label>
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>
         <div className="card">

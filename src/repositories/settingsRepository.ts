@@ -19,6 +19,7 @@ export async function updateClinicSettings(
     confirmation_nudges_enabled: boolean;
     confirmation_nudge_count: number;
     confirmation_nudge_interval_hours: number;
+    reactivation_enabled: boolean;
     inactivity_nudge_enabled: boolean;
     responsible_name: string | null;
     specialty: string | null;

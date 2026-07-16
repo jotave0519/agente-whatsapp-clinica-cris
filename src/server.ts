@@ -6,6 +6,7 @@ import { handleHealthCheck } from "./controllers/healthController";
 import { apiRouter } from "./routes/api";
 import { scheduleReminderEngineCron } from "./cron/reminderEngineCron";
 import { scheduleInactivityCron } from "./cron/inactivityCron";
+import { scheduleReactivationScanCron, scheduleReactivationSendCron } from "./cron/reactivationCron";
 
 const WEB_DIST_DIR = path.join(__dirname, "..", "web-dist");
 
@@ -26,4 +27,6 @@ app.listen(env.port, () => {
   console.log(`Agente rodando na porta ${env.port}`);
   scheduleReminderEngineCron();
   scheduleInactivityCron();
+  scheduleReactivationScanCron();
+  scheduleReactivationSendCron();
 });

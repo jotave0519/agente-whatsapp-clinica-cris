@@ -4,12 +4,20 @@ import { useAuth } from "../context/AuthContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 import { ArrowRightIcon, TrendingUpIcon } from "../components/icons";
+import { ConfirmationsChart } from "../components/ConfirmationsChart";
 import { NewAppointmentFab } from "../components/NewAppointmentFab";
 import { RevenueChart } from "../components/RevenueChart";
 
 interface DashboardData {
-  kpis: { activePatients: number; appointmentsThisMonth: number; revenueThisMonth: number; conversationsWaiting: number };
+  kpis: {
+    activePatients: number;
+    appointmentsThisMonth: number;
+    revenueThisMonth: number;
+    conversationsWaiting: number;
+    awaitingConfirmation: number;
+  };
   revenueChart: { label: string; value: number }[];
+  confirmationsChart: { label: string; confirmed: number; cancelled: number; rescheduled: number }[];
   todayAppointments: { id: string; patient_name: string; procedure: string; time: string; status: string }[];
   recentConversations: { id: string; userName: string | null; userPhone: string; lastMessage: string | null; status: string }[];
 }
@@ -65,6 +73,7 @@ export function Dashboard() {
     { label: "Agendamentos (mês)", value: String(data.kpis.appointmentsThisMonth) },
     { label: "Faturamento (mês)", value: formatMoneyShort(data.kpis.revenueThisMonth) },
     { label: "Conversas aguardando", value: String(data.kpis.conversationsWaiting) },
+    { label: "Consultas aguardando confirmação", value: String(data.kpis.awaitingConfirmation) },
   ];
 
   return (
@@ -82,7 +91,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+      <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
         {kpiCards.map((k) => (
           <div key={k.label} className="card">
             <div className="kpi-value">{k.value}</div>
@@ -134,6 +143,14 @@ export function Dashboard() {
             ))}
           </div>
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 14.5, fontWeight: 600 }}>Confirmações</div>
+          <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginTop: 2 }}>Confirmações, cancelamentos e remarcações — últimos 30 dias</div>
+        </div>
+        <ConfirmationsChart data={isMobile ? data.confirmationsChart.slice(-14) : data.confirmationsChart} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAppointmentModal } from "../context/AppointmentModalContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
+import { getDisplayStatus } from "../lib/scheduleStatus";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
 import { DayStrip } from "../components/DayStrip";
 import { NewAppointmentFab } from "../components/NewAppointmentFab";
@@ -13,6 +14,8 @@ interface ScheduleItem {
   date: string;
   time: string;
   status: string;
+  confirmation_status: "pending" | "awaiting" | "confirmed" | "cancelled";
+  was_rescheduled: boolean;
   notes: string | null;
 }
 
@@ -123,6 +126,20 @@ export function Agenda() {
     }
   }
 
+  async function handleOutcome(outcome: "completed" | "no_show") {
+    if (!selected) return;
+    setActing(true);
+    try {
+      await api.patch(`/schedules/${selected.id}/outcome`, { outcome });
+      setSelected(null);
+      loadSchedules();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setActing(false);
+    }
+  }
+
   function renderHourColumn() {
     return (
       <div style={{ width: 52, flex: "0 0 52px", paddingTop: 6 }}>
@@ -184,6 +201,17 @@ export function Agenda() {
                 cursor: "pointer",
               }}
             >
+              <span
+                style={{
+                  position: "absolute",
+                  top: 5,
+                  right: 5,
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  background: getDisplayStatus(it).dot || "var(--text-faint)",
+                }}
+              />
               <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", opacity: 0.85 }}>{it.time}</div>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {it.patient_name}
@@ -210,10 +238,24 @@ export function Agenda() {
         <div className="modal-card" style={{ maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{selected.patient_name}</div>
           <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>{selected.procedure}</div>
-          <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 14 }}>
+          <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 8 }}>
             {new Date(selected.date + "T00:00:00").toLocaleDateString("pt-BR")} às {selected.time}
           </div>
+          <span className={`badge ${getDisplayStatus(selected).cls}`} style={{ marginBottom: 14, display: "inline-block" }}>
+            {getDisplayStatus(selected).label}
+          </span>
           {selected.notes && <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>Obs: {selected.notes}</div>}
+
+          {!cancelling && selected.status === "Agendado" && new Date(`${selected.date}T${selected.time}`) < new Date() && (
+            <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }} disabled={acting} onClick={() => handleOutcome("completed")}>
+                Marcar como realizado
+              </button>
+              <button className="btn btn-secondary" style={{ flex: 1 }} disabled={acting} onClick={() => handleOutcome("no_show")}>
+                Marcar como falta
+              </button>
+            </div>
+          )}
 
           {cancelling ? (
             <div style={{ display: "grid", gap: 10 }}>

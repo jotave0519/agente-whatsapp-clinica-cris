@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import * as scheduleEventRepository from "../../repositories/scheduleEventRepository";
 import * as scheduleRepository from "../../repositories/scheduleRepository";
 import * as userRepository from "../../repositories/userRepository";
 import * as clinicCancellationService from "../../services/clinicCancellationService";
@@ -99,5 +100,27 @@ export async function cancelSchedule(req: Request, res: Response): Promise<void>
       return;
     }
     res.status(500).json({ error: "Erro ao cancelar agendamento." });
+  }
+}
+
+/** Marcacao manual pela recepcao (consulta ja passou) - "Realizado" ou "Faltou" nao sao detectados automaticamente. */
+export async function updateOutcome(req: Request, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const { outcome } = req.body;
+    if (outcome !== "completed" && outcome !== "no_show") {
+      res.status(400).json({ error: "outcome deve ser 'completed' ou 'no_show'." });
+      return;
+    }
+
+    const status: "Concluido" | "Faltou" = outcome === "completed" ? "Concluido" : "Faltou";
+    logger.info(SCOPE, "Marcando desfecho do agendamento via CRM", { staffId: req.staff?.id, scheduleId: id, outcome });
+    const schedule = await scheduleRepository.updateScheduleStatus(id, status);
+    await scheduleEventRepository.record(id, outcome === "completed" ? "completed" : "no_show");
+
+    res.json(schedule);
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao marcar desfecho do agendamento", err);
+    res.status(500).json({ error: "Erro ao marcar desfecho do agendamento." });
   }
 }

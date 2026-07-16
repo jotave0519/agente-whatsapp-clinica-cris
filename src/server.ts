@@ -4,7 +4,7 @@ import { env } from "./config/env";
 import { handleWhatsAppWebhook } from "./controllers/webhookController";
 import { handleHealthCheck } from "./controllers/healthController";
 import { apiRouter } from "./routes/api";
-import { scheduleReminderCron } from "./cron/reminderCron";
+import { scheduleReminderEngineCron } from "./cron/reminderEngineCron";
 import { scheduleInactivityCron } from "./cron/inactivityCron";
 
 const WEB_DIST_DIR = path.join(__dirname, "..", "web-dist");
@@ -24,6 +24,6 @@ app.get("*", (_req, res) => {
 
 app.listen(env.port, () => {
   console.log(`Agente rodando na porta ${env.port}`);
-  scheduleReminderCron();
+  scheduleReminderEngineCron();
   scheduleInactivityCron();
 });

@@ -1,9 +1,14 @@
 import * as googleCalendar from "../integrations/googleCalendarClient";
+import * as scheduleEventRepository from "../repositories/scheduleEventRepository";
 import * as scheduleRepository from "../repositories/scheduleRepository";
 import { Schedule } from "../types";
 import { AppError } from "../utils/appError";
+import { logger } from "../utils/logger";
 import { sampleSlotsAcrossDay } from "../utils/slots";
 import { toSaoPauloDateTimeParts } from "../utils/timezone";
+import * as reminderEngine from "./reminderEngine";
+
+const SCOPE = "schedulingService";
 
 export async function checkAvailability(date: string, durationMinutes?: number): Promise<string[]> {
   return googleCalendar.checkAvailability(date, durationMinutes);
@@ -51,7 +56,7 @@ export async function createAppointment(params: {
 
   const { date, time } = toSaoPauloDateTimeParts(new Date(params.start));
 
-  return scheduleRepository.createSchedule({
+  const schedule = await scheduleRepository.createSchedule({
     userId: params.userId,
     patientName: params.name,
     phone: params.phone,
@@ -61,6 +66,16 @@ export async function createAppointment(params: {
     googleEventId: event.id!,
     notes: params.notes,
   });
+
+  // Nunca deixa uma falha do motor de lembretes mascarar como falha do
+  // proprio agendamento (que ja foi criado com sucesso no Calendar/banco).
+  try {
+    await reminderEngine.scheduleConfirmationForAppointment(schedule);
+  } catch (err) {
+    logger.error(SCOPE, "Falha ao agendar confirmacao (agendamento ja criado com sucesso)", err);
+  }
+
+  return schedule;
 }
 
 export async function findAppointmentsForUser(userId: string): Promise<Schedule[]> {
@@ -80,11 +95,15 @@ export async function rescheduleAppointment(
 
   const { date, time } = toSaoPauloDateTimeParts(new Date(newStart));
 
-  return scheduleRepository.updateScheduleDateTime(scheduleId, date, time);
-}
+  const updated = await scheduleRepository.updateScheduleDateTime(scheduleId, date, time);
 
-export async function confirmAppointment(scheduleId: string): Promise<void> {
-  await scheduleRepository.markConfirmed(scheduleId);
+  try {
+    await reminderEngine.rescheduleRemindersForAppointment(updated);
+  } catch (err) {
+    logger.error(SCOPE, "Falha ao reagendar lembretes (remarcacao ja concluida com sucesso)", err);
+  }
+
+  return updated;
 }
 
 export async function cancelAppointment(scheduleId: string): Promise<Schedule> {
@@ -95,5 +114,14 @@ export async function cancelAppointment(scheduleId: string): Promise<Schedule> {
     await googleCalendar.cancelEvent(schedule.google_event_id);
   }
 
-  return scheduleRepository.updateScheduleStatus(scheduleId, "Cancelado");
+  const updated = await scheduleRepository.updateScheduleStatus(scheduleId, "Cancelado");
+
+  try {
+    await reminderEngine.cancelRemindersForAppointment(scheduleId);
+    await scheduleEventRepository.record(scheduleId, "cancelled");
+  } catch (err) {
+    logger.error(SCOPE, "Falha ao cancelar lembretes (cancelamento ja concluido com sucesso)", err);
+  }
+
+  return updated;
 }

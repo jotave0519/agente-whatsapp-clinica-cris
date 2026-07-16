@@ -10,7 +10,7 @@ interface StatusData {
 }
 
 interface SettingsData {
-  clinic: { reminders_enabled: boolean; inactivity_nudge_enabled: boolean };
+  clinic: { inactivity_nudge_enabled: boolean };
 }
 
 function daysSince(iso: string | null): string {
@@ -76,7 +76,7 @@ export function WhatsApp() {
     }
   }
 
-  async function toggleFlag(key: "reminders_enabled" | "inactivity_nudge_enabled") {
+  async function toggleFlag(key: "inactivity_nudge_enabled") {
     if (!settings) return;
     setSavingFlag(key);
     setError(null);
@@ -169,24 +169,15 @@ export function WhatsApp() {
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border-soft)" }}>
           <div style={{ fontWeight: 600 }}>Automações</div>
-          <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>Ações executadas automaticamente pelo agente de IA</div>
+          <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>
+            Ações executadas automaticamente pelo agente de IA. Confirmação automática de consultas fica em Inteligência da IA &gt; Confirmação
+            automática.
+          </div>
         </div>
         {!settings ? (
           <div className="empty-state">Carregando...</div>
         ) : (
           <>
-            <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "15px 20px", borderBottom: "1px solid var(--border-soft)" }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600 }}>Lembretes automáticos de consulta</div>
-                <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>Envia lembrete no WhatsApp no dia útil anterior, às 08:00</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={settings.reminders_enabled}
-                disabled={savingFlag === "reminders_enabled"}
-                onChange={() => toggleFlag("reminders_enabled")}
-              />
-            </div>
             <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "15px 20px" }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 600 }}>Mensagem de inatividade</div>

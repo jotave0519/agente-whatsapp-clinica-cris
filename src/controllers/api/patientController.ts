@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as googleCalendar from "../../integrations/googleCalendarClient";
+import * as scheduleEventRepository from "../../repositories/scheduleEventRepository";
 import * as scheduleRepository from "../../repositories/scheduleRepository";
 import * as userRepository from "../../repositories/userRepository";
 import { logger } from "../../utils/logger";
@@ -31,6 +32,27 @@ export async function getPatient(req: Request, res: Response): Promise<void> {
   } catch (err) {
     logger.error(SCOPE, "Erro ao buscar paciente", err);
     res.status(500).json({ error: "Erro ao buscar paciente." });
+  }
+}
+
+/** Usado pela pagina de detalhe do paciente no CRM: agendamentos + linha do tempo de eventos (schedule_events). */
+export async function getPatientHistory(req: Request, res: Response): Promise<void> {
+  try {
+    const patient = await userRepository.findById(req.params.id);
+    if (!patient) {
+      res.status(404).json({ error: "Paciente nao encontrado." });
+      return;
+    }
+
+    const [schedules, events] = await Promise.all([
+      scheduleRepository.findAllByUserId(patient.id),
+      scheduleEventRepository.findByUserId(patient.id),
+    ]);
+
+    res.json({ patient, schedules, events });
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao carregar historico do paciente", err);
+    res.status(500).json({ error: "Erro ao carregar historico do paciente." });
   }
 }
 

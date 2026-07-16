@@ -9,7 +9,7 @@ interface MessageTemplate {
 
 // Estas duas nao sao enviadas literalmente ao cliente - a IA usa como
 // orientacao de tom, porque precisam ser dinamicas (nome do cliente, data
-// especifica etc). As outras 10 sao enviadas exatamente como cadastradas.
+// especifica etc). As outras sao enviadas exatamente como cadastradas.
 const GUIDANCE_KEYS = new Set(["welcome_message", "no_slot_found"]);
 
 export function MensagensAutomaticas() {
@@ -51,7 +51,9 @@ export function MensagensAutomaticas() {
       {error && <div className="error-text">{error}</div>}
       <p style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
         Use <code>{"{{placeholder}}"}</code> para inserir dados dinâmicos (ex: <code>{"{{procedure}}"}</code>, <code>{"{{date}}"}</code>,{" "}
-        <code>{"{{time}}"}</code>, <code>{"{{address}}"}</code>, <code>{"{{patientName}}"}</code>, <code>{"{{error}}"}</code>).
+        <code>{"{{time}}"}</code>, <code>{"{{address}}"}</code>, <code>{"{{patientName}}"}</code>, <code>{"{{error}}"}</code>). Nos lembretes de consulta,
+        use <code>{"{{nome}}"}</code>, <code>{"{{procedimento}}"}</code>, <code>{"{{data}}"}</code>, <code>{"{{hora}}"}</code> e{" "}
+        <code>{"{{dia_semana}}"}</code>.
       </p>
 
       {items.map((t) => (

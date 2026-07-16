@@ -1,5 +1,4 @@
 import * as aiKnowledgeService from "../../services/aiKnowledgeService";
-import * as schedulingService from "../../services/schedulingService";
 import { logger } from "../../utils/logger";
 import { clinicInfoText } from "../prompt";
 import { FlowContext, StepDefinition } from "../types";
@@ -44,11 +43,6 @@ export const menuStep: StepDefinition = {
   tools: [
     ...SWITCH_TOOLS,
     {
-      name: "confirm_appointment",
-      description: "Marca um agendamento como confirmado pelo paciente (ex: em resposta a um lembrete de consulta).",
-      input_schema: { type: "object", properties: { schedule_id: { type: "string" } }, required: ["schedule_id"] },
-    },
-    {
       name: "request_human_handoff",
       description: "Encerra o atendimento automatico e sinaliza que um atendente humano deve continuar a conversa.",
       input_schema: { type: "object", properties: { reason: { type: "string", description: "Motivo do encaminhamento" } }, required: ["reason"] },
@@ -56,11 +50,6 @@ export const menuStep: StepDefinition = {
   ],
   handlers: {
     ...SWITCH_HANDLERS,
-    confirm_appointment: async (ctx, input) => {
-      logger.info(SCOPE, "Confirmando presenca (pos-lembrete)", { conversationId: ctx.conversation.id, scheduleId: input.schedule_id });
-      await schedulingService.confirmAppointment(input.schedule_id);
-      return { nextStep: "MENU", data: {}, message: JSON.stringify({ status: "confirmed" }) };
-    },
     request_human_handoff: async (ctx, input) => {
       logger.info(SCOPE, "Encaminhando para atendimento humano", { conversationId: ctx.conversation.id, reason: input.reason });
       return {

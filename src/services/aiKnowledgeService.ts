@@ -27,8 +27,6 @@ const DEFAULT_TEMPLATES: Record<string, string> = {
   nudge_inactivity: "😊 Oi! Estou por aqui.\n\nSe ainda desejar continuar seu atendimento, é só responder esta mensagem.",
   close_inactivity:
     "Como não recebi nenhuma resposta, vou encerrar este atendimento por enquanto.\n\nQuando quiser continuar, basta enviar uma nova mensagem. Será um prazer ajudar! 💛",
-  appointment_reminder:
-    "Oi, {{patientName}}! Passando para lembrar da sua consulta de {{procedure}} amanha, dia {{date}} as {{time}}, aqui na clinica ({{address}}).\n\nPode confirmar sua presenca respondendo *SIM*? Se precisar remarcar, e so avisar por aqui.",
   generic_error: "Desculpe, tive um problema para responder agora. Nossa equipe vai te retornar em breve.",
   welcome_message:
     "Cumprimente de forma calorosa e profissional, dando as boas-vindas a clinica e se apresentando brevemente como a assistente virtual. Pergunte como pode ajudar hoje. Nao liste opcoes numeradas nem mencione um menu - deixe a conversa fluir naturalmente a partir da resposta do cliente.",
@@ -36,6 +34,10 @@ const DEFAULT_TEMPLATES: Record<string, string> = {
   clinic_initiated_cancellation:
     "Olá, {{patientName}}!\n\nInfelizmente precisaremos cancelar sua consulta que estava marcada para {{date}} às {{time}}.{{reasonBlock}}\n\nPedimos desculpas pelo transtorno.\n\n{{offerQuestion}}",
   clinic_cancellation_decline: "Tudo bem! 😊\n\nQuando desejar agendar novamente, será um prazer atendê-lo.",
+  confirmation_request:
+    "Olá, {{nome}}! 😊\n\nPassando para confirmar sua consulta na Clínica Dra. Cristiane Zangelmi.\n\n📅 {{dia_semana}}\n🕘 {{hora}}\n\nVocê confirma sua presença?\n\nResponda:\n✅ Confirmar\n❌ Cancelar\n🔄 Remarcar",
+  confirmation_nudge: "Olá 😊\n\nSó passando para lembrar da confirmação da sua consulta.\n\nPode responder quando puder.",
+  reminder_confirm_ack: "Perfeito! 😊\n\nSua consulta está confirmada. Até breve!",
 };
 
 let cachedTemplates: Map<string, string> | null = null;

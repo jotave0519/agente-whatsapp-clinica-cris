@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { FormSheet } from "../components/FormSheet";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
@@ -16,6 +16,7 @@ const EMPTY_FORM = { name: "", phone: "", email: "" };
 
 export function Pacientes() {
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [filter, setFilter] = useState<"todos" | "novos">("todos");
@@ -192,7 +193,7 @@ export function Pacientes() {
               const displayName = p.name || "Contato sem nome";
               const initials = (p.name ? p.name.split(" ").map((w) => w[0]).slice(0, 2).join("") : "?").toUpperCase();
               return (
-                <div key={p.id} className="mobile-list-item">
+                <div key={p.id} className="mobile-list-item" style={{ cursor: "pointer" }} onClick={() => navigate(`/pacientes/${p.id}`)}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <span className="avatar" style={{ background: "var(--accent-bg)", color: "var(--accent-dark)" }}>
                       {initials}
@@ -207,10 +208,10 @@ export function Pacientes() {
                     <span>desde {new Date(p.created_at).toLocaleDateString("pt-BR")}</span>
                   </div>
                   <div className="mobile-list-actions">
-                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => startEdit(p)}>
+                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={(e) => { e.stopPropagation(); startEdit(p); }}>
                       Editar
                     </button>
-                    <button className="btn-danger" style={{ flex: 1, borderRadius: 10, fontSize: 13 }} onClick={() => handleDelete(p)}>
+                    <button className="btn-danger" style={{ flex: 1, borderRadius: 10, fontSize: 13 }} onClick={(e) => { e.stopPropagation(); handleDelete(p); }}>
                       Excluir
                     </button>
                   </div>
@@ -235,7 +236,7 @@ export function Pacientes() {
                 const displayName = p.name || "Contato sem nome";
               const initials = (p.name ? p.name.split(" ").map((w) => w[0]).slice(0, 2).join("") : "?").toUpperCase();
                 return (
-                  <tr key={p.id}>
+                  <tr key={p.id} style={{ cursor: "pointer" }} onClick={() => navigate(`/pacientes/${p.id}`)}>
                     <td style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <span className="avatar" style={{ background: "var(--accent-bg)", color: "var(--accent-dark)" }}>
                         {initials}
@@ -248,10 +249,10 @@ export function Pacientes() {
                     <td>{p.phone}</td>
                     <td>{new Date(p.created_at).toLocaleDateString("pt-BR")}</td>
                     <td style={{ display: "flex", gap: 6 }}>
-                      <button className="btn btn-secondary" onClick={() => startEdit(p)}>
+                      <button className="btn btn-secondary" onClick={(e) => { e.stopPropagation(); startEdit(p); }}>
                         Editar
                       </button>
-                      <button className="btn-danger" style={{ borderRadius: 8, padding: "6px 12px", fontSize: 12.5 }} onClick={() => handleDelete(p)}>
+                      <button className="btn-danger" style={{ borderRadius: 8, padding: "6px 12px", fontSize: 12.5 }} onClick={(e) => { e.stopPropagation(); handleDelete(p); }}>
                         Excluir
                       </button>
                     </td>

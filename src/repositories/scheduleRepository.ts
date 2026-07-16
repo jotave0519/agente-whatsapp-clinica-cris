@@ -1,5 +1,5 @@
 import { getSupabaseClient } from "../integrations/supabaseClient";
-import { Schedule, ScheduleStatus } from "../types";
+import { ConfirmationStatus, Schedule, ScheduleStatus } from "../types";
 
 export async function createSchedule(params: {
   userId: string;
@@ -54,6 +54,19 @@ export async function findActiveSchedulesByUser(userId: string): Promise<Schedul
   return data || [];
 }
 
+/** Usado pela pagina do paciente no CRM - todos os agendamentos, qualquer status, mais recentes primeiro. */
+export async function findAllByUserId(userId: string): Promise<Schedule[]> {
+  const { data, error } = await getSupabaseClient()
+    .from("schedules")
+    .select("*")
+    .eq("user_id", userId)
+    .order("date", { ascending: false })
+    .order("time", { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
 export async function findScheduleByGoogleEventId(googleEventId: string): Promise<Schedule | null> {
   const { data, error } = await getSupabaseClient()
     .from("schedules")
@@ -65,6 +78,7 @@ export async function findScheduleByGoogleEventId(googleEventId: string): Promis
   return data;
 }
 
+/** Sempre volta confirmation_status para 'pending' e marca was_rescheduled: um horario novo nunca herda a confirmacao do horario anterior. */
 export async function updateScheduleDateTime(
   scheduleId: string,
   date: string,
@@ -72,7 +86,7 @@ export async function updateScheduleDateTime(
 ): Promise<Schedule> {
   const { data, error } = await getSupabaseClient()
     .from("schedules")
-    .update({ date, time, updated_at: new Date().toISOString() })
+    .update({ date, time, confirmation_status: "pending", was_rescheduled: true, updated_at: new Date().toISOString() })
     .eq("id", scheduleId)
     .select("*")
     .single();
@@ -81,13 +95,51 @@ export async function updateScheduleDateTime(
   return data;
 }
 
+/** Unico status usado hoje e "Cancelado" (ver schedulingService.cancelAppointment) - por isso tambem fecha confirmation_status junto. */
 export async function updateScheduleStatus(
   scheduleId: string,
   status: ScheduleStatus
 ): Promise<Schedule> {
+  const update: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
+  if (status === "Cancelado") update.confirmation_status = "cancelled";
+
   const { data, error } = await getSupabaseClient()
     .from("schedules")
-    .update({ status, updated_at: new Date().toISOString() })
+    .update(update)
+    .eq("id", scheduleId)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/** Usado pelo Dashboard (card "Consultas aguardando confirmacao"). */
+export async function countByConfirmationStatus(confirmationStatus: ConfirmationStatus): Promise<number> {
+  const { count, error } = await getSupabaseClient()
+    .from("schedules")
+    .select("*", { count: "exact", head: true })
+    .eq("confirmation_status", confirmationStatus)
+    .eq("status", "Agendado");
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function setConfirmationStatus(scheduleId: string, confirmationStatus: ConfirmationStatus): Promise<void> {
+  const { error } = await getSupabaseClient()
+    .from("schedules")
+    .update({ confirmation_status: confirmationStatus, updated_at: new Date().toISOString() })
+    .eq("id", scheduleId);
+
+  if (error) throw error;
+}
+
+/** Chamado quando o paciente confirma presenca - grava a data/hora exatas da confirmacao. */
+export async function markConfirmedNow(scheduleId: string): Promise<Schedule> {
+  const { data, error } = await getSupabaseClient()
+    .from("schedules")
+    .update({ confirmation_status: "confirmed", confirmed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq("id", scheduleId)
     .select("*")
     .single();
@@ -111,6 +163,13 @@ export async function findByDateRange(startDate: string, endDate: string): Promi
   return data || [];
 }
 
+/** Usado pelo Dashboard (card "Confirmacoes de Hoje") - sem filtrar status, para incluir cancelados no total do dia. */
+export async function findAllByDate(date: string): Promise<Schedule[]> {
+  const { data, error } = await getSupabaseClient().from("schedules").select("*").eq("date", date);
+  if (error) throw error;
+  return data || [];
+}
+
 export async function findSchedulesByDate(date: string): Promise<Schedule[]> {
   const { data, error } = await getSupabaseClient()
     .from("schedules")
@@ -122,32 +181,3 @@ export async function findSchedulesByDate(date: string): Promise<Schedule[]> {
   return data || [];
 }
 
-export async function findSchedulesNeedingReminder(date: string): Promise<Schedule[]> {
-  const { data, error } = await getSupabaseClient()
-    .from("schedules")
-    .select("*")
-    .eq("date", date)
-    .eq("status", "Agendado")
-    .eq("reminder_sent", false);
-
-  if (error) throw error;
-  return data || [];
-}
-
-export async function markReminderSent(scheduleId: string): Promise<void> {
-  const { error } = await getSupabaseClient()
-    .from("schedules")
-    .update({ reminder_sent: true, updated_at: new Date().toISOString() })
-    .eq("id", scheduleId);
-
-  if (error) throw error;
-}
-
-export async function markConfirmed(scheduleId: string): Promise<void> {
-  const { error } = await getSupabaseClient()
-    .from("schedules")
-    .update({ confirmed: true, updated_at: new Date().toISOString() })
-    .eq("id", scheduleId);
-
-  if (error) throw error;
-}

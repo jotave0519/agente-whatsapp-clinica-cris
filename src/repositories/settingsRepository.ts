@@ -14,6 +14,11 @@ export async function updateClinicSettings(
     email: string | null;
     address: string | null;
     reminders_enabled: boolean;
+    confirmation_enabled: boolean;
+    confirmation_hours_before: number;
+    confirmation_nudges_enabled: boolean;
+    confirmation_nudge_count: number;
+    confirmation_nudge_interval_hours: number;
     inactivity_nudge_enabled: boolean;
     responsible_name: string | null;
     specialty: string | null;

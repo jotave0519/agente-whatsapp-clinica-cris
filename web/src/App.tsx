@@ -13,6 +13,7 @@ import { Financeiro } from "./pages/Financeiro";
 import { InteligenciaIA } from "./pages/InteligenciaIA";
 import { Login } from "./pages/Login";
 import { Pacientes } from "./pages/Pacientes";
+import { PatientDetail } from "./pages/PatientDetail";
 import { Procedimentos } from "./pages/Procedimentos";
 import { Usuarios } from "./pages/Usuarios";
 import { WhatsApp } from "./pages/WhatsApp";
@@ -35,6 +36,7 @@ export function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/agenda" element={<Agenda />} />
                 <Route path="/pacientes" element={<Pacientes />} />
+                <Route path="/pacientes/:id" element={<PatientDetail />} />
                 <Route path="/conversas" element={<Conversas />} />
                 <Route path="/procedimentos" element={<Procedimentos />} />
                 <Route path="/financeiro" element={<Financeiro />} />

@@ -3,6 +3,7 @@ import { StepDefinition } from "../types";
 import { cancellationSteps } from "./cancellation";
 import { clinicCancellationSteps } from "./clinicCancellation";
 import { menuStep } from "./menu";
+import { reminderResponseStep } from "./reminderResponse";
 import { reschedulingSteps } from "./rescheduling";
 import { schedulingSteps } from "./scheduling";
 import { SWITCH_HANDLERS, SWITCH_TOOLS } from "./switchFlow";
@@ -13,6 +14,7 @@ const ALL_STEPS: StepDefinition[] = [
   ...reschedulingSteps,
   ...cancellationSteps,
   ...clinicCancellationSteps,
+  reminderResponseStep,
 ];
 
 // Fora do MENU, toda etapa tambem ganha as ferramentas de troca de fluxo
@@ -43,6 +45,7 @@ const REQUIRED_STATES: ConversationFlowState[] = [
   "CANCELING_SELECT",
   "CANCELING_CONFIRM",
   "CLINIC_CANCELLED_OFFER",
+  "REMINDER_RESPONSE",
 ];
 
 // Falha rapido e alto na inicializacao do processo, em vez de se comportar de

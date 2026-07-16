@@ -15,6 +15,7 @@ interface MessageItem {
   id: string;
   role: "user" | "assistant";
   content: string;
+  automated: boolean;
   created_at: string;
 }
 
@@ -204,15 +205,25 @@ export function Conversas() {
                       style={{
                         maxWidth: "78%",
                         alignSelf: m.role === "user" ? "flex-start" : "flex-end",
-                        background: m.role === "user" ? "var(--surface)" : "var(--accent)",
-                        color: m.role === "user" ? "var(--text)" : "#fff",
-                        border: m.role === "user" ? "1px solid var(--border)" : "none",
-                        borderRadius: 14,
-                        padding: "8px 12px",
-                        fontSize: 13.5,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: m.role === "user" ? "flex-start" : "flex-end",
+                        gap: 3,
                       }}
                     >
-                      {m.content}
+                      {m.automated && <span className="badge badge-yellow">Mensagem automática</span>}
+                      <div
+                        style={{
+                          background: m.role === "user" ? "var(--surface)" : "var(--accent)",
+                          color: m.role === "user" ? "var(--text)" : "#fff",
+                          border: m.role === "user" ? "1px solid var(--border)" : "none",
+                          borderRadius: 14,
+                          padding: "8px 12px",
+                          fontSize: 13.5,
+                        }}
+                      >
+                        {m.content}
+                      </div>
                     </div>
                   ))}
                   <div ref={bottomRef} />

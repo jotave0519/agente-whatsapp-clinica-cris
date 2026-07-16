@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { Procedimentos } from "./Procedimentos";
+import { ConfirmacaoAutomatica } from "./configuracoesIA/ConfirmacaoAutomatica";
 import { FaqInteligente } from "./configuracoesIA/FaqInteligente";
 import { HorariosClinica } from "./configuracoesIA/HorariosClinica";
 import { InformacoesClinica } from "./configuracoesIA/InformacoesClinica";
 import { MensagensAutomaticas } from "./configuracoesIA/MensagensAutomaticas";
 import { RegrasIA } from "./configuracoesIA/RegrasIA";
 
-type IaTab = "informacoes" | "mensagens" | "faq" | "procedimentos" | "horarios" | "regras";
+type IaTab = "informacoes" | "mensagens" | "confirmacao" | "faq" | "procedimentos" | "horarios" | "regras";
 
 const IA_TABS: { id: IaTab; label: string }[] = [
   { id: "informacoes", label: "Informações da Clínica" },
   { id: "mensagens", label: "Mensagens automáticas" },
+  { id: "confirmacao", label: "Confirmação automática" },
   { id: "faq", label: "FAQ Inteligente" },
   { id: "procedimentos", label: "Procedimentos" },
   { id: "horarios", label: "Horários da clínica" },
@@ -23,6 +25,8 @@ function IaTabContent({ tab }: { tab: IaTab }) {
       return <InformacoesClinica />;
     case "mensagens":
       return <MensagensAutomaticas />;
+    case "confirmacao":
+      return <ConfirmacaoAutomatica />;
     case "faq":
       return <FaqInteligente />;
     case "procedimentos":

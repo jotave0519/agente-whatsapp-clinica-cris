@@ -115,11 +115,12 @@ export async function markNudgeSent(conversationId: string): Promise<void> {
 export async function addMessage(
   conversationId: string,
   role: MessageRole,
-  content: string
+  content: string,
+  automated = false
 ): Promise<Message> {
   const { data, error } = await getSupabaseClient()
     .from("messages")
-    .insert({ conversation_id: conversationId, role, content })
+    .insert({ conversation_id: conversationId, role, content, automated })
     .select("*")
     .single();
 

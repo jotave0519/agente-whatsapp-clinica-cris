@@ -8,7 +8,8 @@ export interface User {
   updated_at: string;
 }
 
-export type ScheduleStatus = "Agendado" | "Cancelado" | "Concluido";
+export type ScheduleStatus = "Agendado" | "Cancelado" | "Concluido" | "Faltou";
+export type ConfirmationStatus = "pending" | "awaiting" | "confirmed" | "cancelled";
 
 export interface Schedule {
   id: string;
@@ -23,8 +24,46 @@ export interface Schedule {
   status: ScheduleStatus;
   reminder_sent: boolean;
   confirmed: boolean;
+  confirmation_status: ConfirmationStatus;
+  confirmed_at: string | null;
+  was_rescheduled: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/** 'confirmation' (pedido inicial) ou 'nudge_N' (N-esimo lembrete de nao-resposta) - N e configuravel, nao um enum fixo. */
+export type ReminderTier = string;
+export type ReminderStatus = "pending" | "sending" | "sent" | "cancelled" | "failed";
+
+export interface AppointmentReminder {
+  id: string;
+  schedule_id: string;
+  tier: ReminderTier;
+  scheduled_for: string;
+  status: ReminderStatus;
+  attempts: number;
+  last_error: string | null;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ScheduleEventType =
+  | "created"
+  | "confirmation_sent"
+  | "nudge_sent"
+  | "confirmed"
+  | "cancelled"
+  | "rescheduled"
+  | "completed"
+  | "no_show";
+
+export interface ScheduleEvent {
+  id: string;
+  schedule_id: string;
+  event_type: ScheduleEventType;
+  detail: string | null;
+  created_at: string;
 }
 
 export type ConversationStatus = "ai" | "human" | "closed";
@@ -42,13 +81,15 @@ export type ConversationFlowState =
   | "RESCHEDULING_CONFIRM"
   | "CANCELING_SELECT"
   | "CANCELING_CONFIRM"
-  | "CLINIC_CANCELLED_OFFER";
+  | "CLINIC_CANCELLED_OFFER"
+  | "REMINDER_RESPONSE";
 
 export interface FlowStateData {
   name?: string;
   procedure?: string;
   durationMinutes?: number;
   date?: string;
+  time?: string;
   availableSlots?: string[];
   selectedStart?: string;
   scheduleId?: string;
@@ -74,6 +115,7 @@ export interface Message {
   conversation_id: string;
   role: MessageRole;
   content: string;
+  automated: boolean;
   created_at: string;
 }
 
@@ -161,6 +203,11 @@ export interface ClinicSettings {
   email: string | null;
   address: string | null;
   reminders_enabled: boolean;
+  confirmation_enabled: boolean;
+  confirmation_hours_before: number;
+  confirmation_nudges_enabled: boolean;
+  confirmation_nudge_count: number;
+  confirmation_nudge_interval_hours: number;
   inactivity_nudge_enabled: boolean;
   responsible_name: string | null;
   specialty: string | null;

@@ -14,9 +14,9 @@ import {
 } from "../controllers/api/inventoryController";
 import { getMe } from "../controllers/api/meController";
 import { listMessageTemplates, updateMessageTemplate } from "../controllers/api/messageTemplateController";
-import { createPatient, deletePatient, getPatient, listPatients, updatePatient } from "../controllers/api/patientController";
+import { createPatient, deletePatient, getPatient, getPatientHistory, listPatients, updatePatient } from "../controllers/api/patientController";
 import { createProcedure, deleteProcedure, listProcedures, updateProcedure } from "../controllers/api/procedureController";
-import { cancelSchedule, createSchedule, listSchedules } from "../controllers/api/scheduleController";
+import { cancelSchedule, createSchedule, listSchedules, updateOutcome } from "../controllers/api/scheduleController";
 import { getSettings, updateSettings } from "../controllers/api/settingsController";
 import { createStaff, deleteStaff, listStaff, updateStaff } from "../controllers/api/staffController";
 import { disconnect, getQrCode, getStatus } from "../controllers/api/whatsappController";
@@ -40,6 +40,7 @@ apiRouter.get("/dashboard", requireAdmin, getDashboard);
 
 apiRouter.get("/patients", listPatients);
 apiRouter.get("/patients/:id", getPatient);
+apiRouter.get("/patients/:id/history", getPatientHistory);
 apiRouter.post("/patients", staffOrAbove, createPatient);
 apiRouter.patch("/patients/:id", staffOrAbove, updatePatient);
 apiRouter.delete("/patients/:id", staffOrAbove, deletePatient);
@@ -47,6 +48,7 @@ apiRouter.delete("/patients/:id", staffOrAbove, deletePatient);
 apiRouter.get("/schedules", listSchedules);
 apiRouter.post("/schedules", staffOrAbove, createSchedule);
 apiRouter.delete("/schedules/:id", staffOrAbove, cancelSchedule);
+apiRouter.patch("/schedules/:id/outcome", staffOrAbove, updateOutcome);
 
 apiRouter.get("/conversations", staffOrAbove, listConversations);
 apiRouter.get("/conversations/:id", staffOrAbove, getConversation);

@@ -266,6 +266,11 @@ export async function cancelEvent(eventId: string): Promise<void> {
   await calendarRequest<void>("delete", eventsPath(`/${encodeURIComponent(eventId)}`));
 }
 
+/** Atualiza titulo/descricao do evento (ex: marcar visualmente que o paciente confirmou) sem alterar data/hora. */
+export async function updateEventDetails(eventId: string, fields: { summary?: string; description?: string }): Promise<void> {
+  await calendarRequest<void>("patch", eventsPath(`/${encodeURIComponent(eventId)}`), { data: fields });
+}
+
 export async function listEvents(date: string): Promise<CalendarEvent[]> {
   const { start, end } = await dayBounds(date);
   const data = await calendarRequest<{ items?: CalendarEvent[] }>("get", eventsPath(), {

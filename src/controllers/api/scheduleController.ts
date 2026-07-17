@@ -3,6 +3,7 @@ import * as scheduleEventRepository from "../../repositories/scheduleEventReposi
 import * as scheduleRepository from "../../repositories/scheduleRepository";
 import * as userRepository from "../../repositories/userRepository";
 import * as clinicCancellationService from "../../services/clinicCancellationService";
+import * as postAttendanceEngine from "../../services/postAttendanceEngine";
 import * as schedulingService from "../../services/schedulingService";
 import { getOrCreateUserByPhone } from "../../services/userService";
 import { AppError } from "../../utils/appError";
@@ -119,6 +120,17 @@ export async function updateOutcome(req: Request, res: Response): Promise<void> 
     await scheduleEventRepository.record(id, outcome === "completed" ? "completed" : "no_show");
 
     res.json(schedule);
+
+    // Nao bloqueia a resposta ao CRM (mesmo padrao de cancelSchedule): o
+    // desfecho ja foi marcado com sucesso, uma falha ao matricular no
+    // pos-atendimento nunca deve aparecer como erro dessa acao para a equipe.
+    if (outcome === "completed") {
+      try {
+        await postAttendanceEngine.enrollSchedule(schedule, "manual");
+      } catch (enrollErr) {
+        logger.error(SCOPE, "Falha ao matricular pos-atendimento (desfecho ja registrado com sucesso)", enrollErr);
+      }
+    }
   } catch (err) {
     logger.error(SCOPE, "Erro ao marcar desfecho do agendamento", err);
     res.status(500).json({ error: "Erro ao marcar desfecho do agendamento." });

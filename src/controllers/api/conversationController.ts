@@ -62,6 +62,23 @@ export async function sendMessage(req: Request, res: Response): Promise<void> {
   }
 }
 
+export async function updatePriority(req: Request, res: Response): Promise<void> {
+  try {
+    const { priority } = req.body;
+    if (typeof priority !== "boolean") {
+      res.status(400).json({ error: "priority deve ser boolean." });
+      return;
+    }
+
+    logger.info(SCOPE, "Alterando prioridade da conversa via CRM", { staffId: req.staff?.id, conversationId: req.params.id, priority });
+    await conversationRepository.setPriority(req.params.id, priority);
+    res.json({ status: "ok" });
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao atualizar prioridade da conversa", err);
+    res.status(500).json({ error: "Erro ao atualizar prioridade da conversa." });
+  }
+}
+
 export async function updateStatus(req: Request, res: Response): Promise<void> {
   try {
     const { status } = req.body;

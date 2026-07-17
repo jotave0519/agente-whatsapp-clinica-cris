@@ -29,6 +29,14 @@ interface DashboardData {
     conversionRate: number;
     recoveredRevenue: number;
   };
+  postAttendance: {
+    patientsFollowedToday: number;
+    messagesSentToday: number;
+    responseRate: number;
+    casesEscalated: number;
+    reviewsRequested: number;
+    reviewsReceivedEstimate: number;
+  };
 }
 
 interface FinanceOverview {
@@ -208,6 +216,44 @@ export function Dashboard() {
           <span>
             <strong style={{ color: "var(--text-faint)" }}>{data.reactivation.byStatus.ignored || 0}</strong> ignoraram
           </span>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <div>
+            <div style={{ fontSize: 14.5, fontWeight: 600 }}>Pós-atendimento</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginTop: 2 }}>IA de acompanhamento automático depois das consultas</div>
+          </div>
+          <button style={{ fontSize: 12.5, fontWeight: 500, color: "var(--accent)" }} onClick={() => navigate("/pos-atendimento")}>
+            Ver fluxos
+          </button>
+        </div>
+        <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
+          <div className="card">
+            <div className="kpi-value">{data.postAttendance.patientsFollowedToday}</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Pacientes acompanhados hoje</div>
+          </div>
+          <div className="card">
+            <div className="kpi-value">{data.postAttendance.messagesSentToday}</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Mensagens hoje</div>
+          </div>
+          <div className="card">
+            <div className="kpi-value">{(data.postAttendance.responseRate * 100).toFixed(0)}%</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Taxa de resposta</div>
+          </div>
+          <div className="card">
+            <div className="kpi-value">{data.postAttendance.casesEscalated}</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Encaminhados à equipe</div>
+          </div>
+          <div className="card">
+            <div className="kpi-value">{data.postAttendance.reviewsRequested}</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Avaliações solicitadas</div>
+          </div>
+          <div className="card">
+            <div className="kpi-value">{data.postAttendance.reviewsReceivedEstimate}</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Avaliações recebidas (estimativa)</div>
+          </div>
         </div>
       </div>
 

@@ -32,7 +32,10 @@ const NAV_GROUPS = [
   },
   {
     label: "Marketing",
-    items: [{ to: "/campanhas-reativacao", label: "Campanhas de Reativação" }],
+    items: [
+      { to: "/campanhas-reativacao", label: "Campanhas de Reativação" },
+      { to: "/pos-atendimento", label: "Pós-atendimento" },
+    ],
   },
   {
     label: "Inteligência Artificial",

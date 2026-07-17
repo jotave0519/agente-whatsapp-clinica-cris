@@ -4,6 +4,7 @@ import { getOrCreateUserByPhone } from "../services/userService";
 import * as conversationRepository from "../repositories/conversationRepository";
 import * as conversationEngine from "../conversation/engine";
 import * as aiKnowledgeService from "../services/aiKnowledgeService";
+import * as postAttendanceEngine from "../services/postAttendanceEngine";
 import * as reactivationEngine from "../services/reactivationEngine";
 import { logger } from "../utils/logger";
 
@@ -58,6 +59,16 @@ export async function handleWhatsAppWebhook(req: Request, res: Response): Promis
       }
     }
 
+    // Bloco isolado do de cima (reativacao) de proposito - uma falha aqui
+    // nunca pode impedir a marcacao de reativacao, e vice-versa.
+    if (conversation.state === "POST_ATTENDANCE_RESPONSE" && conversation.state_data.postAttendanceEnrollmentId) {
+      try {
+        await postAttendanceEngine.markResponded(conversation.state_data.postAttendanceEnrollmentId);
+      } catch (err) {
+        logger.error(SCOPE, "Falha ao marcar resposta de pos-atendimento", err);
+      }
+    }
+
     // Nao sobrescrevemos conversation.status em memoria mesmo apos reabrir no banco:
     // o engine usa o status original ("closed") para saber que o contexto expirou e
     // reiniciar o fluxo. Isso e seguro aqui porque "closed" nunca e igual a "human".
@@ -68,9 +79,29 @@ export async function handleWhatsAppWebhook(req: Request, res: Response): Promis
       return;
     }
 
+    const wasPostAttendanceResponse = conversation.state === "POST_ATTENDANCE_RESPONSE";
+
     logger.info(SCOPE, "Encaminhando para conversationEngine.runTurn", { conversationId: conversation.id, state: conversation.state });
     const { reply, handoffRequested } = await conversationEngine.runTurn(user, conversation, text);
     logger.info(SCOPE, "Resposta gerada pelo agente", { conversationId: conversation.id, handoffRequested, reply });
+
+    // Rede de seguranca deterministica: se a Claude nao escalou nada nesse
+    // turno mas o texto bate com palavras-chave de possivel complicacao,
+    // sinaliza mesmo assim. Roda so DEPOIS do runTurn (nunca antes - forcar
+    // status humano cedo demais deixaria o paciente sem resposta nesse turno,
+    // o oposto do que se quer) e nunca altera a resposta ja decidida.
+    if (wasPostAttendanceResponse && !handoffRequested && postAttendanceEngine.looksLikeClinicalConcern(text)) {
+      try {
+        await conversationRepository.setPriority(conversation.id, true);
+        await conversationRepository.updateConversationStatus(conversation.id, "human");
+        if (conversation.state_data.postAttendanceEnrollmentId) {
+          await postAttendanceEngine.recordFailsafeAlert(conversation.state_data.postAttendanceEnrollmentId);
+        }
+        logger.warn(SCOPE, "Fail-safe deterministico de pos-atendimento acionado", { conversationId: conversation.id, text });
+      } catch (err) {
+        logger.error(SCOPE, "Falha ao acionar fail-safe de pos-atendimento", err);
+      }
+    }
 
     await sendWhatsAppMessage(phone, reply);
     logger.info(SCOPE, "Resposta enviada via Evolution API", { phone });

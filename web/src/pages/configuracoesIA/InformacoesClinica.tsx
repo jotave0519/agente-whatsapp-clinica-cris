@@ -16,6 +16,7 @@ interface ClinicSettings {
   website: string | null;
   general_notes: string | null;
   about_text: string | null;
+  google_review_link: string | null;
 }
 
 export function InformacoesClinica() {
@@ -87,6 +88,14 @@ export function InformacoesClinica() {
           {field("Instagram", "instagram")}
           {field("Site", "website")}
         </div>
+      </div>
+
+      <div className="card">
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>Avaliações no Google</div>
+        <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12 }}>
+          Link usado pela IA de Pós-atendimento ao convidar pacientes a avaliar a clínica no Google
+        </div>
+        {field("Link de avaliação do Google", "google_review_link")}
       </div>
 
       <div className="card">

@@ -65,6 +65,7 @@ export async function createAppointment(params: {
     time,
     googleEventId: event.id!,
     notes: params.notes,
+    durationMinutes: params.durationMinutes ?? null,
   });
 
   // Nunca deixa uma falha do motor de lembretes mascarar como falha do

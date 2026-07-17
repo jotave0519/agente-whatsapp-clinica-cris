@@ -15,6 +15,7 @@ import { InteligenciaIA } from "./pages/InteligenciaIA";
 import { Login } from "./pages/Login";
 import { Pacientes } from "./pages/Pacientes";
 import { PatientDetail } from "./pages/PatientDetail";
+import { PosAtendimento } from "./pages/PosAtendimento";
 import { Procedimentos } from "./pages/Procedimentos";
 import { Usuarios } from "./pages/Usuarios";
 import { WhatsApp } from "./pages/WhatsApp";
@@ -45,6 +46,7 @@ export function App() {
                 <Route path="/usuarios" element={<Usuarios />} />
                 <Route path="/whatsapp" element={<WhatsApp />} />
                 <Route path="/campanhas-reativacao" element={<CampanhasReativacao />} />
+                <Route path="/pos-atendimento" element={<PosAtendimento />} />
                 <Route path="/inteligencia-ia" element={<InteligenciaIA />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />
               </Route>

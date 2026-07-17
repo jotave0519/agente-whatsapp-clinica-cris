@@ -5,7 +5,17 @@ import { canAccessPage } from "../lib/permissions";
 import { CalendarIcon, HomeIcon, MessageCircleIcon, MoreIcon, UsersIcon } from "./icons";
 import { MobileMoreSheet } from "./MobileMoreSheet";
 
-const SECONDARY_PATHS = ["/procedimentos", "/financeiro", "/estoque", "/usuarios", "/whatsapp", "/campanhas-reativacao", "/inteligencia-ia", "/configuracoes"];
+const SECONDARY_PATHS = [
+  "/procedimentos",
+  "/financeiro",
+  "/estoque",
+  "/usuarios",
+  "/whatsapp",
+  "/campanhas-reativacao",
+  "/pos-atendimento",
+  "/inteligencia-ia",
+  "/configuracoes",
+];
 
 const TABS = [
   { to: "/", label: "Início", icon: HomeIcon, end: true },

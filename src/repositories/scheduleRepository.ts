@@ -10,6 +10,7 @@ export async function createSchedule(params: {
   time: string;
   googleEventId: string;
   notes?: string | null;
+  durationMinutes?: number | null;
 }): Promise<Schedule> {
   const { data, error } = await getSupabaseClient()
     .from("schedules")
@@ -23,6 +24,7 @@ export async function createSchedule(params: {
       google_event_id: params.googleEventId,
       notes: params.notes ?? null,
       status: "Agendado",
+      duration_minutes: params.durationMinutes ?? null,
     })
     .select("*")
     .single();
@@ -205,6 +207,27 @@ export async function findAllForSegmentation(): Promise<SegmentationRow[]> {
   }
 
   return all;
+}
+
+/**
+ * Usado pelo cron de varredura de pos-atendimento (a cada 15 min) - candidatos
+ * a "consulta cujo horario ja passou mas ninguem marcou o desfecho ainda".
+ * Janela movel de 14 dias (nao a tabela inteira) - consultas mais antigas que
+ * isso ja teriam sido matriculadas ou nao fazem mais sentido pra um check-in.
+ */
+export async function findRecentAgendadoForPostAttendanceScan(daysBack = 14): Promise<Schedule[]> {
+  const since = new Date(Date.now() - daysBack * 24 * 3600_000).toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await getSupabaseClient()
+    .from("schedules")
+    .select("*")
+    .eq("status", "Agendado")
+    .gte("date", since)
+    .lte("date", today)
+    .order("date", { ascending: true });
+
+  if (error) throw error;
+  return data || [];
 }
 
 export async function findSchedulesByDate(date: string): Promise<Schedule[]> {

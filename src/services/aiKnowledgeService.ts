@@ -38,6 +38,7 @@ const DEFAULT_TEMPLATES: Record<string, string> = {
     "Olá, {{nome}}! 😊\n\nPassando para confirmar sua consulta na Clínica Dra. Cristiane Zangelmi.\n\n📅 {{dia_semana}}\n🕘 {{hora}}\n\nVocê confirma sua presença?\n\nResponda:\n✅ Confirmar\n❌ Cancelar\n🔄 Remarcar",
   confirmation_nudge: "Olá 😊\n\nSó passando para lembrar da confirmação da sua consulta.\n\nPode responder quando puder.",
   reminder_confirm_ack: "Perfeito! 😊\n\nSua consulta está confirmada. Até breve!",
+  post_attendance_stop_ack: "Sem problemas! 😊\n\nVou parar por aqui. Se precisar de qualquer coisa, é só chamar. 💛",
 };
 
 let cachedTemplates: Map<string, string> | null = null;

@@ -1,5 +1,8 @@
 import { Request, Response } from "express";
 import * as conversationRepository from "../../repositories/conversationRepository";
+import * as postAttendanceEventRepository from "../../repositories/postAttendanceEventRepository";
+import * as postAttendanceMessageRepository from "../../repositories/postAttendanceMessageRepository";
+import * as postAttendanceRepository from "../../repositories/postAttendanceRepository";
 import * as reactivationMessageRepository from "../../repositories/reactivationMessageRepository";
 import * as reactivationRepository from "../../repositories/reactivationRepository";
 import * as scheduleEventRepository from "../../repositories/scheduleEventRepository";
@@ -68,6 +71,9 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
       reactivationMessagesToday,
       reactivationByStatus,
       reactivationRecoveredRevenue,
+      postAttendancePatientsToday,
+      postAttendanceMessagesToday,
+      postAttendanceEvents30d,
     ] = await Promise.all([
       userRepository.count(),
       scheduleRepository.findSchedulesByDate(today),
@@ -83,6 +89,12 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
       reactivationMessageRepository.countSentSince(todayStart),
       reactivationRepository.countAllByStatus(),
       reactivationRepository.estimateRecoveredRevenue(),
+      postAttendanceRepository.countEnrollmentsSince(todayStart),
+      postAttendanceMessageRepository.countSentSince(todayStart),
+      postAttendanceEventRepository.findByTypeSince(
+        ["message_sent", "responded", "alert_raised", "alert_raised_failsafe", "review_requested"],
+        thirtyDaysAgo
+      ),
     ]);
 
     const revenueThisMonth = monthTransactions
@@ -94,6 +106,16 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
 
     const reactivationEverSent = Object.values(reactivationByStatus).reduce((acc, n) => acc + n, 0) - reactivationByStatus.pending;
     const reactivationResponded = reactivationByStatus.responded + reactivationByStatus.converted + reactivationByStatus.declined;
+
+    const postAttendanceSent30d = postAttendanceEvents30d.filter((e) => e.event_type === "message_sent" || e.event_type === "review_requested").length;
+    const postAttendanceResponded30d = postAttendanceEvents30d.filter((e) => e.event_type === "responded").length;
+    const postAttendanceEscalated30d = postAttendanceEvents30d.filter((e) => e.event_type === "alert_raised" || e.event_type === "alert_raised_failsafe").length;
+    const reviewRequestedEnrollmentIds = new Set(postAttendanceEvents30d.filter((e) => e.event_type === "review_requested").map((e) => e.enrollment_id));
+    const respondedEnrollmentIds = new Set(postAttendanceEvents30d.filter((e) => e.event_type === "responded").map((e) => e.enrollment_id));
+    // Estimativa: nao ha integracao com a API do Google Business Profile - "recebida" e
+    // inferido por "o paciente respondeu depois de ser convidado a avaliar", rotulado como
+    // estimativa na UI (mesmo espirito de "receita recuperada" da reativacao).
+    const postAttendanceReviewsReceivedEstimate = [...reviewRequestedEnrollmentIds].filter((id) => respondedEnrollmentIds.has(id)).length;
 
     res.json({
       kpis: {
@@ -115,6 +137,14 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
         responseRate: reactivationEverSent > 0 ? reactivationResponded / reactivationEverSent : 0,
         conversionRate: reactivationEverSent > 0 ? reactivationByStatus.converted / reactivationEverSent : 0,
         recoveredRevenue: reactivationRecoveredRevenue,
+      },
+      postAttendance: {
+        patientsFollowedToday: postAttendancePatientsToday,
+        messagesSentToday: postAttendanceMessagesToday,
+        responseRate: postAttendanceSent30d > 0 ? postAttendanceResponded30d / postAttendanceSent30d : 0,
+        casesEscalated: postAttendanceEscalated30d,
+        reviewsRequested: reviewRequestedEnrollmentIds.size,
+        reviewsReceivedEstimate: postAttendanceReviewsReceivedEstimate,
       },
     });
   } catch (err) {

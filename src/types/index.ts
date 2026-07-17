@@ -28,6 +28,7 @@ export interface Schedule {
   confirmation_status: ConfirmationStatus;
   confirmed_at: string | null;
   was_rescheduled: boolean;
+  duration_minutes: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -142,6 +143,83 @@ export interface ReactivationEvent {
   created_at: string;
 }
 
+export type PostAttendanceFlowMessageType = "simple" | "question" | "review" | "reminder";
+export type PostAttendanceDelayUnit = "hours" | "days";
+
+export interface PostAttendanceFlow {
+  id: string;
+  name: string;
+  procedure_match: string; // texto livre comparado a Schedule.procedure, ou 'all'
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PostAttendanceFlowMessage {
+  id: string;
+  flow_id: string;
+  sequence: number;
+  delay_value: number;
+  delay_unit: PostAttendanceDelayUnit;
+  message_type: PostAttendanceFlowMessageType;
+  body: string; // instrucao de estilo p/ a Claude compor - nunca o texto final
+  created_at: string;
+  updated_at: string;
+}
+
+export type PostAttendanceEnrollmentStatus = "active" | "completed" | "interrupted" | "transferred";
+export type PostAttendanceTriggerSource = "manual" | "time_elapsed";
+
+export interface PostAttendanceEnrollment {
+  id: string;
+  schedule_id: string;
+  flow_id: string;
+  user_id: string;
+  status: PostAttendanceEnrollmentStatus;
+  trigger_source: PostAttendanceTriggerSource;
+  started_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PostAttendanceMessage {
+  id: string;
+  enrollment_id: string;
+  flow_message_id: string;
+  scheduled_for: string;
+  status: ReminderStatus;
+  body: string | null;
+  attempts: number;
+  postpone_count: number;
+  last_error: string | null;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PostAttendanceEventType =
+  | "enrolled"
+  | "message_sent"
+  | "responded"
+  | "review_requested"
+  | "alert_raised"
+  | "alert_raised_failsafe"
+  | "transferred"
+  | "interrupted"
+  | "completed"
+  | "skipped_no_link"
+  | "skipped_future_appointment"
+  | "skipped_conversation_busy"
+  | "skipped_schedule_status_changed";
+
+export interface PostAttendanceEvent {
+  id: string;
+  enrollment_id: string;
+  event_type: PostAttendanceEventType;
+  detail: string | null;
+  created_at: string;
+}
+
 export type ConversationStatus = "ai" | "human" | "closed";
 
 export type ConversationFlowState =
@@ -159,7 +237,8 @@ export type ConversationFlowState =
   | "CANCELING_CONFIRM"
   | "CLINIC_CANCELLED_OFFER"
   | "REMINDER_RESPONSE"
-  | "REACTIVATION_RESPONSE";
+  | "REACTIVATION_RESPONSE"
+  | "POST_ATTENDANCE_RESPONSE";
 
 export interface FlowStateData {
   name?: string;
@@ -172,6 +251,7 @@ export interface FlowStateData {
   scheduleId?: string;
   candidates?: { scheduleId: string; procedure: string; date: string; time: string }[];
   reactivationTargetId?: string;
+  postAttendanceEnrollmentId?: string;
 }
 
 export interface Conversation {
@@ -180,6 +260,7 @@ export interface Conversation {
   status: ConversationStatus;
   state: ConversationFlowState;
   state_data: FlowStateData;
+  priority: boolean;
   last_user_message_at: string | null;
   nudge_sent_at: string | null;
   created_at: string;
@@ -299,6 +380,7 @@ export interface ClinicSettings {
   general_notes: string | null;
   about_text: string | null;
   context_expiry_minutes: number;
+  google_review_link: string | null;
   updated_at: string;
 }
 

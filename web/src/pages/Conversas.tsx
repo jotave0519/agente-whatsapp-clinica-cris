@@ -6,6 +6,7 @@ import { ArrowLeftIcon } from "../components/icons";
 interface ConversationSummary {
   id: string;
   status: "ai" | "human" | "closed";
+  priority: boolean;
   userName: string;
   userPhone: string;
   lastMessage: string | null;
@@ -92,6 +93,13 @@ export function Conversas() {
     await loadList();
   }
 
+  async function handleResolvePriority() {
+    if (!conversation) return;
+    await api.patch(`/conversations/${conversation.id}/priority`, { priority: false });
+    await loadConversation(conversation.id);
+    await loadList();
+  }
+
   async function handleClose() {
     if (!conversation) return;
     if (!window.confirm("Encerrar esta conversa? A IA não voltará a responder automaticamente até uma nova mensagem do paciente.")) return;
@@ -136,7 +144,10 @@ export function Conversas() {
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13.5 }}>{c.userName || c.userPhone}</span>
+                  <span style={{ fontWeight: 600, fontSize: 13.5, display: "flex", alignItems: "center", gap: 6 }}>
+                    {c.priority && <span className="badge badge-red">🔴 Prioridade</span>}
+                    {c.userName || c.userPhone}
+                  </span>
                   {statusBadge(c.status)}
                 </div>
                 <div
@@ -182,11 +193,19 @@ export function Conversas() {
                       </button>
                     )}
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{conversation.userName || conversation.userPhone}</div>
+                      <div style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 6 }}>
+                        {conversation.priority && <span className="badge badge-red">🔴 Prioridade</span>}
+                        {conversation.userName || conversation.userPhone}
+                      </div>
                       <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{conversation.userPhone}</div>
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    {conversation.priority && (
+                      <button className="btn btn-secondary" onClick={handleResolvePriority}>
+                        Marcar como resolvido
+                      </button>
+                    )}
                     <button className="btn btn-secondary" onClick={handleToggleStatus}>
                       {conversation.status === "human" ? (isMobile ? "IA" : "Devolver para IA") : isMobile ? "Assumir" : "Assumir conversa"}
                     </button>

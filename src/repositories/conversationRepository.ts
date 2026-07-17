@@ -43,6 +43,15 @@ export async function updateConversationStatus(
   if (error) throw error;
 }
 
+export async function setPriority(conversationId: string, priority: boolean): Promise<void> {
+  const { error } = await getSupabaseClient()
+    .from("conversations")
+    .update({ priority, updated_at: new Date().toISOString() })
+    .eq("id", conversationId);
+
+  if (error) throw error;
+}
+
 export async function updateConversationFlow(
   conversationId: string,
   state: ConversationFlowState,

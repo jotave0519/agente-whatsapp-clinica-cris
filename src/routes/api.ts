@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { createException, deleteException, listExceptions } from "../controllers/api/businessHourExceptionController";
-import { getConversation, listConversations, sendMessage, updateStatus } from "../controllers/api/conversationController";
+import { getConversation, listConversations, sendMessage, updatePriority, updateStatus } from "../controllers/api/conversationController";
 import { getDashboard } from "../controllers/api/dashboardController";
 import { createFaq, deleteFaq, listFaq, updateFaq } from "../controllers/api/faqController";
 import { createTransaction, deleteTransaction, getFinanceOverview, updateTransaction } from "../controllers/api/financeController";
@@ -16,6 +16,13 @@ import { getMe } from "../controllers/api/meController";
 import { listMessageTemplates, updateMessageTemplate } from "../controllers/api/messageTemplateController";
 import { createPatient, deletePatient, getPatient, getPatientHistory, listPatients, updatePatient } from "../controllers/api/patientController";
 import { createProcedure, deleteProcedure, listProcedures, updateProcedure } from "../controllers/api/procedureController";
+import {
+  createFlow as createPostAttendanceFlow,
+  deleteFlow as deletePostAttendanceFlow,
+  listEnrollments as listPostAttendanceEnrollments,
+  listFlows as listPostAttendanceFlows,
+  updateFlow as updatePostAttendanceFlow,
+} from "../controllers/api/postAttendanceController";
 import {
   createCampaign,
   deleteCampaign,
@@ -62,6 +69,7 @@ apiRouter.get("/conversations", staffOrAbove, listConversations);
 apiRouter.get("/conversations/:id", staffOrAbove, getConversation);
 apiRouter.post("/conversations/:id/messages", staffOrAbove, sendMessage);
 apiRouter.patch("/conversations/:id/status", staffOrAbove, updateStatus);
+apiRouter.patch("/conversations/:id/priority", staffOrAbove, updatePriority);
 
 apiRouter.get("/procedures", listProcedures);
 apiRouter.post("/procedures", requireAdmin, createProcedure);
@@ -110,3 +118,9 @@ apiRouter.patch("/reactivation-campaigns/:id", requireAdmin, updateCampaign);
 apiRouter.delete("/reactivation-campaigns/:id", requireAdmin, deleteCampaign);
 apiRouter.post("/reactivation-campaigns/:id/duplicate", requireAdmin, duplicateCampaign);
 apiRouter.get("/reactivation-campaigns/:id/stats", requireAdmin, getCampaignStats);
+
+apiRouter.get("/post-attendance-flows", requireAdmin, listPostAttendanceFlows);
+apiRouter.post("/post-attendance-flows", requireAdmin, createPostAttendanceFlow);
+apiRouter.patch("/post-attendance-flows/:id", requireAdmin, updatePostAttendanceFlow);
+apiRouter.delete("/post-attendance-flows/:id", requireAdmin, deletePostAttendanceFlow);
+apiRouter.get("/post-attendance-enrollments", requireAdmin, listPostAttendanceEnrollments);

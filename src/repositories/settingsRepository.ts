@@ -32,7 +32,9 @@ export async function updateClinicSettings(
     general_notes: string | null;
     about_text: string | null;
     context_expiry_minutes: number;
+    google_review_link: string | null;
   }>
+
 ): Promise<ClinicSettings> {
   const { data, error } = await getSupabaseClient()
     .from("clinic_settings")

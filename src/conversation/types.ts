@@ -25,6 +25,16 @@ export interface StepResult {
   message: string;
   /** So usado por request_human_handoff: sinaliza que a conversa deve passar para atendimento humano. */
   handoffRequested?: boolean;
+  /**
+   * Quando true, `message` ja e o texto final a ser enviado ao cliente - o
+   * engine pula a chamada extra ao modelo que normalmente viria a seguir
+   * (usado quando o texto pode ser montado deterministicamente em codigo, ex:
+   * resumo de confirmacao de agendamento com data/horario exatos do
+   * state_data, evitando que o modelo "invente" ou puxe uma data antiga do
+   * historico da conversa ao redigir o resumo). So tem efeito se essa foi a
+   * UNICA tool chamada nessa rodada.
+   */
+  finalReply?: boolean;
 }
 
 export type ToolHandler = (ctx: FlowContext, input: any) => Promise<StepResult>;

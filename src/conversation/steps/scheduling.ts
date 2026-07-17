@@ -5,7 +5,7 @@ import * as settingsRepository from "../../repositories/settingsRepository";
 import * as userRepository from "../../repositories/userRepository";
 import { FlowStateData } from "../../types";
 import { logger } from "../../utils/logger";
-import { describeSlots, formatDate, formatTime } from "../prompt";
+import { describeSlots, formatDate, formatTime, formatWeekdayDate, todayIsoDate } from "../prompt";
 import { FlowContext, StepDefinition, StepResult, ToolHandler } from "../types";
 import { ABANDON_TOOL, CALENDAR_UNAVAILABLE_INSTRUCTION, SLOT_TAKEN_INSTRUCTION, abandonFlow, looksLikeFullName, sampleSlotsAcrossDay } from "./shared";
 
@@ -32,6 +32,20 @@ export async function provideDate(ctx: FlowContext, baseData: FlowStateData, dat
         `A data "${date}" nao esta num formato valido (YYYY-MM-DD). Resolva a data que o cliente quis dizer usando a data ` +
         "atual e o dia da semana informados no topo destas instrucoes, e chame provide_date novamente com o formato correto. " +
         "Nao mencione esse erro ao cliente.",
+    };
+  }
+
+  // Nunca consulta o Calendar nem mostra horarios para uma data que ja
+  // passou - nem cria evento nenhum. Isso tambem funciona como rede de
+  // seguranca para o caso do modelo calcular errado um dia da semana relativo
+  // ("segunda" caindo no passado): em vez de agendar no passado, pede outra data.
+  const today = todayIsoDate();
+  if (date < today) {
+    logger.info(SCOPE, "Data no passado recusada sem consultar o Calendar", { conversationId: ctx.conversation.id, date, today });
+    return {
+      nextStep: "SCHEDULING_DATE",
+      data: { ...baseData, date: undefined, availableSlots: undefined, selectedStart: undefined },
+      message: `A data ${date} ja passou (hoje e ${today}). Informe isso ao cliente educadamente e pergunte se ele quer agendar para outra data. Nao chame nenhuma outra ferramenta agora.`,
     };
   }
 
@@ -75,7 +89,10 @@ export async function provideDate(ctx: FlowContext, baseData: FlowStateData, dat
     };
   }
 
-  const data: FlowStateData = { ...baseData, date, availableSlots: sampleSlotsAcrossDay(slots) };
+  // Uma data nova sempre descarta qualquer horario escolhido anteriormente
+  // (de outra data) - so uma data ativa por vez, nunca mistura horario de
+  // uma data com a data seguinte escolhida pelo cliente.
+  const data: FlowStateData = { ...baseData, date, availableSlots: sampleSlotsAcrossDay(slots), selectedStart: undefined };
   return {
     nextStep: "SCHEDULING_TIME",
     data,
@@ -106,19 +123,32 @@ export const beginScheduling: ToolHandler = async (ctx, input) => {
     logger.info(SCOPE, "Nome ja cadastrado reaproveitado", { conversationId: ctx.conversation.id, name: ctx.user.name });
   }
 
+  // Se o cliente ja mencionou uma data nesta primeira mensagem mas nome e/ou
+  // procedimento ainda faltam, essa data NUNCA pode ser descartada - fica
+  // guardada em pendingDate e e consumida automaticamente assim que os dois
+  // forem coletados (provide_name/provide_procedure), sem depender do modelo
+  // "lembrar" e reinterpretar essa mesma mencao de novo mais tarde relendo o
+  // historico da conversa (essa releitura tardia era a causa raiz de datas
+  // antigas ressurgindo na confirmacao).
+  const pendingDate = input.date && ISO_DATE.test(input.date) ? input.date : undefined;
+
   if (!data.name) {
     return {
       nextStep: "SCHEDULING_NAME",
-      data,
+      data: { ...data, pendingDate },
       message: "Fluxo de agendamento iniciado. Peça o nome completo do paciente para realizar o cadastro (explique rapidamente o motivo).",
     };
   }
 
   if (!data.procedure) {
-    return { nextStep: "SCHEDULING_PROCEDURE", data, message: `Nome já conhecido (${data.name}), não precisa perguntar de novo. Pergunte qual procedimento o cliente deseja, ou se prefere uma avaliação.` };
+    return {
+      nextStep: "SCHEDULING_PROCEDURE",
+      data: { ...data, pendingDate },
+      message: `Nome já conhecido (${data.name}), não precisa perguntar de novo. Pergunte qual procedimento o cliente deseja, ou se prefere uma avaliação.`,
+    };
   }
-  if (input.date) {
-    return provideDate(ctx, data, input.date);
+  if (pendingDate) {
+    return provideDate(ctx, data, pendingDate);
   }
   return { nextStep: "SCHEDULING_DATE", data, message: `Procedimento registrado: ${data.procedure}. Nome já conhecido (${data.name}), não precisa perguntar de novo. Peça a data desejada.` };
 };
@@ -140,10 +170,15 @@ export const procedureStep: StepDefinition = {
   ],
   handlers: {
     provide_procedure: async (ctx, input) => {
-      const data: FlowStateData = { ...ctx.conversation.state_data, procedure: input.procedure };
+      const { pendingDate, ...rest } = ctx.conversation.state_data;
+      const data: FlowStateData = { ...rest, procedure: input.procedure };
       const duration = await aiKnowledgeService.findProcedureDuration(input.procedure);
       if (duration) data.durationMinutes = duration;
       logger.info(SCOPE, "Procedimento registrado", { conversationId: ctx.conversation.id, procedure: input.procedure, durationMinutes: data.durationMinutes });
+      // Nome ja e conhecido nesta etapa (SCHEDULING_PROCEDURE so e alcancada
+      // depois do nome) - se o cliente ja tinha mencionado uma data na
+      // primeira mensagem, usa ela agora em vez de perguntar de novo.
+      if (pendingDate) return provideDate(ctx, data, pendingDate);
       return { nextStep: "SCHEDULING_DATE", data, message: `Procedimento registrado: ${input.procedure}. Peça a data desejada.` };
     },
     abandon_flow: abandonFlow,
@@ -179,13 +214,17 @@ export const nameStep: StepDefinition = {
       await userRepository.updatePatient(ctx.user.id, { name: input.name });
       logger.info(SCOPE, "Nome registrado e persistido no cadastro", { conversationId: ctx.conversation.id, userId: ctx.user.id, name: input.name });
 
-      const data: FlowStateData = { ...ctx.conversation.state_data, name: input.name };
+      const { pendingDate, ...rest } = ctx.conversation.state_data;
+      const data: FlowStateData = { ...rest, name: input.name };
       if (data.procedure) {
+        // Se o cliente ja tinha mencionado uma data na primeira mensagem
+        // (antes do nome ser conhecido), usa ela agora em vez de perguntar de novo.
+        if (pendingDate) return provideDate(ctx, data, pendingDate);
         return { nextStep: "SCHEDULING_DATE", data, message: `Nome registrado: ${input.name}. Procedimento já conhecido (${data.procedure}), não precisa perguntar de novo. Peça a data desejada.` };
       }
       return {
         nextStep: "SCHEDULING_PROCEDURE",
-        data,
+        data: { ...data, pendingDate },
         message: `Nome registrado: ${input.name}. Pergunte se já sabe qual procedimento deseja ou prefere agendar uma avaliação.`,
       };
     },
@@ -202,12 +241,14 @@ export const dateStep: StepDefinition = {
       '- "hoje", "amanha", "depois de amanha", nome de dia da semana ("segunda", "quarta-feira", "sabado", "domingo"), "proxima sexta", ' +
       '"semana que vem", "inicio/fim da semana" etc - resolva mentalmente para uma data exata usando a data atual e o dia da semana informados ' +
       "no topo destas instrucoes (dia da semana sozinho = a proxima ocorrencia desse dia a partir de hoje, mesmo que seja o mesmo dia da semana " +
-      "de hoje - nesse caso e o dia da semana que vem) e chame provide_date DIRETO com o resultado no formato YYYY-MM-DD. " +
+      "de hoje - nesse caso e o dia da semana que vem; SE a conta resultar numa data que ja passou, use a mesma ocorrencia da semana SEGUINTE - " +
+      "jamais uma data no passado) e chame provide_date DIRETO com o resultado no formato YYYY-MM-DD. " +
       'NUNCA responda coisas como "pode confirmar a data?", "digite no formato DD/MM", "não consegui entender" ou "pode repetir a data?" quando ' +
       "o cliente ja disse um dia da semana ou termo relativo claro - isso so deve ser perguntado se a mensagem realmente nao contiver nenhuma " +
-      "referencia de data. SEMPRE priorize a informacao mais recente do cliente: se voce ja sugeriu ou consultou uma data antes nesta conversa e " +
-      "o cliente agora mencionar uma data ou dia da semana DIFERENTE, esqueca completamente a data anterior (sugerida ou pedida) e chame " +
-      "provide_date com a nova data - nunca insista ou volte a oferecer a data anterior."
+      "referencia de data. Existe SEMPRE apenas UMA data ativa no agendamento: use EXCLUSIVAMENTE a referencia temporal da ULTIMA mensagem do " +
+      "cliente - ignore completamente qualquer data mencionada em mensagens anteriores desta conversa (sua ou dele), mesmo que tenha sido " +
+      "sugerida, consultada ou quase confirmada antes. Se o cliente mencionar uma data ou dia da semana DIFERENTE do que foi tratado antes, " +
+      "a data anterior deixa de existir - chame provide_date com a nova data, nunca insista ou volte a oferecer a anterior."
     );
   },
   tools: [
@@ -262,11 +303,17 @@ export const timeStep: StepDefinition = {
 
       const newData: FlowStateData = { ...data, selectedStart: start };
       logger.info(SCOPE, "Horario selecionado", { conversationId: ctx.conversation.id, start });
-      return {
-        nextStep: "SCHEDULING_CONFIRM",
-        data: newData,
-        message: `Horario selecionado: ${formatDate(start)} as ${formatTime(start)}. Repita os dados (nome, procedimento, data, horario) e peça confirmação explícita ao cliente.`,
-      };
+
+      // Resumo de confirmacao montado deterministicamente em codigo (nunca
+      // pelo modelo) a partir do state_data - e o que garante que a data/hora
+      // exibida ao cliente e SEMPRE a mesma que sera usada pra criar o evento,
+      // mesmo que o historico da conversa contenha mencoes de outras datas.
+      const settings = await settingsRepository.getClinicSettings();
+      const local = `${settings.name}${settings.address ? `, ${settings.address}` : ""}`;
+      const summary =
+        `📅 ${formatWeekdayDate(start)}\n🕒 ${formatTime(start)}\n👤 ${data.name}\n📍 ${local}\n\nPosso confirmar esse horário?`;
+
+      return { nextStep: "SCHEDULING_CONFIRM", data: newData, message: summary, finalReply: true };
     },
     provide_date: async (ctx, input) => provideDate(ctx, ctx.conversation.state_data, input.date),
     abandon_flow: abandonFlow,
@@ -346,9 +393,13 @@ export const confirmStep: StepDefinition = {
     const settings = await settingsRepository.getClinicSettings();
     return (
       `Etapa: aguardando confirmacao final. Dados: nome=${name}, procedimento=${procedure}, horario=${selectedStart ? `${formatDate(selectedStart)} as ${formatTime(selectedStart)}` : selectedStart}, ` +
-      `local=${settings.name}${settings.address ? `, ${settings.address}` : ""}. Monte um resumo nesse formato antes de pedir confirmação (adapte o texto ao redor, mas mantenha os emojis e a estrutura):\n` +
-      `📅 [dia da semana, data]\n🕒 [horario]\n👤 [nome do paciente]\n📍 [nome da clinica e endereco]\n\n` +
-      'Pergunte algo como "Posso confirmar esse horário?" logo depois. Se o cliente ja confirmou claramente, chame confirm_scheduling. Nunca chame sem confirmacao explicita.'
+      `local=${settings.name}${settings.address ? `, ${settings.address}` : ""}. Se precisar montar um resumo, use SOMENTE esses dados - ` +
+      "IGNORE completamente qualquer data/horario mencionado em mensagens anteriores desta conversa, existe sempre so UMA data/horario ativos: " +
+      "os informados aqui.\n" +
+      "Se o cliente confirmou claramente, chame confirm_scheduling. Se ele quiser mudar a DATA (ex: \"na verdade quero sexta\"), resolva a nova " +
+      "data (mesma logica de outras etapas: dia da semana relativo = proxima ocorrencia futura) e chame provide_date - isso vai pedir a escolha " +
+      "de horario de novo pra essa nova data. Se ele quiser mudar so o HORARIO mantendo a mesma data (ex: \"prefiro 15h\"), chame change_time. " +
+      "Nunca chame confirm_scheduling sem confirmacao explicita."
     );
   },
   tools: [
@@ -357,10 +408,30 @@ export const confirmStep: StepDefinition = {
       description: "Confirma e cria o agendamento (Google Calendar + Supabase). Só chamar apos confirmacao explicita do cliente.",
       input_schema: { type: "object", properties: {} },
     },
+    {
+      name: "provide_date",
+      description: "Usado quando o cliente muda de ideia sobre a DATA enquanto revisava a confirmação - registra a nova data, consulta a disponibilidade real e pede a escolha de horário de novo.",
+      input_schema: { type: "object", properties: { date: { type: "string", description: "YYYY-MM-DD" } }, required: ["date"] },
+    },
+    {
+      name: "change_time",
+      description: "Usado quando o cliente quer só trocar o horário escolhido, mantendo a mesma data já registrada.",
+      input_schema: { type: "object", properties: {} },
+    },
     ABANDON_TOOL,
   ],
   handlers: {
     confirm_scheduling: async (ctx) => confirmScheduling(ctx),
+    provide_date: async (ctx, input) => provideDate(ctx, ctx.conversation.state_data, input.date),
+    change_time: async (ctx) => {
+      const data = ctx.conversation.state_data;
+      logger.info(SCOPE, "Cliente pediu para trocar so o horario, mantendo a data", { conversationId: ctx.conversation.id, date: data.date });
+      return {
+        nextStep: "SCHEDULING_TIME",
+        data: { ...data, selectedStart: undefined },
+        message: `Horarios disponiveis em ${data.date}: ${describeSlots(data.availableSlots)}. Pergunte qual horario o cliente prefere agora.`,
+      };
+    },
     abandon_flow: abandonFlow,
   },
 };

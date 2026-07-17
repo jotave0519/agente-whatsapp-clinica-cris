@@ -244,6 +244,8 @@ export interface FlowStateData {
   name?: string;
   procedure?: string;
   durationMinutes?: number;
+  /** Data (YYYY-MM-DD) ja mencionada pelo cliente antes de nome/procedimento serem conhecidos - consumida assim que ambos forem coletados, nunca perdida. */
+  pendingDate?: string;
   date?: string;
   time?: string;
   availableSlots?: string[];

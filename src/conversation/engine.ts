@@ -137,7 +137,13 @@ export async function runTurn(user: User, conversation: Conversation, userMessag
       if (response.stop_reason === "tool_use") {
         history.push({ role: "assistant", content: response.content });
 
+        const toolUseBlocks = response.content.filter((b) => b.type === "tool_use");
         const toolResults = [];
+        // So tem efeito se essa foi a UNICA ferramenta chamada nessa rodada -
+        // com mais de uma chamada em paralelo, sempre segue o fluxo normal
+        // (uma segunda chamada ao modelo) para nao arriscar ignorar a outra.
+        let finalReplyText: string | null = null;
+
         for (const block of response.content) {
           if (block.type !== "tool_use") continue;
 
@@ -157,6 +163,7 @@ export async function runTurn(user: User, conversation: Conversation, userMessag
               workingConversation = { ...workingConversation, state: result.nextStep, state_data: result.data };
               if (result.handoffRequested) handoffRequested = true;
               output = result.message;
+              if (result.finalReply && toolUseBlocks.length === 1) finalReplyText = output;
             } catch (err) {
               logger.error(SCOPE, `Excecao ao executar ferramenta ${block.name}`, err);
               // Nunca repassar err.message (texto tecnico) para o tool_result - o
@@ -172,6 +179,23 @@ export async function runTurn(user: User, conversation: Conversation, userMessag
           }
 
           toolResults.push({ type: "tool_result", tool_use_id: block.id, content: output });
+        }
+
+        // Resposta final montada deterministicamente em codigo (ex: resumo de
+        // confirmacao de agendamento com a data/horario exatos do state_data) -
+        // pula a chamada extra ao modelo que normalmente redigiria essa mensagem,
+        // eliminando o risco dele puxar uma data antiga solta no historico da conversa.
+        if (finalReplyText !== null) {
+          logger.info(SCOPE, "runTurn: resposta final deterministica (sem nova chamada ao modelo)", {
+            conversationId: conversation.id,
+            finalText: finalReplyText,
+            handoffRequested,
+          });
+          await conversationRepository.addMessage(conversation.id, "assistant", finalReplyText);
+          if (handoffRequested) {
+            await conversationRepository.updateConversationStatus(conversation.id, "human");
+          }
+          return { reply: finalReplyText, handoffRequested };
         }
 
         history.push({ role: "user", content: toolResults });

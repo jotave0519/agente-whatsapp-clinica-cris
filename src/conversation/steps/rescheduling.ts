@@ -3,7 +3,7 @@ import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as schedulingService from "../../services/schedulingService";
 import { FlowStateData } from "../../types";
 import { logger } from "../../utils/logger";
-import { describeCandidates, describeSlots, formatDate, formatTime } from "../prompt";
+import { describeCandidates, describeSlots, formatDate, formatTime, formatWeekdayDate, todayIsoDate } from "../prompt";
 import { FlowContext, StepDefinition, StepResult, ToolHandler } from "../types";
 import { ABANDON_TOOL, CALENDAR_UNAVAILABLE_INSTRUCTION, SLOT_TAKEN_INSTRUCTION, abandonFlow, sampleSlotsAcrossDay } from "./shared";
 
@@ -82,10 +82,12 @@ export const dateStep: StepDefinition = {
   instructions: (ctx) =>
     `Etapa: falta a nova data desejada para remarcar (procedimento: ${ctx.conversation.state_data.procedure}). Se a mensagem ja contem QUALQUER ` +
     'referencia temporal ("amanha", nome de dia da semana, "proxima sexta", "semana que vem" etc), resolva mentalmente para uma data exata ' +
-    "usando a data atual e o dia da semana informados no topo destas instrucoes (dia da semana sozinho = a proxima ocorrencia a partir de hoje) " +
-    'e chame provide_date DIRETO no formato YYYY-MM-DD. NUNCA peça para confirmar/repetir a data ou digitar em DD/MM quando o cliente ja disse ' +
-    "um dia da semana ou termo relativo claro. SEMPRE priorize a informacao mais recente: se voce ja sugeriu ou consultou uma data antes e o " +
-    "cliente mencionar uma data diferente, esqueca a anterior e chame provide_date com a nova - nunca insista na data anterior. Caso a mensagem " +
+    "usando a data atual e o dia da semana informados no topo destas instrucoes (dia da semana sozinho = a proxima ocorrencia a partir de hoje; " +
+    "SE a conta resultar numa data que ja passou, use a mesma ocorrencia da semana SEGUINTE - jamais uma data no passado) e chame provide_date " +
+    'DIRETO no formato YYYY-MM-DD. NUNCA peça para confirmar/repetir a data ou digitar em DD/MM quando o cliente ja disse um dia da semana ou ' +
+    "termo relativo claro. Existe SEMPRE apenas UMA data ativa na remarcacao: use EXCLUSIVAMENTE a referencia temporal da ULTIMA mensagem do " +
+    "cliente - ignore completamente qualquer data mencionada em mensagens anteriores desta conversa, mesmo que ja tenha sido sugerida ou " +
+    "consultada antes. Se o cliente mencionar uma data diferente, a anterior deixa de existir - chame provide_date com a nova. Caso a mensagem " +
     "realmente nao contenha nenhuma data, pergunte (apenas) a nova data.",
   tools: [
     {
@@ -107,6 +109,16 @@ export const dateStep: StepDefinition = {
           message:
             `A data "${input.date}" nao esta num formato valido (YYYY-MM-DD). Resolva a data que o cliente quis dizer usando a data atual e o ` +
             "dia da semana informados no topo destas instrucoes, e chame provide_date novamente com o formato correto. Nao mencione esse erro ao cliente.",
+        };
+      }
+
+      const today = todayIsoDate();
+      if (input.date < today) {
+        logger.info(SCOPE, "Data no passado recusada sem consultar o Calendar", { conversationId: ctx.conversation.id, date: input.date, today });
+        return {
+          nextStep: "RESCHEDULING_DATE",
+          data: { ...baseData, date: undefined, availableSlots: undefined, selectedStart: undefined },
+          message: `A data ${input.date} ja passou (hoje e ${today}). Informe isso ao cliente educadamente e pergunte se ele quer remarcar para outra data. Nao chame nenhuma outra ferramenta agora.`,
         };
       }
 
@@ -145,7 +157,7 @@ export const dateStep: StepDefinition = {
         return { nextStep: "RESCHEDULING_DATE", data: baseData, message: `Nenhum horario livre em ${input.date} nem nos proximos dias. ${guidance}` };
       }
 
-      const data: FlowStateData = { ...baseData, date: input.date, availableSlots: sampleSlotsAcrossDay(slots) };
+      const data: FlowStateData = { ...baseData, date: input.date, availableSlots: sampleSlotsAcrossDay(slots), selectedStart: undefined };
       return {
         nextStep: "RESCHEDULING_TIME",
         data,
@@ -192,11 +204,14 @@ export const timeStep: StepDefinition = {
 
       const newData: FlowStateData = { ...data, selectedStart: start };
       logger.info(SCOPE, "Novo horario selecionado", { conversationId: ctx.conversation.id, start });
-      return {
-        nextStep: "RESCHEDULING_CONFIRM",
-        data: newData,
-        message: `Horario selecionado: ${formatDate(start)} as ${formatTime(start)}. Repita os dados e peça confirmação explícita.`,
-      };
+
+      // Resumo montado deterministicamente em codigo (nunca pelo modelo) - a
+      // mesma razao do fluxo de agendamento: garante que a data/hora exibida
+      // e sempre a que sera usada pra aplicar a remarcacao, mesmo que o
+      // historico da conversa contenha mencoes de outras datas.
+      const summary = `📅 ${formatWeekdayDate(start)}\n🕒 ${formatTime(start)}\n\nPosso confirmar essa remarcação?`;
+
+      return { nextStep: "RESCHEDULING_CONFIRM", data: newData, message: summary, finalReply: true };
     },
     provide_date: dateStep.handlers.provide_date,
     abandon_flow: abandonFlow,
@@ -263,8 +278,11 @@ export const confirmStep: StepDefinition = {
     const { selectedStart, procedure } = ctx.conversation.state_data;
     return (
       `Etapa: aguardando confirmacao final da remarcacao (procedimento: ${procedure}, novo horario: ${selectedStart ? `${formatDate(selectedStart)} as ${formatTime(selectedStart)}` : selectedStart}). ` +
-      "Monte um resumo curto com 📅 [data] e 🕒 [horario] antes de perguntar algo como \"Posso confirmar essa remarcação?\". " +
-      "Se ja confirmou, chame confirm_rescheduling."
+      "Se precisar montar um resumo, use SOMENTE esses dados - IGNORE completamente qualquer data/horario mencionado em mensagens anteriores " +
+      "desta conversa, existe sempre so UMA data/horario ativos: os informados aqui.\n" +
+      "Se o cliente confirmou claramente, chame confirm_rescheduling. Se ele quiser mudar a DATA, resolva a nova data (dia da semana relativo = " +
+      "proxima ocorrencia futura) e chame provide_date - isso vai pedir a escolha de horario de novo. Se quiser mudar so o HORARIO mantendo a " +
+      "mesma data, chame change_time. Nunca chame confirm_rescheduling sem confirmacao explicita."
     );
   },
   tools: [
@@ -273,10 +291,30 @@ export const confirmStep: StepDefinition = {
       description: "Confirma e aplica a remarcacao (Google Calendar + Supabase). Só chamar apos confirmacao explicita do cliente.",
       input_schema: { type: "object", properties: {} },
     },
+    {
+      name: "provide_date",
+      description: "Usado quando o cliente muda de ideia sobre a DATA enquanto revisava a confirmação - registra a nova data, consulta a disponibilidade real e pede a escolha de horário de novo.",
+      input_schema: { type: "object", properties: { date: { type: "string", description: "YYYY-MM-DD" } }, required: ["date"] },
+    },
+    {
+      name: "change_time",
+      description: "Usado quando o cliente quer só trocar o horário escolhido, mantendo a mesma data já registrada.",
+      input_schema: { type: "object", properties: {} },
+    },
     ABANDON_TOOL,
   ],
   handlers: {
     confirm_rescheduling: async (ctx) => confirmRescheduling(ctx),
+    provide_date: dateStep.handlers.provide_date,
+    change_time: async (ctx) => {
+      const data = ctx.conversation.state_data;
+      logger.info(SCOPE, "Cliente pediu para trocar so o horario, mantendo a data", { conversationId: ctx.conversation.id, date: data.date });
+      return {
+        nextStep: "RESCHEDULING_TIME",
+        data: { ...data, selectedStart: undefined },
+        message: `Horarios disponiveis em ${data.date}: ${describeSlots(data.availableSlots)}. Pergunte qual horario o cliente prefere agora.`,
+      };
+    },
     abandon_flow: abandonFlow,
   },
 };

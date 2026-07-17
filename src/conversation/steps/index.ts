@@ -71,12 +71,16 @@ export function getStep(state: ConversationFlowState): StepDefinition {
 }
 
 /**
- * Identifica a unica ferramenta de acao "primaria" de uma etapa (ignorando
- * abandon_flow e as ferramentas de troca de fluxo begin_*, que agora toda
- * etapa nao-MENU tambem expoe), usada pelo fast-path deterministico de
- * confirmacao no engine.
+ * Identifica a ferramenta de confirmacao (prefixo confirm_) de uma etapa,
+ * usada pelo fast-path deterministico de confirmacao no engine (uma resposta
+ * afirmativa clara do cliente executa a acao direto, sem chamar o modelo).
+ * Filtra especificamente por esse prefixo (nao so "unica ferramenta que nao e
+ * abandon_flow/begin_*") para que etapas de confirmacao possam ganhar outras
+ * ferramentas auxiliares (ex: provide_date/change_time em SCHEDULING_CONFIRM,
+ * para o cliente poder trocar de data/horario sem reiniciar o fluxo) sem
+ * desativar esse fast-path.
  */
 export function getPrimaryToolName(step: StepDefinition): string | null {
-  const candidates = step.tools.filter((tool) => tool.name !== "abandon_flow" && !tool.name.startsWith("begin_"));
-  return candidates.length === 1 ? candidates[0].name : null;
+  const confirmTools = step.tools.filter((tool) => tool.name.startsWith("confirm_"));
+  return confirmTools.length === 1 ? confirmTools[0].name : null;
 }

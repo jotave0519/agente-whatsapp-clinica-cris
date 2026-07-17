@@ -38,6 +38,17 @@ export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 }
 
+/** "Sexta-feira, 17/07/2026" - usado nos resumos de confirmacao montados deterministicamente em codigo (nunca pelo modelo), pra nunca puxar uma data antiga do historico da conversa. */
+export function formatWeekdayDate(iso: string): string {
+  const weekday = new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long" });
+  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${formatDate(iso)}`;
+}
+
+/** YYYY-MM-DD do dia atual em America/Sao_Paulo - usado para nunca permitir agendar/remarcar em uma data ja passada. */
+export function todayIsoDate(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
 export function describeSlots(slots?: string[]): string {
   return (slots || []).map((s, i) => `${i + 1}) ${formatTime(s)}`).join("  ");
 }

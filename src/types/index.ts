@@ -220,6 +220,84 @@ export interface PostAttendanceEvent {
   created_at: string;
 }
 
+export type CommercialOpportunityStage =
+  | "new_interest"
+  | "evaluation_scheduled"
+  | "evaluation_done"
+  | "awaiting_decision"
+  | "follow_up_active"
+  | "procedure_scheduled"
+  | "converted"
+  | "lost";
+
+export type CommercialSignalType =
+  | "price_question"
+  | "general_interest"
+  | "abandoned_scheduling"
+  | "post_evaluation_no_procedure"
+  | "will_think"
+  | "no_money"
+  | "traveling"
+  | "needs_to_talk"
+  | "come_back_later"
+  | "other";
+
+export interface CommercialOpportunity {
+  id: string;
+  user_id: string;
+  procedure_interest: string;
+  stage: CommercialOpportunityStage;
+  source_signal: CommercialSignalType;
+  signal_note: string | null;
+  schedule_id: string | null;
+  paused: boolean;
+  first_contact_at: string;
+  evaluation_at: string | null;
+  last_message_sent_at: string | null;
+  last_message_body: string | null;
+  last_response_at: string | null;
+  last_response_body: string | null;
+  next_action_at: string | null;
+  attempts_used: number;
+  estimated_value: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CommercialFollowUpMessage {
+  id: string;
+  opportunity_id: string;
+  scheduled_for: string;
+  status: ReminderStatus;
+  body: string | null;
+  attempts: number;
+  postpone_count: number;
+  last_error: string | null;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CommercialEventType =
+  | "created"
+  | "signal_detected"
+  | "stage_changed"
+  | "message_sent"
+  | "responded"
+  | "moved_manually"
+  | "schedule_cancelled_or_noshow"
+  | "converted"
+  | "lost"
+  | "escalated_human";
+
+export interface CommercialEvent {
+  id: string;
+  opportunity_id: string;
+  event_type: CommercialEventType;
+  detail: string | null;
+  created_at: string;
+}
+
 export type ConversationStatus = "ai" | "human" | "closed";
 
 export type ConversationFlowState =
@@ -238,7 +316,8 @@ export type ConversationFlowState =
   | "CLINIC_CANCELLED_OFFER"
   | "REMINDER_RESPONSE"
   | "REACTIVATION_RESPONSE"
-  | "POST_ATTENDANCE_RESPONSE";
+  | "POST_ATTENDANCE_RESPONSE"
+  | "COMMERCIAL_FOLLOWUP_RESPONSE";
 
 export interface FlowStateData {
   name?: string;
@@ -254,6 +333,8 @@ export interface FlowStateData {
   candidates?: { scheduleId: string; procedure: string; date: string; time: string }[];
   reactivationTargetId?: string;
   postAttendanceEnrollmentId?: string;
+  commercialOpportunityId?: string;
+  commercialProcedureInterest?: string;
 }
 
 export interface Conversation {
@@ -383,6 +464,10 @@ export interface ClinicSettings {
   about_text: string | null;
   context_expiry_minutes: number;
   google_review_link: string | null;
+  commercial_ai_enabled: boolean;
+  commercial_max_attempts: number;
+  commercial_nudge_interval_days: number;
+  commercial_decision_grace_days: number;
   updated_at: string;
 }
 

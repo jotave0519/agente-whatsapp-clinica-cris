@@ -4,6 +4,7 @@ import { getOrCreateUserByPhone } from "../services/userService";
 import * as conversationRepository from "../repositories/conversationRepository";
 import * as conversationEngine from "../conversation/engine";
 import * as aiKnowledgeService from "../services/aiKnowledgeService";
+import * as commercialEngine from "../services/commercialEngine";
 import * as postAttendanceEngine from "../services/postAttendanceEngine";
 import * as reactivationEngine from "../services/reactivationEngine";
 import { logger } from "../utils/logger";
@@ -66,6 +67,17 @@ export async function handleWhatsAppWebhook(req: Request, res: Response): Promis
         await postAttendanceEngine.markResponded(conversation.state_data.postAttendanceEnrollmentId);
       } catch (err) {
         logger.error(SCOPE, "Falha ao marcar resposta de pos-atendimento", err);
+      }
+    }
+
+    // Bloco isolado dos dois de cima - pausa a campanha comercial imediatamente
+    // ao chegar QUALQUER resposta, independente do que a Claude decidir fazer
+    // com o conteudo (mesmo padrao dos hooks de reativacao/pos-atendimento).
+    if (conversation.state === "COMMERCIAL_FOLLOWUP_RESPONSE" && conversation.state_data.commercialOpportunityId) {
+      try {
+        await commercialEngine.markResponded(conversation.state_data.commercialOpportunityId, text);
+      } catch (err) {
+        logger.error(SCOPE, "Falha ao marcar resposta de oportunidade comercial", err);
       }
     }
 

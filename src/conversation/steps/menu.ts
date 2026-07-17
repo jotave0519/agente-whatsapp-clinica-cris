@@ -1,7 +1,7 @@
 import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import { clinicInfoText } from "../prompt";
 import { FlowContext, StepDefinition } from "../types";
-import { HUMAN_HANDOFF_TOOL, looksLikeFullName, requestHumanHandoff } from "./shared";
+import { FLAG_OPPORTUNITY_TOOL, HUMAN_HANDOFF_TOOL, flagOpportunity, looksLikeFullName, requestHumanHandoff } from "./shared";
 import { SWITCH_HANDLERS, SWITCH_TOOLS } from "./switchFlow";
 
 export const menuStep: StepDefinition = {
@@ -20,7 +20,10 @@ export const menuStep: StepDefinition = {
       "perguntas, uma de cada vez. A intencao de agendar tem prioridade sobre explicar o procedimento ou " +
       "informar preco: se o cliente disser \"quero agendar Botox\", va direto para o agendamento. E essas ferramentas " +
       "que vao pedir o cadastro (nome) quando for realmente necessario - nao peça nome so por causa de uma pergunta solta.\n" +
-      "Depois de responder uma duvida (ex: sobre um procedimento), pode convidar naturalmente para uma avaliacao, sem forcar.\n";
+      "Depois de responder uma duvida (ex: sobre um procedimento), pode convidar naturalmente para uma avaliacao, sem forcar.\n" +
+      "Se o cliente demonstrar interesse comercial num procedimento sem pedir para agendar agora (perguntou preco, disse que " +
+      "vai pensar, que esta caro, que vai viajar, que precisa conversar com alguem, que resolve depois), responda a duvida " +
+      "normalmente e chame flag_opportunity - nunca insista nem tente convencer.\n";
 
     const hasName = looksLikeFullName(ctx.user.name);
 
@@ -37,9 +40,10 @@ export const menuStep: StepDefinition = {
 
     return text + "\n\n---\n\n" + (await clinicInfoText());
   },
-  tools: [...SWITCH_TOOLS, HUMAN_HANDOFF_TOOL],
+  tools: [...SWITCH_TOOLS, HUMAN_HANDOFF_TOOL, FLAG_OPPORTUNITY_TOOL],
   handlers: {
     ...SWITCH_HANDLERS,
     request_human_handoff: requestHumanHandoff,
+    flag_opportunity: flagOpportunity,
   },
 };

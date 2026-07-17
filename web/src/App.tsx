@@ -13,6 +13,7 @@ import { Estoque } from "./pages/Estoque";
 import { Financeiro } from "./pages/Financeiro";
 import { InteligenciaIA } from "./pages/InteligenciaIA";
 import { Login } from "./pages/Login";
+import { Oportunidades } from "./pages/Oportunidades";
 import { Pacientes } from "./pages/Pacientes";
 import { PatientDetail } from "./pages/PatientDetail";
 import { PosAtendimento } from "./pages/PosAtendimento";
@@ -47,6 +48,7 @@ export function App() {
                 <Route path="/whatsapp" element={<WhatsApp />} />
                 <Route path="/campanhas-reativacao" element={<CampanhasReativacao />} />
                 <Route path="/pos-atendimento" element={<PosAtendimento />} />
+                <Route path="/oportunidades" element={<Oportunidades />} />
                 <Route path="/inteligencia-ia" element={<InteligenciaIA />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />
               </Route>

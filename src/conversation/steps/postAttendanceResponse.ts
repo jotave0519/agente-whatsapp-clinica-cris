@@ -3,7 +3,7 @@ import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as postAttendanceEngine from "../../services/postAttendanceEngine";
 import { logger } from "../../utils/logger";
 import { StepDefinition } from "../types";
-import { ABANDON_TOOL, HUMAN_HANDOFF_TOOL, abandonFlow, requestHumanHandoff } from "./shared";
+import { ABANDON_TOOL, FLAG_OPPORTUNITY_TOOL, HUMAN_HANDOFF_TOOL, abandonFlow, flagOpportunity, requestHumanHandoff } from "./shared";
 
 const SCOPE = "conversation.postAttendanceResponse";
 
@@ -38,9 +38,11 @@ export const postAttendanceResponseStep: StepDefinition = {
     "protocolo ou IA.\n\n" +
     "Se for so uma atualizacao positiva ou neutra, responda com calor humano, sem chamar nenhuma ferramenta. Se pedir " +
     "para agendar um retorno, chame begin_scheduling. Se pedir explicitamente para nao receber mais essas mensagens de " +
-    "acompanhamento, chame stop_followup. Para qualquer outro motivo de encaminhamento a um atendente humano, chame " +
-    "request_human_handoff.",
+    "acompanhamento, chame stop_followup. Se a resposta demonstrar interesse comercial num novo procedimento sem pedir " +
+    "pra agendar agora (ex: perguntar preco, dizer que vai pensar), chame flag_opportunity. Para qualquer outro motivo de " +
+    "encaminhamento a um atendente humano, chame request_human_handoff.",
   tools: [
+    FLAG_OPPORTUNITY_TOOL,
     {
       name: "flag_concern",
       description:
@@ -61,6 +63,7 @@ export const postAttendanceResponseStep: StepDefinition = {
     ABANDON_TOOL,
   ],
   handlers: {
+    flag_opportunity: flagOpportunity,
     flag_concern: async (ctx, input) => {
       const { postAttendanceEnrollmentId } = ctx.conversation.state_data;
       const reason = String(input.reason || "").slice(0, 300);

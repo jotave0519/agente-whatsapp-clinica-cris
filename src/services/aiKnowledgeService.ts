@@ -39,6 +39,7 @@ const DEFAULT_TEMPLATES: Record<string, string> = {
   confirmation_nudge: "Olá 😊\n\nSó passando para lembrar da confirmação da sua consulta.\n\nPode responder quando puder.",
   reminder_confirm_ack: "Perfeito! 😊\n\nSua consulta está confirmada. Até breve!",
   post_attendance_stop_ack: "Sem problemas! 😊\n\nVou parar por aqui. Se precisar de qualquer coisa, é só chamar. 💛",
+  commercial_stop_ack: "Sem problemas! 😊\n\nQualquer coisa, é só chamar por aqui. 💛",
 };
 
 let cachedTemplates: Map<string, string> | null = null;
@@ -97,6 +98,20 @@ export async function findProcedureDuration(procedureName: string): Promise<numb
     return match?.duration_minutes ?? null;
   } catch (err) {
     logger.error(SCOPE, "Falha ao buscar duracao do procedimento", err);
+    return null;
+  }
+}
+
+/** Mesmo casamento de findProcedureDuration, mas devolve o valor medio (Procedure.price) - usado pela IA Comercial para estimar receita recuperada no momento da conversao. */
+export async function findProcedurePrice(procedureName: string): Promise<number | null> {
+  try {
+    const procedures = await procedureRepository.listAll();
+    const needle = procedureName.trim().toLowerCase();
+    const match = procedures.find((p) => p.active && p.name.trim().toLowerCase() === needle) ||
+      procedures.find((p) => p.active && (needle.includes(p.name.trim().toLowerCase()) || p.name.trim().toLowerCase().includes(needle)));
+    return match?.price ?? null;
+  } catch (err) {
+    logger.error(SCOPE, "Falha ao buscar valor medio do procedimento", err);
     return null;
   }
 }

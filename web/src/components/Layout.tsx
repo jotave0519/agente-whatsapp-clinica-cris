@@ -35,6 +35,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/campanhas-reativacao", label: "Campanhas de Reativação" },
       { to: "/pos-atendimento", label: "Pós-atendimento" },
+      { to: "/oportunidades", label: "Oportunidades" },
     ],
   },
   {

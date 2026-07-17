@@ -2,6 +2,7 @@ import { env } from "../config/env";
 import { createMessage } from "../integrations/anthropicClient";
 import * as conversationRepository from "../repositories/conversationRepository";
 import * as aiKnowledgeService from "../services/aiKnowledgeService";
+import * as commercialEngine from "../services/commercialEngine";
 import { Conversation, User } from "../types";
 import { logger } from "../utils/logger";
 import { isAbandon, isConfirmation } from "./confirmations";
@@ -56,6 +57,20 @@ export async function runTurn(user: User, conversation: Conversation, userMessag
       previousState: conversation.state,
       previousStateData: conversation.state_data,
     });
+
+    // Mesmo sinal capturado em abandonFlow (shared.ts), pro caso do cliente
+    // simplesmente sumir no meio de um agendamento em vez de abandonar
+    // explicitamente - so o estado SCHEDULING_* com procedimento ja conhecido
+    // conta (nunca remarcacao/cancelamento/etapas de resposta espontanea).
+    // Isolado em try/catch: uma falha aqui nunca pode impedir o reset normal.
+    if (conversation.state.startsWith("SCHEDULING_") && conversation.state_data.procedure) {
+      try {
+        await commercialEngine.flagAbandonedScheduling(user.id, conversation.state_data.procedure);
+      } catch (err) {
+        logger.error(SCOPE, "Falha ao sinalizar oportunidade comercial (expiracao durante agendamento)", err);
+      }
+    }
+
     await conversationRepository.updateConversationFlow(conversation.id, "MENU", {});
     conversation = { ...conversation, state: "MENU", state_data: {} };
   }

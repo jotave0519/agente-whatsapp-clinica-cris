@@ -11,6 +11,7 @@ const ITEMS = [
   { to: "/whatsapp", label: "WhatsApp" },
   { to: "/campanhas-reativacao", label: "Campanhas de Reativação" },
   { to: "/pos-atendimento", label: "Pós-atendimento" },
+  { to: "/oportunidades", label: "Oportunidades" },
   { to: "/inteligencia-ia", label: "Inteligência da IA" },
   { to: "/configuracoes", label: "Configurações" },
 ];

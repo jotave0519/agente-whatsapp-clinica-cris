@@ -2,6 +2,7 @@ import { ConversationFlowState } from "../../types";
 import { StepDefinition } from "../types";
 import { cancellationSteps } from "./cancellation";
 import { clinicCancellationSteps } from "./clinicCancellation";
+import { commercialFollowupResponseStep } from "./commercialFollowupResponse";
 import { menuStep } from "./menu";
 import { postAttendanceResponseStep } from "./postAttendanceResponse";
 import { reactivationResponseStep } from "./reactivationResponse";
@@ -19,6 +20,7 @@ const ALL_STEPS: StepDefinition[] = [
   reminderResponseStep,
   reactivationResponseStep,
   postAttendanceResponseStep,
+  commercialFollowupResponseStep,
 ];
 
 // Fora do MENU, toda etapa tambem ganha as ferramentas de troca de fluxo
@@ -52,6 +54,7 @@ const REQUIRED_STATES: ConversationFlowState[] = [
   "REMINDER_RESPONSE",
   "REACTIVATION_RESPONSE",
   "POST_ATTENDANCE_RESPONSE",
+  "COMMERCIAL_FOLLOWUP_RESPONSE",
 ];
 
 // Falha rapido e alto na inicializacao do processo, em vez de se comportar de

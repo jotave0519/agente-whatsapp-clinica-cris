@@ -13,6 +13,7 @@ const SECONDARY_PATHS = [
   "/whatsapp",
   "/campanhas-reativacao",
   "/pos-atendimento",
+  "/oportunidades",
   "/inteligencia-ia",
   "/configuracoes",
 ];

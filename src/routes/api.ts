@@ -1,5 +1,12 @@
 import { Router } from "express";
 import { createException, deleteException, listExceptions } from "../controllers/api/businessHourExceptionController";
+import {
+  getOpportunity,
+  listEvents as listCommercialEvents,
+  listOpportunities,
+  moveStage,
+  pauseResume,
+} from "../controllers/api/commercialController";
 import { getConversation, listConversations, sendMessage, updatePriority, updateStatus } from "../controllers/api/conversationController";
 import { getDashboard } from "../controllers/api/dashboardController";
 import { createFaq, deleteFaq, listFaq, updateFaq } from "../controllers/api/faqController";
@@ -124,3 +131,9 @@ apiRouter.post("/post-attendance-flows", requireAdmin, createPostAttendanceFlow)
 apiRouter.patch("/post-attendance-flows/:id", requireAdmin, updatePostAttendanceFlow);
 apiRouter.delete("/post-attendance-flows/:id", requireAdmin, deletePostAttendanceFlow);
 apiRouter.get("/post-attendance-enrollments", requireAdmin, listPostAttendanceEnrollments);
+
+apiRouter.get("/commercial-opportunities", requireAdmin, listOpportunities);
+apiRouter.get("/commercial-opportunities/:id", requireAdmin, getOpportunity);
+apiRouter.patch("/commercial-opportunities/:id/stage", requireAdmin, moveStage);
+apiRouter.patch("/commercial-opportunities/:id/pause", requireAdmin, pauseResume);
+apiRouter.get("/commercial-events", requireAdmin, listCommercialEvents);

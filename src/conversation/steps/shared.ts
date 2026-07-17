@@ -1,4 +1,5 @@
 import * as aiKnowledgeService from "../../services/aiKnowledgeService";
+import * as commercialEngine from "../../services/commercialEngine";
 import { logger } from "../../utils/logger";
 import { sampleSlotsAcrossDay } from "../../utils/slots";
 import { ToolHandler, ToolSchema } from "../types";
@@ -36,6 +37,52 @@ export const requestHumanHandoff: ToolHandler = async (ctx, input) => {
   };
 };
 
+export const FLAG_OPPORTUNITY_TOOL: ToolSchema = {
+  name: "flag_opportunity",
+  description:
+    "Registre quando o cliente demonstrar interesse comercial num procedimento sem confirmar agendamento AGORA: perguntou preco, " +
+    "fez avaliacao e nao voltou, ou deu um sinal de hesitacao/adiamento (\"vou pensar\", \"ta caro\", \"vou viajar\", \"preciso " +
+    "conversar com alguem\", \"depois eu vejo\"). NAO chame para agendamentos que ja vao acontecer (isso e begin_scheduling) nem " +
+    "para reclamacoes/duvidas sem relacao com decidir por um procedimento.",
+  input_schema: {
+    type: "object",
+    properties: {
+      procedure: { type: "string", description: "Procedimento de interesse" },
+      signal: {
+        type: "string",
+        enum: ["price_question", "general_interest", "will_think", "no_money", "traveling", "needs_to_talk", "come_back_later", "other"],
+      },
+      note: {
+        type: "string",
+        description: "Cite brevemente, com as palavras do proprio cliente quando possivel, o que ele disse - isso sera usado depois para compor mensagens de acompanhamento contextuais, nunca genericas.",
+      },
+    },
+    required: ["procedure", "signal"],
+  },
+};
+
+/**
+ * Handler somente-efeito-colateral: NUNCA muda nextStep/data, sempre retorna
+ * o estado/state_data atuais inalterados. E o que permite essa tool coexistir
+ * com qualquer fluxo em andamento (ex: chamada junto de outra tool no mesmo
+ * turno) sem apagar dados ja coletados - diferente de flag_concern/stop_followup
+ * do pos-atendimento, que podem resetar pra MENU porque la sao a UNICA tool
+ * possivel na etapa.
+ */
+export const flagOpportunity: ToolHandler = async (ctx, input) => {
+  logger.info("conversation.shared", "Sinal comercial detectado", {
+    conversationId: ctx.conversation.id,
+    procedure: input.procedure,
+    signal: input.signal,
+  });
+  try {
+    await commercialEngine.flagSignal(ctx.user.id, String(input.procedure || ""), input.signal, input.note ? String(input.note).slice(0, 300) : null);
+  } catch (err) {
+    logger.error("conversation.shared", "Falha ao registrar oportunidade comercial", err);
+  }
+  return { nextStep: ctx.conversation.state, data: ctx.conversation.state_data, message: JSON.stringify({ status: "ok" }) };
+};
+
 /**
  * Checagem deterministica de nome completo (>=2 palavras), usada tanto para
  * validar o que o cliente digita quanto para decidir se o nome ja cadastrado
@@ -51,6 +98,20 @@ export const abandonFlow: ToolHandler = async (ctx) => {
     conversationId: ctx.conversation.id,
     estadoAnterior: ctx.conversation.state,
   });
+
+  // Sinaliza pra IA Comercial quando um AGENDAMENTO (nunca remarcacao/cancelamento/
+  // etapa de resposta espontanea) e abandonado com um procedimento ja conhecido -
+  // captura ctx.conversation.state/state_data ANTES do reset abaixo, unico
+  // momento em que essa informacao existe. Isolado em try/catch: uma falha aqui
+  // nunca pode impedir o abandono normal do fluxo.
+  if (ctx.conversation.state.startsWith("SCHEDULING_") && ctx.conversation.state_data.procedure) {
+    try {
+      await commercialEngine.flagAbandonedScheduling(ctx.user.id, ctx.conversation.state_data.procedure);
+    } catch (err) {
+      logger.error("conversation.shared", "Falha ao sinalizar oportunidade comercial (abandono de agendamento)", err);
+    }
+  }
+
   const message = await aiKnowledgeService.getMessageTemplate("abandon_flow");
   return { nextStep: "MENU", data: {}, message };
 };

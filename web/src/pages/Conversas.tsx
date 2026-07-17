@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 import { ArrowLeftIcon } from "../components/icons";
@@ -22,8 +23,9 @@ interface MessageItem {
 
 export function Conversas() {
   const isMobile = useIsMobile();
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState<ConversationSummary[] | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(searchParams.get("open"));
   const [conversation, setConversation] = useState<ConversationSummary | null>(null);
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [input, setInput] = useState("");

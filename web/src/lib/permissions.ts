@@ -18,6 +18,7 @@ const PAGE_ROLES: Record<string, StaffRole[]> = {
   "/whatsapp": ["admin", "recepcionista"],
   "/campanhas-reativacao": ["admin"],
   "/pos-atendimento": ["admin"],
+  "/oportunidades": ["admin"],
   "/inteligencia-ia": ["admin"],
 };
 

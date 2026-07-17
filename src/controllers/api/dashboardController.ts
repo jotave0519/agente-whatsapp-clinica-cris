@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import * as commercialOpportunityRepository from "../../repositories/commercialOpportunityRepository";
 import * as conversationRepository from "../../repositories/conversationRepository";
 import * as postAttendanceEventRepository from "../../repositories/postAttendanceEventRepository";
 import * as postAttendanceMessageRepository from "../../repositories/postAttendanceMessageRepository";
@@ -74,6 +75,11 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
       postAttendancePatientsToday,
       postAttendanceMessagesToday,
       postAttendanceEvents30d,
+      commercialOpen,
+      commercialInFollowUp,
+      commercialConverted30d,
+      commercialLost30d,
+      commercialRecoveredRevenue30d,
     ] = await Promise.all([
       userRepository.count(),
       scheduleRepository.findSchedulesByDate(today),
@@ -95,6 +101,11 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
         ["message_sent", "responded", "alert_raised", "alert_raised_failsafe", "review_requested"],
         thirtyDaysAgo
       ),
+      commercialOpportunityRepository.countOpen(),
+      commercialOpportunityRepository.countInFollowUp(),
+      commercialOpportunityRepository.countConvertedSince(thirtyDaysAgo),
+      commercialOpportunityRepository.countLostSince(thirtyDaysAgo),
+      commercialOpportunityRepository.sumEstimatedValueConvertedSince(thirtyDaysAgo),
     ]);
 
     const revenueThisMonth = monthTransactions
@@ -145,6 +156,13 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
         casesEscalated: postAttendanceEscalated30d,
         reviewsRequested: reviewRequestedEnrollmentIds.size,
         reviewsReceivedEstimate: postAttendanceReviewsReceivedEstimate,
+      },
+      commercial: {
+        openOpportunities: commercialOpen,
+        inFollowUp: commercialInFollowUp,
+        conversions: commercialConverted30d,
+        recoveredRevenue: commercialRecoveredRevenue30d,
+        conversionRate: commercialConverted30d + commercialLost30d > 0 ? commercialConverted30d / (commercialConverted30d + commercialLost30d) : 0,
       },
     });
   } catch (err) {

@@ -33,6 +33,10 @@ export async function updateClinicSettings(
     about_text: string | null;
     context_expiry_minutes: number;
     google_review_link: string | null;
+    commercial_ai_enabled: boolean;
+    commercial_max_attempts: number;
+    commercial_nudge_interval_days: number;
+    commercial_decision_grace_days: number;
   }>
 
 ): Promise<ClinicSettings> {

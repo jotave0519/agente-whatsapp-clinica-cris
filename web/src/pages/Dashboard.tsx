@@ -37,6 +37,13 @@ interface DashboardData {
     reviewsRequested: number;
     reviewsReceivedEstimate: number;
   };
+  commercial: {
+    openOpportunities: number;
+    inFollowUp: number;
+    conversions: number;
+    recoveredRevenue: number;
+    conversionRate: number;
+  };
 }
 
 interface FinanceOverview {
@@ -253,6 +260,40 @@ export function Dashboard() {
           <div className="card">
             <div className="kpi-value">{data.postAttendance.reviewsReceivedEstimate}</div>
             <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Avaliações recebidas (estimativa)</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <div>
+            <div style={{ fontSize: 14.5, fontWeight: 600 }}>Oportunidades comerciais</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-faint)", marginTop: 2 }}>IA Comercial — recuperação de avaliações e agendamentos abandonados</div>
+          </div>
+          <button style={{ fontSize: 12.5, fontWeight: 500, color: "var(--accent)" }} onClick={() => navigate("/oportunidades")}>
+            Ver Kanban
+          </button>
+        </div>
+        <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
+          <div className="card">
+            <div className="kpi-value">{data.commercial.openOpportunities}</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Oportunidades abertas</div>
+          </div>
+          <div className="card">
+            <div className="kpi-value">{data.commercial.inFollowUp}</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Em follow-up</div>
+          </div>
+          <div className="card">
+            <div className="kpi-value">{data.commercial.conversions}</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Conversões (30 dias)</div>
+          </div>
+          <div className="card">
+            <div className="kpi-value">{(data.commercial.conversionRate * 100).toFixed(0)}%</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Taxa de conversão</div>
+          </div>
+          <div className="card">
+            <div className="kpi-value">{formatMoneyShort(data.commercial.recoveredRevenue)}</div>
+            <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Receita recuperada (estimativa)</div>
           </div>
         </div>
       </div>

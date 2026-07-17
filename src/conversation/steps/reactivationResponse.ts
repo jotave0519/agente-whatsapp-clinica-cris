@@ -2,7 +2,7 @@ import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as reactivationEngine from "../../services/reactivationEngine";
 import { logger } from "../../utils/logger";
 import { StepDefinition } from "../types";
-import { ABANDON_TOOL, HUMAN_HANDOFF_TOOL, abandonFlow, requestHumanHandoff } from "./shared";
+import { ABANDON_TOOL, FLAG_OPPORTUNITY_TOOL, HUMAN_HANDOFF_TOOL, abandonFlow, flagOpportunity, requestHumanHandoff } from "./shared";
 
 const SCOPE = "conversation.reactivationResponse";
 
@@ -31,13 +31,16 @@ export const reactivationResponseStep: StepDefinition = {
     "begin_scheduling imediatamente; se for só uma pergunta ou cumprimento, responda normalmente em texto livre usando " +
     "as informações da clínica, sem chamar nenhuma ferramenta - NÃO insista em perguntar sobre a campanha ou mencionar " +
     'que essa mensagem foi uma reativação. Se o cliente disser explicitamente que não tem interesse (ex: "não tenho ' +
-    'interesse", "não quero", "agora não", "não precisa"), chame decline_reactivation. Nunca insista depois de uma recusa.',
+    'interesse", "não quero", "agora não", "não precisa"), chame decline_reactivation. Nunca insista depois de uma recusa. ' +
+    "Se em vez de recusar o cliente demonstrar interesse noutro procedimento sem confirmar agendar agora (perguntou preco, " +
+    "disse que vai pensar), chame flag_opportunity.",
   tools: [
     {
       name: "decline_reactivation",
       description: "Cliente disse explicitamente que nao tem interesse em retomar o atendimento agora.",
       input_schema: { type: "object", properties: {} },
     },
+    FLAG_OPPORTUNITY_TOOL,
     HUMAN_HANDOFF_TOOL,
     ABANDON_TOOL,
   ],
@@ -49,6 +52,7 @@ export const reactivationResponseStep: StepDefinition = {
       const message = await aiKnowledgeService.getMessageTemplate("reactivation_decline_ack");
       return { nextStep: "MENU", data: {}, message };
     },
+    flag_opportunity: flagOpportunity,
     request_human_handoff: requestHumanHandoff,
     abandon_flow: abandonFlow,
   },

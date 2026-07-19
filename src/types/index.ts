@@ -474,10 +474,13 @@ export interface ClinicSettings {
 export interface BusinessHourRow {
   weekday: number;
   enabled: boolean;
-  open_time: string;
-  close_time: string;
-  lunch_start: string | null;
-  lunch_end: string | null;
+}
+
+export interface BusinessHourSlot {
+  id: string;
+  weekday: number;
+  time: string; // "HH:MM:SS" (coluna `time` do Postgres)
+  created_at: string;
 }
 
 export type BusinessHourExceptionType = "holiday" | "block" | "special";
@@ -487,8 +490,8 @@ export interface BusinessHourException {
   date: string;
   type: BusinessHourExceptionType;
   closed: boolean;
-  open_time: string | null;
-  close_time: string | null;
+  /** Horarios customizados pra esse dia especifico (ex: feriado com expediente reduzido) - null/vazio = sem personalizacao, usa os slots normais da semana quando nao estiver fechado. */
+  slots: string[] | null;
   note: string | null;
   created_at: string;
   updated_at: string;

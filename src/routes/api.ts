@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { createException, deleteException, listExceptions } from "../controllers/api/businessHourExceptionController";
+import { createSlot, deleteSlot } from "../controllers/api/businessHourSlotController";
 import {
   getOpportunity,
   listEvents as listCommercialEvents,
@@ -114,6 +115,8 @@ apiRouter.patch("/message-templates/:key", requireAdmin, updateMessageTemplate);
 apiRouter.get("/business-hours/exceptions", requireAdmin, listExceptions);
 apiRouter.post("/business-hours/exceptions", requireAdmin, createException);
 apiRouter.delete("/business-hours/exceptions/:id", requireAdmin, deleteException);
+apiRouter.post("/business-hours/slots", requireAdmin, createSlot);
+apiRouter.delete("/business-hours/slots/:id", requireAdmin, deleteSlot);
 
 apiRouter.get("/whatsapp/status", staffOrAbove, getStatus);
 apiRouter.get("/whatsapp/qrcode", staffOrAbove, getQrCode);

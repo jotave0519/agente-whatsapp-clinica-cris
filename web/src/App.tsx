@@ -11,6 +11,7 @@ import { Conversas } from "./pages/Conversas";
 import { Dashboard } from "./pages/Dashboard";
 import { Estoque } from "./pages/Estoque";
 import { Financeiro } from "./pages/Financeiro";
+import { HorariosClinica } from "./pages/HorariosClinica";
 import { InteligenciaIA } from "./pages/InteligenciaIA";
 import { Login } from "./pages/Login";
 import { Oportunidades } from "./pages/Oportunidades";
@@ -45,6 +46,7 @@ export function App() {
                 <Route path="/financeiro" element={<Financeiro />} />
                 <Route path="/estoque" element={<Estoque />} />
                 <Route path="/usuarios" element={<Usuarios />} />
+                <Route path="/horarios-clinica" element={<HorariosClinica />} />
                 <Route path="/whatsapp" element={<WhatsApp />} />
                 <Route path="/campanhas-reativacao" element={<CampanhasReativacao />} />
                 <Route path="/pos-atendimento" element={<PosAtendimento />} />

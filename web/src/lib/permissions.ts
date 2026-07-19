@@ -15,6 +15,7 @@ const PAGE_ROLES: Record<string, StaffRole[]> = {
   "/financeiro": ["admin"],
   "/estoque": ["admin"],
   "/usuarios": ["admin"],
+  "/horarios-clinica": ["admin"],
   "/whatsapp": ["admin", "recepcionista"],
   "/campanhas-reativacao": ["admin"],
   "/pos-atendimento": ["admin"],

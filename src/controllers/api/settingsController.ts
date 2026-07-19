@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import * as businessHourSlotRepository from "../../repositories/businessHourSlotRepository";
 import * as settingsRepository from "../../repositories/settingsRepository";
 import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as businessHoursService from "../../services/businessHoursService";
@@ -8,8 +9,12 @@ const SCOPE = "api.settings";
 
 export async function getSettings(_req: Request, res: Response): Promise<void> {
   try {
-    const [clinic, businessHours] = await Promise.all([settingsRepository.getClinicSettings(), settingsRepository.getBusinessHours()]);
-    res.json({ clinic, businessHours });
+    const [clinic, businessHours, businessHourSlots] = await Promise.all([
+      settingsRepository.getClinicSettings(),
+      settingsRepository.getBusinessHours(),
+      businessHourSlotRepository.listAll(),
+    ]);
+    res.json({ clinic, businessHours, businessHourSlots });
   } catch (err) {
     logger.error(SCOPE, "Erro ao carregar configuracoes", err);
     res.status(500).json({ error: "Erro ao carregar configuracoes." });

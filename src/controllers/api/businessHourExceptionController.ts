@@ -17,14 +17,14 @@ export async function listExceptions(_req: Request, res: Response): Promise<void
 
 export async function createException(req: Request, res: Response): Promise<void> {
   try {
-    const { date, type, closed, open_time, close_time, note } = req.body;
+    const { date, type, closed, slots, note } = req.body;
     if (!date || !type) {
       res.status(400).json({ error: "date e type sao obrigatorios." });
       return;
     }
 
     logger.info(SCOPE, "Criando excecao de horario via CRM", { staffId: req.staff?.id, date, type });
-    const item = await businessHourExceptionRepository.create({ date, type, closed, open_time, close_time, note });
+    const item = await businessHourExceptionRepository.create({ date, type, closed, slots, note });
     businessHoursService.invalidateCache();
     res.status(201).json(item);
   } catch (err) {

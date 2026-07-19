@@ -8,6 +8,7 @@ const ITEMS = [
   { to: "/financeiro", label: "Financeiro" },
   { to: "/estoque", label: "Estoque" },
   { to: "/usuarios", label: "Usuários" },
+  { to: "/horarios-clinica", label: "Horários da Clínica" },
   { to: "/whatsapp", label: "WhatsApp" },
   { to: "/campanhas-reativacao", label: "Campanhas de Reativação" },
   { to: "/pos-atendimento", label: "Pós-atendimento" },

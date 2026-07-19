@@ -62,24 +62,31 @@ function addDaysIso(dateIso: string, days: number): string {
   return spDateIso(new Date(ms));
 }
 
-/** Empurra pro proximo horario de funcionamento real da clinica (nunca madrugada, nunca fechado/almoco) - reaproveita businessHoursService, sem campos de config dedicados. */
+/**
+ * Empurra pro proximo horario de funcionamento real da clinica (nunca
+ * madrugada, nunca dia fechado) - reaproveita businessHoursService, sem
+ * campos de config dedicados. Nao existe mais um intervalo continuo com
+ * almoco pra alinhar: clampa entre o primeiro e o ultimo horario CADASTRADO
+ * do dia como envelope (sem tentar acertar um slot exato) - e so o horario de
+ * envio de uma mensagem de WhatsApp de follow-up comercial, nunca uma reserva
+ * real, entao nao precisa coincidir com um slot de atendimento.
+ */
 async function clampToBusinessHours(date: Date): Promise<Date> {
   let cursor = date;
   for (let i = 0; i < 21; i += 1) {
     const dateIso = spDateIso(cursor);
-    const hours = await businessHoursService.getDayHours(dateIso);
-    if (!hours.enabled) {
+    const { enabled, slots } = await businessHoursService.getDaySlots(dateIso);
+    if (!enabled || slots.length === 0) {
       cursor = spDateTime(addDaysIso(dateIso, 1), "08:00");
       continue;
     }
+    const open = slots[0];
+    const close = slots[slots.length - 1];
     const hhmm = spTimeHHMM(cursor);
-    if (hhmm < hours.open) return spDateTime(dateIso, hours.open);
-    if (hhmm >= hours.close) {
+    if (hhmm < open) return spDateTime(dateIso, open);
+    if (hhmm > close) {
       cursor = spDateTime(addDaysIso(dateIso, 1), "08:00");
       continue;
-    }
-    if (hours.lunchStart && hours.lunchEnd && hhmm >= hours.lunchStart && hhmm < hours.lunchEnd) {
-      return spDateTime(dateIso, hours.lunchEnd);
     }
     return cursor;
   }

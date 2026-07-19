@@ -17,8 +17,7 @@ export async function create(params: {
   date: string;
   type: "holiday" | "block" | "special";
   closed?: boolean;
-  open_time?: string | null;
-  close_time?: string | null;
+  slots?: string[] | null;
   note?: string | null;
 }): Promise<BusinessHourException> {
   const { data, error } = await getSupabaseClient()

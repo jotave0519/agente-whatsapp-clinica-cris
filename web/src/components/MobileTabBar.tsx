@@ -10,6 +10,7 @@ const SECONDARY_PATHS = [
   "/financeiro",
   "/estoque",
   "/usuarios",
+  "/horarios-clinica",
   "/whatsapp",
   "/campanhas-reativacao",
   "/pos-atendimento",

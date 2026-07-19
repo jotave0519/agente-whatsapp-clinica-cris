@@ -170,48 +170,53 @@ function eventsPath(suffix = ""): string {
   return `/calendars/${encodeURIComponent(env.googleCalendarId)}/events${suffix}`;
 }
 
-async function dayBounds(date: string): Promise<{ start: Date; end: Date; enabled: boolean; lunch: { start: Date; end: Date } | null }> {
-  const hours = await businessHoursService.getDayHours(date);
-  const start = new Date(`${date}T${hours.open}:00-03:00`);
-  const end = new Date(`${date}T${hours.close}:00-03:00`);
-  const lunch =
-    hours.lunchStart && hours.lunchEnd
-      ? { start: new Date(`${date}T${hours.lunchStart}:00-03:00`), end: new Date(`${date}T${hours.lunchEnd}:00-03:00`) }
-      : null;
-  return { start, end, enabled: hours.enabled, lunch };
+/** Intervalo de calendario do dia INTEIRO (00:00-23:59) - nao depende mais de horario de funcionamento, ja que os slots agora podem existir em qualquer horario cadastrado. */
+function fullDayBounds(date: string): { start: Date; end: Date } {
+  return { start: new Date(`${date}T00:00:00-03:00`), end: new Date(`${date}T23:59:59-03:00`) };
 }
 
+function todayIsoDate(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+async function fetchBusyBlocksForDay(date: string): Promise<{ start: Date; end: Date }[]> {
+  const { start, end } = fullDayBounds(date);
+  const data = await calendarRequest<{ items?: CalendarEvent[] }>("get", eventsPath(), {
+    params: { timeMin: start.toISOString(), timeMax: end.toISOString(), singleEvents: true, orderBy: "startTime" },
+  });
+  return (data.items || [])
+    .filter((e) => e.start?.dateTime && e.end?.dateTime)
+    .map((e) => ({ start: new Date(e.start!.dateTime!), end: new Date(e.end!.dateTime!) }));
+}
+
+/**
+ * Os horarios candidatos vem EXCLUSIVAMENTE da lista cadastrada em
+ * business_hour_slots (via businessHoursService.getDaySlots) - nunca gerados
+ * automaticamente. A duracao do procedimento so entra na checagem de conflito
+ * (esse horario especifico colide com algum evento real do Calendar?), nunca
+ * pra criar novos candidatos. Nunca oferece um horario de hoje que ja passou
+ * (ou que passa nos proximos 20 min, sem tempo habil de confirmar).
+ */
 export async function checkAvailability(
   date: string,
   durationMinutes: number = DEFAULT_SLOT_MINUTES
 ): Promise<string[]> {
-  const { start, end, enabled, lunch } = await dayBounds(date);
+  const { enabled, slots } = await businessHoursService.getDaySlots(date);
   if (!enabled) return [];
 
-  const data = await calendarRequest<{ items?: CalendarEvent[] }>("get", eventsPath(), {
-    params: { timeMin: start.toISOString(), timeMax: end.toISOString(), singleEvents: true, orderBy: "startTime" },
-  });
+  const busy = await fetchBusyBlocksForDay(date);
+  const isToday = date === todayIsoDate();
+  const minStartMs = Date.now() + 20 * 60_000;
 
-  const busy = (data.items || [])
-    .filter((e) => e.start?.dateTime && e.end?.dateTime)
-    .map((e) => ({ start: new Date(e.start!.dateTime!), end: new Date(e.end!.dateTime!) }));
-
-  // Intervalo de almoco (se configurado) entra como um bloco "ocupado"
-  // sintetico, junto com os eventos reais do Calendar.
-  if (lunch) busy.push(lunch);
-
-  const slots: string[] = [];
-  const slotMs = durationMinutes * 60 * 1000;
-  let cursor = start.getTime();
-
-  while (cursor + slotMs <= end.getTime()) {
-    const cursorEnd = cursor + slotMs;
-    const overlaps = busy.some((b) => cursor < b.end.getTime() && cursorEnd > b.start.getTime());
-    if (!overlaps) slots.push(new Date(cursor).toISOString());
-    cursor += slotMs;
+  const results: string[] = [];
+  for (const slotTime of slots) {
+    const start = new Date(`${date}T${slotTime}:00-03:00`);
+    if (isToday && start.getTime() < minStartMs) continue;
+    const end = new Date(start.getTime() + durationMinutes * 60_000);
+    const overlaps = busy.some((b) => start.getTime() < b.end.getTime() && end.getTime() > b.start.getTime());
+    if (!overlaps) results.push(start.toISOString());
   }
-
-  return slots;
+  return results;
 }
 
 export async function createEvent(params: {
@@ -272,7 +277,7 @@ export async function updateEventDetails(eventId: string, fields: { summary?: st
 }
 
 export async function listEvents(date: string): Promise<CalendarEvent[]> {
-  const { start, end } = await dayBounds(date);
+  const { start, end } = fullDayBounds(date);
   const data = await calendarRequest<{ items?: CalendarEvent[] }>("get", eventsPath(), {
     params: { timeMin: start.toISOString(), timeMax: end.toISOString(), singleEvents: true, orderBy: "startTime" },
   });

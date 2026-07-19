@@ -24,6 +24,7 @@ const NAV_GROUPS = [
       { to: "/financeiro", label: "Financeiro" },
       { to: "/estoque", label: "Estoque" },
       { to: "/usuarios", label: "Usuários" },
+      { to: "/horarios-clinica", label: "Horários da Clínica" },
     ],
   },
   {

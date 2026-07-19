@@ -320,6 +320,84 @@ a {
   box-shadow: var(--shadow-card);
 }
 
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 27px;
+  flex: 0 0 46px;
+  cursor: pointer;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-track {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+
+.switch-track::before {
+  content: "";
+  position: absolute;
+  width: 21px;
+  height: 21px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.switch input:checked + .switch-track {
+  background: var(--accent);
+}
+
+.switch input:checked + .switch-track::before {
+  transform: translateX(19px);
+}
+
+.switch input:disabled + .switch-track {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.toggle-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+}
+
+.toggle-card + .toggle-card {
+  border-top: 1px solid var(--border-soft);
+}
+
+.toggle-card-title {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.toggle-card-desc {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.toggle-card-adjust {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-dark);
+  white-space: nowrap;
+}
+
 .kpi-label {
   font-size: 12.5px;
   color: var(--text-muted);

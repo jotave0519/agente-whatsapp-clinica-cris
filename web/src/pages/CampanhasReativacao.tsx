@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { BackHeader } from "../components/BackHeader";
 import { FormSheet } from "../components/FormSheet";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
@@ -146,8 +147,6 @@ export function CampanhasReativacao() {
   const [saving, setSaving] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [statsFor, setStatsFor] = useState<CampaignStats | null>(null);
-  const [reactivationEnabled, setReactivationEnabled] = useState<boolean | null>(null);
-  const [savingToggle, setSavingToggle] = useState(false);
 
   function load() {
     api
@@ -158,24 +157,7 @@ export function CampanhasReativacao() {
 
   useEffect(() => {
     load();
-    api
-      .get<{ clinic: { reactivation_enabled: boolean } }>("/settings")
-      .then((r) => setReactivationEnabled(r.clinic.reactivation_enabled))
-      .catch(() => {});
   }, []);
-
-  async function toggleReactivationEnabled() {
-    if (reactivationEnabled === null) return;
-    setSavingToggle(true);
-    try {
-      await api.patch("/settings", { clinic: { reactivation_enabled: !reactivationEnabled } });
-      setReactivationEnabled(!reactivationEnabled);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setSavingToggle(false);
-    }
-  }
 
   function startCreate() {
     setEditingId(null);
@@ -479,24 +461,13 @@ export function CampanhasReativacao() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 22, flexWrap: "wrap" }}>
-        <div>
-          <h1 className="page-title">Campanhas de Reativação</h1>
-          <p className="page-subtitle">IA que retoma contato com pacientes inativos de forma natural e contextualizada</p>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          {reactivationEnabled !== null && (
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-              <input type="checkbox" checked={reactivationEnabled} disabled={savingToggle} onChange={toggleReactivationEnabled} />
-              Reativação automática ativa
-            </label>
-          )}
-          <button
-            onClick={startCreate}
-            style={{ display: "flex", alignItems: "center", gap: 7, height: 38, padding: "0 15px", borderRadius: 11, background: "var(--text)", color: "var(--bg)", fontSize: 13.5, fontWeight: 500 }}
-          >
-            + Nova campanha
-          </button>
-        </div>
+        <BackHeader title="Recuperar pacientes que sumiram" subtitle="Retoma contato com pacientes inativos de forma natural e contextualizada" backTo="/secretaria-virtual" />
+        <button
+          onClick={startCreate}
+          style={{ display: "flex", alignItems: "center", gap: 7, height: 38, padding: "0 15px", borderRadius: 11, background: "var(--text)", color: "var(--bg)", fontSize: 13.5, fontWeight: 500 }}
+        >
+          + Nova campanha
+        </button>
       </div>
 
       {error && <div className="error-text">{error}</div>}

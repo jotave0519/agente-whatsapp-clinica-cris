@@ -16,11 +16,8 @@ const PAGE_ROLES: Record<string, StaffRole[]> = {
   "/estoque": ["admin"],
   "/usuarios": ["admin"],
   "/horarios-clinica": ["admin"],
-  "/whatsapp": ["admin", "recepcionista"],
-  "/campanhas-reativacao": ["admin"],
-  "/pos-atendimento": ["admin"],
   "/oportunidades": ["admin"],
-  "/inteligencia-ia": ["admin"],
+  "/secretaria-virtual": ["admin"],
 };
 
 export function canAccessPage(role: StaffRole | undefined, path: string): boolean {

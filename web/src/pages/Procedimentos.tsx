@@ -26,7 +26,7 @@ const EMPTY_FORM = {
   active: true,
 };
 
-export function Procedimentos({ embedded = false }: { embedded?: boolean } = {}) {
+export function Procedimentos() {
   const isMobile = useIsMobile();
   const [items, setItems] = useState<ProcedureItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -174,16 +174,10 @@ export function Procedimentos({ embedded = false }: { embedded?: boolean } = {})
   return (
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 22 }}>
-        {embedded ? (
-          <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: 0 }}>
-            Usados pela IA para conhecer duração e orientações de cada procedimento (sem valores).
-          </p>
-        ) : (
-          <div>
-            <h1 className="page-title">Procedimentos</h1>
-            <p className="page-subtitle">Catálogo de serviços e protocolos da clínica</p>
-          </div>
-        )}
+        <div>
+          <h1 className="page-title">Procedimentos</h1>
+          <p className="page-subtitle">Catálogo de serviços e protocolos da clínica</p>
+        </div>
         <button
           onClick={startCreate}
           style={{ display: "flex", alignItems: "center", gap: 7, height: 38, padding: "0 15px", borderRadius: 11, background: "var(--text)", color: "var(--bg)", fontSize: 13.5, fontWeight: 500, flexShrink: 0 }}

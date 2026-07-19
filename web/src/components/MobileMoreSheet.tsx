@@ -9,11 +9,8 @@ const ITEMS = [
   { to: "/estoque", label: "Estoque" },
   { to: "/usuarios", label: "Usuários" },
   { to: "/horarios-clinica", label: "Horários da Clínica" },
-  { to: "/whatsapp", label: "WhatsApp" },
-  { to: "/campanhas-reativacao", label: "Campanhas de Reativação" },
-  { to: "/pos-atendimento", label: "Pós-atendimento" },
   { to: "/oportunidades", label: "Oportunidades" },
-  { to: "/inteligencia-ia", label: "Inteligência da IA" },
+  { to: "/secretaria-virtual", label: "Secretária Virtual" },
   { to: "/configuracoes", label: "Configurações" },
 ];
 

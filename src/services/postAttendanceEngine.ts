@@ -90,6 +90,9 @@ async function biasHourIfLearned(date: Date, userId: string): Promise<Date> {
 
 /** Matricula um agendamento no fluxo aplicavel (por procedimento, ou o generico 'all') - idempotente via unique(schedule_id). */
 export async function enrollSchedule(schedule: Schedule, triggerSource: PostAttendanceTriggerSource): Promise<void> {
+  const settings = await settingsRepository.getClinicSettings();
+  if (!settings.post_attendance_enabled) return;
+
   const flow = await postAttendanceRepository.findFlowByProcedure(schedule.procedure);
   if (!flow) return; // nenhum fluxo configurado pra esse procedimento (nem um 'all' generico) - nada a fazer
 

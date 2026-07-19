@@ -28,20 +28,11 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: "Integrações",
-    items: [{ to: "/whatsapp", label: "WhatsApp" }],
-  },
-  {
-    label: "Marketing",
+    label: "Ferramentas",
     items: [
-      { to: "/campanhas-reativacao", label: "Campanhas de Reativação" },
-      { to: "/pos-atendimento", label: "Pós-atendimento" },
       { to: "/oportunidades", label: "Oportunidades" },
+      { to: "/secretaria-virtual", label: "Secretária Virtual" },
     ],
-  },
-  {
-    label: "Inteligência Artificial",
-    items: [{ to: "/inteligencia-ia", label: "Inteligência da IA" }],
   },
 ];
 

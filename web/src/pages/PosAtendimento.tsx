@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { BackHeader } from "../components/BackHeader";
 import { FormSheet } from "../components/FormSheet";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
@@ -295,10 +296,7 @@ export function PosAtendimento() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 18, flexWrap: "wrap" }}>
-        <div>
-          <h1 className="page-title">Pós-atendimento</h1>
-          <p className="page-subtitle">IA que acompanha o paciente automaticamente depois de cada consulta</p>
-        </div>
+        <BackHeader title="Acompanhar depois da consulta" subtitle="Mensagens automáticas enviadas ao paciente após o atendimento" backTo="/secretaria-virtual" />
         {tab === "fluxos" && (
           <button
             onClick={startCreate}

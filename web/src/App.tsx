@@ -9,18 +9,21 @@ import { CampanhasReativacao } from "./pages/CampanhasReativacao";
 import { Configuracoes } from "./pages/Configuracoes";
 import { Conversas } from "./pages/Conversas";
 import { Dashboard } from "./pages/Dashboard";
+import { DadosClinica } from "./pages/DadosClinica";
 import { Estoque } from "./pages/Estoque";
 import { Financeiro } from "./pages/Financeiro";
 import { HorariosClinica } from "./pages/HorariosClinica";
-import { InteligenciaIA } from "./pages/InteligenciaIA";
 import { Login } from "./pages/Login";
 import { Oportunidades } from "./pages/Oportunidades";
 import { Pacientes } from "./pages/Pacientes";
 import { PatientDetail } from "./pages/PatientDetail";
 import { PosAtendimento } from "./pages/PosAtendimento";
 import { Procedimentos } from "./pages/Procedimentos";
+import { SecretariaVirtual } from "./pages/SecretariaVirtual";
+import { Confirmacao } from "./pages/secretariaVirtual/Confirmacao";
+import { Faq } from "./pages/secretariaVirtual/Faq";
+import { OportunidadesConfig } from "./pages/secretariaVirtual/OportunidadesConfig";
 import { Usuarios } from "./pages/Usuarios";
-import { WhatsApp } from "./pages/WhatsApp";
 
 export function App() {
   return (
@@ -47,12 +50,15 @@ export function App() {
                 <Route path="/estoque" element={<Estoque />} />
                 <Route path="/usuarios" element={<Usuarios />} />
                 <Route path="/horarios-clinica" element={<HorariosClinica />} />
-                <Route path="/whatsapp" element={<WhatsApp />} />
-                <Route path="/campanhas-reativacao" element={<CampanhasReativacao />} />
-                <Route path="/pos-atendimento" element={<PosAtendimento />} />
                 <Route path="/oportunidades" element={<Oportunidades />} />
-                <Route path="/inteligencia-ia" element={<InteligenciaIA />} />
+                <Route path="/secretaria-virtual" element={<SecretariaVirtual />} />
+                <Route path="/secretaria-virtual/confirmacao" element={<Confirmacao />} />
+                <Route path="/secretaria-virtual/reativacao" element={<CampanhasReativacao />} />
+                <Route path="/secretaria-virtual/pos-consulta" element={<PosAtendimento />} />
+                <Route path="/secretaria-virtual/oportunidades" element={<OportunidadesConfig />} />
+                <Route path="/secretaria-virtual/faq" element={<Faq />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />
+                <Route path="/configuracoes/dados-clinica" element={<DadosClinica />} />
               </Route>
             </Route>
           </Routes>

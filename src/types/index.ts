@@ -452,6 +452,7 @@ export interface ClinicSettings {
   confirmation_nudge_interval_hours: number;
   reactivation_enabled: boolean;
   inactivity_nudge_enabled: boolean;
+  post_attendance_enabled: boolean;
   responsible_name: string | null;
   specialty: string | null;
   city: string | null;

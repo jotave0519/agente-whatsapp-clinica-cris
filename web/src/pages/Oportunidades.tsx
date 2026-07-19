@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
@@ -110,7 +110,7 @@ function timeAgo(iso: string | null): string {
 export function Oportunidades() {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"kanban" | "historico" | "config">("kanban");
+  const [tab, setTab] = useState<"kanban" | "historico">("kanban");
 
   const [items, setItems] = useState<Opportunity[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -118,15 +118,6 @@ export function Oportunidades() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const [events, setEvents] = useState<CommercialEvent[] | null>(null);
-
-  const [settings, setSettings] = useState<{
-    commercial_ai_enabled: boolean;
-    commercial_max_attempts: number;
-    commercial_nudge_interval_days: number;
-    commercial_decision_grace_days: number;
-  } | null>(null);
-  const [savingSettings, setSavingSettings] = useState(false);
-  const [settingsSaved, setSettingsSaved] = useState(false);
 
   function loadOpportunities() {
     api
@@ -144,10 +135,6 @@ export function Oportunidades() {
 
   useEffect(() => {
     loadOpportunities();
-    api
-      .get<{ clinic: typeof settings }>("/settings")
-      .then((r) => setSettings(r.clinic))
-      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -177,22 +164,6 @@ export function Oportunidades() {
   function handleOpenConversation(opp: Opportunity) {
     setOpenMenuId(null);
     if (opp.conversationId) navigate(`/conversas?open=${opp.conversationId}`);
-  }
-
-  async function handleSaveSettings(e: FormEvent) {
-    e.preventDefault();
-    if (!settings) return;
-    setSavingSettings(true);
-    setSettingsSaved(false);
-    setError(null);
-    try {
-      await api.patch("/settings", { clinic: settings });
-      setSettingsSaved(true);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setSavingSettings(false);
-    }
   }
 
   const grouped = new Map<Stage, Opportunity[]>();
@@ -274,7 +245,7 @@ export function Oportunidades() {
   return (
     <div>
       <h1 className="page-title">Oportunidades</h1>
-      <p className="page-subtitle">IA Comercial — acompanhamento automático de pacientes que ainda não converteram</p>
+      <p className="page-subtitle">Pacientes que demonstraram interesse mas ainda não fecharam</p>
 
       <div className="tab-nav">
         <button className={`tab-nav-item${tab === "kanban" ? " active" : ""}`} onClick={() => setTab("kanban")}>
@@ -282,9 +253,6 @@ export function Oportunidades() {
         </button>
         <button className={`tab-nav-item${tab === "historico" ? " active" : ""}`} onClick={() => setTab("historico")}>
           Histórico
-        </button>
-        <button className={`tab-nav-item${tab === "config" ? " active" : ""}`} onClick={() => setTab("config")}>
-          Configurações
         </button>
       </div>
 
@@ -349,58 +317,6 @@ export function Oportunidades() {
             ))}
           </div>
         </div>
-      )}
-
-      {tab === "config" && settings && (
-        <form onSubmit={handleSaveSettings} className="card" style={{ maxWidth: 480, display: "grid", gap: 18 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5 }}>
-            <input type="checkbox" checked={settings.commercial_ai_enabled} onChange={(e) => setSettings({ ...settings, commercial_ai_enabled: e.target.checked })} />
-            IA Comercial ativa
-          </label>
-
-          <div>
-            <label className="field-label">Máximo de tentativas de follow-up por paciente</label>
-            <input
-              className="input"
-              type="number"
-              min={1}
-              value={settings.commercial_max_attempts}
-              onChange={(e) => setSettings({ ...settings, commercial_max_attempts: Math.max(1, Number(e.target.value)) })}
-            />
-          </div>
-
-          <div>
-            <label className="field-label">Intervalo entre mensagens (dias)</label>
-            <input
-              className="input"
-              type="number"
-              min={1}
-              value={settings.commercial_nudge_interval_days}
-              onChange={(e) => setSettings({ ...settings, commercial_nudge_interval_days: Math.max(1, Number(e.target.value)) })}
-            />
-          </div>
-
-          <div>
-            <label className="field-label">Dias de carência após avaliação antes de retomar contato</label>
-            <input
-              className="input"
-              type="number"
-              min={0}
-              value={settings.commercial_decision_grace_days}
-              onChange={(e) => setSettings({ ...settings, commercial_decision_grace_days: Math.max(0, Number(e.target.value)) })}
-            />
-          </div>
-
-          <p style={{ fontSize: 12, color: "var(--text-faint)" }}>
-            As mensagens só são enviadas dentro do horário de funcionamento já configurado da clínica, e param imediatamente assim que o
-            paciente responder.
-          </p>
-
-          {settingsSaved && <div style={{ color: "var(--green)", fontSize: 12.5 }}>Configurações salvas.</div>}
-          <button className="btn" type="submit" disabled={savingSettings}>
-            {savingSettings ? "Salvando..." : "Salvar"}
-          </button>
-        </form>
       )}
     </div>
   );

@@ -4,7 +4,6 @@ import * as scheduleRepository from "../repositories/scheduleRepository";
 import { Schedule } from "../types";
 import { AppError } from "../utils/appError";
 import { logger } from "../utils/logger";
-import { sampleSlotsAcrossDay } from "../utils/slots";
 import { toSaoPauloDateTimeParts } from "../utils/timezone";
 import * as reminderEngine from "./reminderEngine";
 
@@ -30,7 +29,7 @@ export async function findNextAvailable(
     const candidateDate = cursor.toISOString().slice(0, 10);
     const slots = await checkAvailability(candidateDate, durationMinutes);
     if (slots.length > 0) {
-      return { date: candidateDate, slots: sampleSlotsAcrossDay(slots) };
+      return { date: candidateDate, slots };
     }
   }
   return null;

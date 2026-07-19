@@ -1,10 +1,7 @@
 import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as commercialEngine from "../../services/commercialEngine";
 import { logger } from "../../utils/logger";
-import { sampleSlotsAcrossDay } from "../../utils/slots";
 import { ToolHandler, ToolSchema } from "../types";
-
-export { sampleSlotsAcrossDay };
 
 /** Usada quando o Google Calendar esta indisponivel (rede/timeout/auth) - nunca expor o erro tecnico ao cliente. */
 export const CALENDAR_UNAVAILABLE_INSTRUCTION =

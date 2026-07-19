@@ -5,7 +5,7 @@ import { FlowStateData } from "../../types";
 import { logger } from "../../utils/logger";
 import { describeCandidates, describeSlots, formatDate, formatTime, formatWeekdayDate, todayIsoDate } from "../prompt";
 import { FlowContext, StepDefinition, StepResult, ToolHandler } from "../types";
-import { ABANDON_TOOL, CALENDAR_UNAVAILABLE_INSTRUCTION, SLOT_TAKEN_INSTRUCTION, abandonFlow, sampleSlotsAcrossDay } from "./shared";
+import { ABANDON_TOOL, CALENDAR_UNAVAILABLE_INSTRUCTION, SLOT_TAKEN_INSTRUCTION, abandonFlow } from "./shared";
 
 const SCOPE = "conversation.rescheduling";
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -157,7 +157,7 @@ export const dateStep: StepDefinition = {
         return { nextStep: "RESCHEDULING_DATE", data: baseData, message: `Nenhum horario livre em ${input.date} nem nos proximos dias. ${guidance}` };
       }
 
-      const data: FlowStateData = { ...baseData, date: input.date, availableSlots: sampleSlotsAcrossDay(slots), selectedStart: undefined };
+      const data: FlowStateData = { ...baseData, date: input.date, availableSlots: slots, selectedStart: undefined };
       return {
         nextStep: "RESCHEDULING_TIME",
         data,
@@ -238,7 +238,7 @@ export async function confirmRescheduling(ctx: FlowContext): Promise<StepResult>
       const freshSlots = await schedulingService.checkAvailability(date, durationMinutes);
       if (!freshSlots.includes(selectedStart)) {
         logger.warn(SCOPE, "Novo horario nao esta mais disponivel (conflito de concorrencia)", { conversationId: ctx.conversation.id, selectedStart });
-        const newData: FlowStateData = { ...ctx.conversation.state_data, availableSlots: sampleSlotsAcrossDay(freshSlots), selectedStart: undefined };
+        const newData: FlowStateData = { ...ctx.conversation.state_data, availableSlots: freshSlots, selectedStart: undefined };
         if (freshSlots.length > 0) {
           return {
             nextStep: "RESCHEDULING_TIME",

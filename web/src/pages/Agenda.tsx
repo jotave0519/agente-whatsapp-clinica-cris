@@ -6,6 +6,8 @@ import { getDisplayStatus } from "../lib/scheduleStatus";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
 import { DayStrip } from "../components/DayStrip";
 import { NewAppointmentFab } from "../components/NewAppointmentFab";
+import { Skeleton } from "../components/Skeleton";
+import { useToast } from "../context/ToastContext";
 
 interface ScheduleItem {
   id: string;
@@ -50,6 +52,7 @@ function toDateStr(d: Date): string {
 
 export function Agenda() {
   const { open: openNewAppointment, lastCreatedAt } = useAppointmentModal();
+  const showToast = useToast();
   const isMobile = useIsMobile();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [view, setView] = useState<"dia" | "semana">("semana");
@@ -119,6 +122,7 @@ export function Agenda() {
       setCancelling(false);
       setCancelReason("");
       loadSchedules();
+      showToast("✓ Agenda atualizada.");
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -133,6 +137,7 @@ export function Agenda() {
       await api.patch(`/schedules/${selected.id}/outcome`, { outcome });
       setSelected(null);
       loadSchedules();
+      showToast("✓ Agenda atualizada.");
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -175,7 +180,12 @@ export function Agenda() {
             <span style={{ position: "absolute", left: -4, top: -3.5, width: 8, height: 8, borderRadius: "50%", background: "var(--accent)" }} />
           </div>
         )}
-        {items === null && <div style={{ padding: 10, fontSize: 11.5, color: "var(--text-muted)" }}>...</div>}
+        {items === null && (
+          <div style={{ padding: 8, display: "grid", gap: 6 }}>
+            <Skeleton style={{ height: 32, borderRadius: 8 }} />
+            <Skeleton style={{ height: 32, borderRadius: 8 }} />
+          </div>
+        )}
         {dayItems.map((it) => {
           const [h, m] = it.time.split(":").map(Number);
           const top = ((h - 7) * 60 + m) * (HOUR_HEIGHT / 60);

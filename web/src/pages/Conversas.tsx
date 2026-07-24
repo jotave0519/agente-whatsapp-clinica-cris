@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 import { ArrowLeftIcon } from "../components/icons";
+import { SkeletonList } from "../components/Skeleton";
+import { useToast } from "../context/ToastContext";
 
 interface ConversationSummary {
   id: string;
@@ -23,6 +25,7 @@ interface MessageItem {
 
 export function Conversas() {
   const isMobile = useIsMobile();
+  const showToast = useToast();
   const [searchParams] = useSearchParams();
   const [items, setItems] = useState<ConversationSummary[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get("open"));
@@ -108,6 +111,7 @@ export function Conversas() {
     await api.patch(`/conversations/${conversation.id}/status`, { status: "closed" });
     await loadConversation(conversation.id);
     await loadList();
+    showToast("✓ Conversa encerrada.");
   }
 
   function statusBadge(status: ConversationSummary["status"]) {
@@ -132,7 +136,7 @@ export function Conversas() {
       <div style={{ display: "flex", height: chatHeight, gap: 16 }}>
         {showList && (
           <div className="card" style={{ width: isMobile ? "100%" : 300, flex: isMobile ? 1 : "0 0 300px", padding: 0, overflowY: "auto" }}>
-            {items === null && <div className="empty-state">Carregando...</div>}
+            {items === null && <SkeletonList count={6} />}
             {items !== null && items.length === 0 && <div className="empty-state">Nenhuma conversa ainda.</div>}
             {items?.map((c) => (
               <div

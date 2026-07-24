@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { FormSheet } from "../components/FormSheet";
 import { PatientPicker } from "../components/PatientPicker";
+import { Skeleton, SkeletonKpiGrid } from "../components/Skeleton";
+import { useToast } from "../context/ToastContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 import { ChevronLeftIcon, ChevronRightIcon } from "../components/icons";
@@ -59,6 +61,7 @@ function monthLabel(monthKey: string): string {
 }
 
 export function Financeiro() {
+  const showToast = useToast();
   const isMobile = useIsMobile();
   const [month, setMonth] = useState(currentMonthKey);
   const [data, setData] = useState<FinanceData | null>(null);
@@ -131,6 +134,7 @@ export function Financeiro() {
       }
       setShowForm(false);
       await load();
+      showToast(form.type === "receita" ? "✓ Receita salva." : "✓ Despesa salva.");
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -143,13 +147,25 @@ export function Financeiro() {
     try {
       await api.delete(`/finance/transactions/${t.id}`);
       await load();
+      showToast("✓ Lançamento excluído.");
     } catch (e: any) {
       setError(e.message);
     }
   }
 
   if (error && !data) return <div className="empty-state">{error}</div>;
-  if (!data) return <div className="empty-state">Carregando...</div>;
+  if (!data) {
+    return (
+      <div>
+        <Skeleton className="skeleton-title" style={{ width: 180, height: 28, marginBottom: 22 }} />
+        <SkeletonKpiGrid count={4} />
+        <div className="card" style={{ marginTop: 20, marginBottom: 20, minHeight: 160 }}>
+          <Skeleton className="skeleton-title" style={{ width: "35%" }} />
+          <Skeleton style={{ height: 100, marginTop: 12 }} />
+        </div>
+      </div>
+    );
+  }
 
   const maxBar = Math.max(1, ...data.chart.flatMap((b) => [b.in, b.out]));
 

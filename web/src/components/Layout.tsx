@@ -1,10 +1,11 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useAppointmentModal } from "../context/AppointmentModalContext";
 import { useAuth } from "../context/AuthContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { canAccessPage } from "../lib/permissions";
 import { MobileHeader } from "./MobileHeader";
 import { MobileTabBar } from "./MobileTabBar";
+import { PageTransition } from "./PageTransition";
 import { Topbar } from "./Topbar";
 
 const NAV_GROUPS = [
@@ -55,7 +56,7 @@ export function Layout() {
       <div style={{ display: "flex", flexDirection: "column", height: "100dvh", width: "100%" }}>
         <MobileHeader />
         <main className="main">
-          <Outlet />
+          <PageTransition />
         </main>
         <MobileTabBar />
       </div>
@@ -105,7 +106,7 @@ export function Layout() {
       <div className="main-column">
         <Topbar onNewAppointment={openNewAppointment} onSignOut={signOut} />
         <main className="main">
-          <Outlet />
+          <PageTransition />
         </main>
       </div>
     </div>

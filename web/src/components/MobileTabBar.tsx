@@ -29,10 +29,20 @@ export function MobileTabBar() {
   const { staff } = useAuth();
   const visibleTabs = TABS.filter((tab) => canAccessPage(staff?.role, tab.to));
   const isSecondaryActive = SECONDARY_PATHS.some((p) => location.pathname.startsWith(p));
+  const isTabActive = (tab: (typeof TABS)[number]) =>
+    tab.end ? location.pathname === tab.to : location.pathname.startsWith(tab.to);
+  const totalItems = visibleTabs.length + 1;
+  const activeIndex = isSecondaryActive
+    ? visibleTabs.length
+    : Math.max(0, visibleTabs.findIndex((tab) => isTabActive(tab)));
 
   return (
     <>
       <nav className="mobile-tabbar">
+        <span
+          className="mobile-tabbar-indicator"
+          style={{ width: `${100 / totalItems}%`, transform: `translateX(${activeIndex * 100}%)` }}
+        />
         {visibleTabs.map((tab) => (
           <NavLink
             key={tab.to}

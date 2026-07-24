@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FormSheet } from "../components/FormSheet";
+import { SkeletonList } from "../components/Skeleton";
+import { useToast } from "../context/ToastContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 
@@ -15,6 +17,7 @@ interface Patient {
 const EMPTY_FORM = { name: "", phone: "", email: "" };
 
 export function Pacientes() {
+  const showToast = useToast();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -70,6 +73,7 @@ export function Pacientes() {
       }
       setShowForm(false);
       load();
+      showToast("✓ Paciente salvo.");
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -83,6 +87,7 @@ export function Pacientes() {
     try {
       await api.delete(`/patients/${p.id}`);
       load();
+      showToast("✓ Paciente excluído.");
     } catch (e: any) {
       setError(e.message);
     }
@@ -184,7 +189,7 @@ export function Pacientes() {
           </div>
         </div>
 
-        {items === null && <div className="empty-state">Carregando...</div>}
+        {items === null && (isMobile ? <SkeletonList count={6} /> : <div style={{ padding: 14 }}><SkeletonList count={6} /></div>)}
         {items !== null && filtered.length === 0 && <div className="empty-state">Nenhum paciente encontrado.</div>}
 
         {items !== null && filtered.length > 0 && isMobile && (

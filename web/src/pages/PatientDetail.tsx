@@ -2,7 +2,9 @@ import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeftIcon } from "../components/icons";
 import { PhotoCompare, PatientMediaItem } from "../components/PhotoCompare";
+import { Skeleton, SkeletonKpiGrid } from "../components/Skeleton";
 import { Timeline, TimelineItem } from "../components/Timeline";
+import { useToast } from "../context/ToastContext";
 import { api } from "../lib/api";
 import { uploadPatientDocument, uploadPatientMedia, getSignedDocumentUrl } from "../lib/patientMediaUpload";
 import { getDisplayStatus } from "../lib/scheduleStatus";
@@ -125,6 +127,7 @@ type TabId = (typeof TABS)[number]["id"];
 export function PatientDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const showToast = useToast();
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
@@ -218,6 +221,7 @@ export function PatientDetail() {
       }
       setShowPaymentForm(false);
       load();
+      showToast("✓ Pagamento registrado.");
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -230,6 +234,7 @@ export function PatientDetail() {
     try {
       await api.delete(`/finance/transactions/${transactionId}`);
       load();
+      showToast("✓ Pagamento excluído.");
     } catch (e: any) {
       setError(e.message);
     }
@@ -255,6 +260,7 @@ export function PatientDetail() {
       await api.post(`/patients/${id}/notes`, { body: noteDraft });
       setNoteDraft("");
       load();
+      showToast("✓ Observação adicionada.");
     } catch (e: any) {
       setError(e.message);
     }
@@ -264,6 +270,7 @@ export function PatientDetail() {
     if (!id) return;
     await api.delete(`/patients/${id}/notes/${noteId}`);
     load();
+    showToast("✓ Observação excluída.");
   }
 
   async function handleAddGoal(e: FormEvent) {
@@ -273,6 +280,7 @@ export function PatientDetail() {
       await api.post(`/patients/${id}/goals`, { description: goalDraft });
       setGoalDraft("");
       load();
+      showToast("✓ Objetivo adicionado.");
     } catch (e: any) {
       setError(e.message);
     }
@@ -288,6 +296,7 @@ export function PatientDetail() {
     if (!id) return;
     await api.delete(`/patients/${id}/goals/${goalId}`);
     load();
+    showToast("✓ Objetivo excluído.");
   }
 
   async function handleAddEvent(e: FormEvent) {
@@ -298,6 +307,7 @@ export function PatientDetail() {
       setEventDraft({ title: "", detail: "" });
       setShowEventForm(false);
       load();
+      showToast("✓ Evento adicionado.");
     } catch (e: any) {
       setError(e.message);
     }
@@ -310,6 +320,7 @@ export function PatientDetail() {
       const path = await uploadPatientMedia(id, file);
       await api.post(`/patients/${id}/media`, { kind, storagePath: path, scheduleId: scheduleId ?? null });
       load();
+      showToast("✓ Foto adicionada.");
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -330,6 +341,7 @@ export function PatientDetail() {
       const path = await uploadPatientDocument(id, file);
       await api.post(`/patients/${id}/documents`, { name: file.name, storagePath: path });
       load();
+      showToast("✓ Documento adicionado.");
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -341,6 +353,7 @@ export function PatientDetail() {
     if (!id) return;
     await api.delete(`/patients/${id}/documents/${docId}`);
     load();
+    showToast("✓ Documento excluído.");
   }
 
   async function openDocument(doc: PatientDocument) {
@@ -355,10 +368,18 @@ export function PatientDetail() {
   async function assignStaff(scheduleId: string, staffId: string) {
     await api.patch(`/schedules/${scheduleId}/staff`, { staffId: staffId || null });
     load();
+    showToast("✓ Procedimento atualizado.");
   }
 
   if (error && !patient) return <div className="empty-state">{error}</div>;
-  if (!patient) return <div className="empty-state">Carregando...</div>;
+  if (!patient) {
+    return (
+      <div>
+        <Skeleton className="skeleton-title" style={{ width: 220, height: 30, marginBottom: 16 }} />
+        <SkeletonKpiGrid count={6} />
+      </div>
+    );
+  }
 
   const completedSchedules = schedules.filter((s) => s.status === "Concluido").sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`));
   const ticketMedio = summary && summary.totalVisits > 0 ? summary.totalInvested / summary.totalVisits : 0;

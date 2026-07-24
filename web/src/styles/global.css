@@ -82,6 +82,9 @@ html,
 body,
 #root {
   height: 100%;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -90,6 +93,14 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   transition: background 0.15s ease, color 0.15s ease;
+  /* impede zoom por double-tap sem desabilitar pinch-to-zoom de acessibilidade */
+  touch-action: manipulation;
+}
+
+img,
+svg,
+video {
+  max-width: 100%;
 }
 
 button {
@@ -143,6 +154,7 @@ a {
   flex-direction: column;
   gap: 20px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .sidebar-brand {
@@ -290,7 +302,27 @@ a {
 .main {
   flex: 1;
   overflow-y: auto;
+  /* overflow-y:auto sozinho faz o navegador tratar overflow-x tambem como
+     auto (regra de acoplamento do CSS) - sem isso, qualquer filho um pixel
+     mais largo que o container libera arrasto horizontal na tela inteira. */
+  overflow-x: hidden;
+  max-width: 100%;
   padding: 28px 32px;
+}
+
+.page-transition {
+  animation: page-enter 220ms ease both;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .page-title {
@@ -318,6 +350,36 @@ a {
   border-radius: var(--radius-md);
   padding: 18px;
   box-shadow: var(--shadow-card);
+  animation: entrance-rise 250ms ease both;
+}
+
+/* Cascata confiavel só onde a estrutura garante irmãos diretos e exclusivos
+   (kpi-grid so tem .card como filho) - em outros lugares .card entra junto,
+   sem numeros de delay que dependeriam de contar divs nao relacionados. */
+.kpi-grid > .card:nth-child(1) { animation-delay: 0ms; }
+.kpi-grid > .card:nth-child(2) { animation-delay: 40ms; }
+.kpi-grid > .card:nth-child(3) { animation-delay: 80ms; }
+.kpi-grid > .card:nth-child(4) { animation-delay: 120ms; }
+.kpi-grid > .card:nth-child(5) { animation-delay: 160ms; }
+.kpi-grid > .card:nth-child(n + 6) { animation-delay: 200ms; }
+
+@keyframes entrance-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
 .switch {
@@ -441,8 +503,15 @@ a {
 
 .table {
   width: 100%;
+  max-width: 100%;
   border-collapse: collapse;
   font-size: 13.5px;
+}
+
+/* Se uma tabela especifica ainda assim ficar mais larga que a tela (muitas
+   colunas), ela rola dentro do proprio card - nunca a pagina inteira. */
+.card:has(> .table) {
+  overflow-x: auto;
 }
 
 .table th {
@@ -470,6 +539,18 @@ a {
   font-size: 12.5px;
   font-weight: 600;
   flex: 0 0 auto;
+}
+
+.btn,
+.btn-secondary,
+.btn-danger {
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.btn:active,
+.btn-secondary:active,
+.btn-danger:active {
+  transform: scale(0.97);
 }
 
 .btn {
@@ -533,6 +614,11 @@ a {
   color: var(--text-muted);
   padding: 5px 12px;
   border-radius: 7px;
+  transition: transform 120ms ease, color 150ms ease, background 150ms ease;
+}
+
+.segmented-item:active {
+  transform: scale(0.97);
 }
 
 .segmented-item.active {
@@ -566,6 +652,11 @@ a {
   background: var(--surface);
   cursor: pointer;
   white-space: nowrap;
+  transition: transform 120ms ease, color 150ms ease, background 150ms ease, border-color 150ms ease;
+}
+
+.tab-nav-item:active {
+  transform: scale(0.97);
 }
 
 .tab-nav-item.active {
@@ -582,6 +673,11 @@ a {
   border: 1px solid var(--border);
   border-radius: 20px;
   padding: 4px 12px;
+  transition: transform 120ms ease, color 150ms ease, background 150ms ease, border-color 150ms ease;
+}
+
+.chip:active {
+  transform: scale(0.97);
 }
 
 .chip.active {
@@ -672,6 +768,7 @@ a {
   justify-content: center;
   z-index: 50;
   padding: 20px;
+  animation: overlay-fade 0.18s ease both;
 }
 
 .modal-card {
@@ -683,13 +780,19 @@ a {
   max-width: 460px;
   max-height: 90vh;
   overflow-y: auto;
-  animation: modal-pop 0.18s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation: modal-pop 0.2s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+@keyframes overlay-fade {
+  from {
+    opacity: 0;
+  }
 }
 
 @keyframes modal-pop {
   from {
     opacity: 0;
-    transform: scale(0.97);
+    transform: translateY(12px) scale(0.98);
   }
 }
 
@@ -728,10 +831,12 @@ a {
   color: var(--text-muted);
   flex: 0 0 44px;
   position: relative;
+  transition: transform 120ms ease, background 120ms ease;
 }
 
 .mobile-icon-btn:active {
   background: var(--border-soft);
+  transform: scale(0.97);
 }
 
 .mobile-search-overlay {
@@ -757,6 +862,15 @@ a {
   z-index: 40;
 }
 
+.mobile-tabbar-indicator {
+  position: absolute;
+  top: 0;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--accent);
+  transition: transform 220ms ease;
+}
+
 .mobile-tabbar-item {
   flex: 1;
   display: flex;
@@ -768,11 +882,31 @@ a {
   color: var(--text-faint);
   font-size: 10.5px;
   font-weight: 500;
+  transition: color 150ms ease;
 }
 
 .mobile-tabbar-item.active {
   color: var(--accent);
   font-weight: 600;
+}
+
+.mobile-tabbar-item.active svg {
+  animation: tabbar-icon-bounce 320ms ease;
+}
+
+@keyframes tabbar-icon-bounce {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.22);
+  }
+  65% {
+    transform: scale(0.94);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .fab {
@@ -789,10 +923,24 @@ a {
   justify-content: center;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
   z-index: 35;
+  animation: fab-entrance 220ms ease both;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+@keyframes fab-entrance {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .fab:active {
   opacity: 0.85;
+  transform: scale(0.97);
 }
 
 .day-strip {
@@ -811,6 +959,11 @@ a {
   text-align: center;
   border: 1px solid var(--border);
   background: var(--surface);
+  transition: transform 120ms ease, background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.day-strip-chip:active {
+  transform: scale(0.97);
 }
 
 .day-strip-chip.active {
@@ -825,6 +978,112 @@ a {
   gap: 8px;
   padding: 14px;
   border-bottom: 1px solid var(--border-soft);
+  animation: entrance-rise 250ms ease both;
+}
+
+.mobile-list-item:nth-child(1) { animation-delay: 0ms; }
+.mobile-list-item:nth-child(2) { animation-delay: 30ms; }
+.mobile-list-item:nth-child(3) { animation-delay: 60ms; }
+.mobile-list-item:nth-child(4) { animation-delay: 90ms; }
+.mobile-list-item:nth-child(5) { animation-delay: 120ms; }
+.mobile-list-item:nth-child(6) { animation-delay: 150ms; }
+.mobile-list-item:nth-child(n + 7) { animation-delay: 180ms; }
+
+/* ---------- Skeleton loading placeholders ---------- */
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--border-soft);
+  border-radius: 6px;
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton-text {
+  height: 12px;
+  margin: 6px 0;
+}
+
+.skeleton-title {
+  height: 16px;
+  width: 60%;
+  margin-bottom: 10px;
+}
+
+.skeleton-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex: 0 0 40px;
+}
+
+.skeleton-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ---------- Toast feedback ---------- */
+
+.toast-container {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--bottom-nav-height) + var(--safe-bottom) + 20px);
+  transform: translateX(-50%);
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0 20px;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  max-width: 420px;
+  text-align: center;
+  background: var(--text);
+  color: var(--bg);
+  padding: 12px 18px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  animation: toast-in 220ms ease both, toast-out 220ms ease 2780ms forwards;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
 }
 
 .mobile-list-row {

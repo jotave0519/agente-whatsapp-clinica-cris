@@ -7,6 +7,7 @@ import { ArrowRightIcon, TrendingUpIcon } from "../components/icons";
 import { ConfirmationsChart } from "../components/ConfirmationsChart";
 import { NewAppointmentFab } from "../components/NewAppointmentFab";
 import { RevenueChart } from "../components/RevenueChart";
+import { Skeleton, SkeletonKpiGrid } from "../components/Skeleton";
 
 interface DashboardData {
   kpis: {
@@ -86,7 +87,24 @@ export function Dashboard() {
   }, []);
 
   if (error) return <div className="empty-state">{error}</div>;
-  if (!data) return <div className="empty-state">Carregando...</div>;
+  if (!data) {
+    return (
+      <div>
+        <Skeleton className="skeleton-title" style={{ width: 220, height: 30, marginBottom: 26 }} />
+        <SkeletonKpiGrid count={5} />
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.55fr 1fr", gap: 20, marginTop: 20 }}>
+          <div className="card" style={{ minHeight: 220 }}>
+            <Skeleton className="skeleton-title" style={{ width: "40%" }} />
+            <Skeleton style={{ height: 160, marginTop: 12 }} />
+          </div>
+          <div className="card" style={{ minHeight: 220 }}>
+            <Skeleton className="skeleton-title" style={{ width: "40%" }} />
+            <Skeleton style={{ height: 160, marginTop: 12 }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const name = session?.user.email?.split("@")[0] || "";
   const today = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });

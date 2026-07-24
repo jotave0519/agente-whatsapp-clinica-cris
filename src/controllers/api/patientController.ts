@@ -6,8 +6,10 @@ import * as patientGoalRepository from "../../repositories/patientGoalRepository
 import * as patientMediaRepository from "../../repositories/patientMediaRepository";
 import * as patientNoteRepository from "../../repositories/patientNoteRepository";
 import * as patientTimelineEventRepository from "../../repositories/patientTimelineEventRepository";
+import * as procedureRepository from "../../repositories/procedureRepository";
 import * as scheduleEventRepository from "../../repositories/scheduleEventRepository";
 import * as scheduleRepository from "../../repositories/scheduleRepository";
+import * as transactionRepository from "../../repositories/transactionRepository";
 import * as userRepository from "../../repositories/userRepository";
 import * as patientSummaryService from "../../services/patientSummaryService";
 import { logger } from "../../utils/logger";
@@ -100,6 +102,27 @@ export async function getPatientSummary(req: Request, res: Response): Promise<vo
   } catch (err) {
     logger.error(SCOPE, "Erro ao calcular resumo do paciente", err);
     res.status(500).json({ error: "Erro ao calcular resumo do paciente." });
+  }
+}
+
+/**
+ * Pagamentos (receitas) vinculados ao paciente - mesma tabela `transactions`
+ * usada pelo Financeiro (transactionRepository.findByUserId), unica fonte de
+ * dados. Edicao/exclusao usam os endpoints genericos /finance/transactions/:id
+ * ja existentes, entao qualquer alteracao aqui aparece automaticamente no
+ * Financeiro e vice-versa - nao ha replicacao/sincronizacao manual.
+ */
+export async function listPatientTransactions(req: Request, res: Response): Promise<void> {
+  try {
+    const [transactions, procedures] = await Promise.all([transactionRepository.findByUserId(req.params.id), procedureRepository.listAll()]);
+    const procedureNameById = new Map(procedures.map((p) => [p.id, p.name]));
+    const items = transactions
+      .filter((t) => t.type === "receita")
+      .map((t) => ({ ...t, procedureName: t.procedure_id ? procedureNameById.get(t.procedure_id) || null : null }));
+    res.json({ items });
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao listar pagamentos do paciente", err);
+    res.status(500).json({ error: "Erro ao listar pagamentos do paciente." });
   }
 }
 

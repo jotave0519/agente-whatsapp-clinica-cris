@@ -41,6 +41,14 @@ export async function findById(id: string): Promise<User | null> {
   return data;
 }
 
+/** Usado pelo Financeiro pra enriquecer transacoes com o nome do paciente vinculado, num unico round-trip. */
+export async function findByIds(ids: string[]): Promise<Pick<User, "id" | "name" | "phone">[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await getSupabaseClient().from("users").select("id, name, phone").in("id", ids);
+  if (error) throw error;
+  return data || [];
+}
+
 /** Usado pela tela de Pacientes do CRM web. */
 export async function listAll(params: { search?: string; limit?: number; offset?: number }): Promise<{ items: User[]; total: number }> {
   const limit = params.limit ?? 20;

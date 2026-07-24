@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as scheduleRepository from "../../repositories/scheduleRepository";
 import * as transactionRepository from "../../repositories/transactionRepository";
+import * as userRepository from "../../repositories/userRepository";
 import * as financeService from "../../services/financeService";
 import { Transaction } from "../../types";
 import { logger } from "../../utils/logger";
@@ -63,6 +64,13 @@ export async function getFinanceOverview(req: Request, res: Response): Promise<v
     const receitas = receitasMes.slice(0, 20);
     const despesas = despesasMes.slice(0, 20);
 
+    // Enriquece com o nome do paciente vinculado (transactions.patient_id) - um
+    // unico round-trip pra todos os ids presentes nas listas exibidas.
+    const patientIds = [...new Set([...receitas, ...despesas].map((t) => t.patient_id).filter((id): id is string => !!id))];
+    const patients = await userRepository.findByIds(patientIds);
+    const patientNameById = new Map(patients.map((p) => [p.id, p.name]));
+    const withPatientName = (t: Transaction) => ({ ...t, patientName: t.patient_id ? patientNameById.get(t.patient_id) || null : null });
+
     res.json({
       month: `${reference.getFullYear()}-${String(reference.getMonth() + 1).padStart(2, "0")}`,
       kpis: {
@@ -72,8 +80,8 @@ export async function getFinanceOverview(req: Request, res: Response): Promise<v
         pendentes,
       },
       chart: bars,
-      receitas,
-      despesas,
+      receitas: receitas.map(withPatientName),
+      despesas: despesas.map(withPatientName),
       reportProcs,
       reportPatients,
     });

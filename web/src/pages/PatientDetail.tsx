@@ -73,6 +73,33 @@ interface StaffOption {
   name: string;
 }
 
+interface PatientTransaction {
+  id: string;
+  description: string;
+  amount: number;
+  method: string | null;
+  status: "pago" | "pendente";
+  occurred_on: string;
+  procedure_id: string | null;
+  procedureName: string | null;
+}
+
+interface TreatmentTypeOption {
+  id: string;
+  name: string;
+}
+
+const PAYMENT_METHODS = ["Pix", "Cartão crédito", "Cartão débito", "Dinheiro", "Transferência", "Outro"];
+
+const EMPTY_PAYMENT_DRAFT = {
+  amount: "",
+  method: "Pix",
+  status: "pago" as "pago" | "pendente",
+  occurred_on: new Date().toLocaleDateString("en-CA"),
+  procedureId: "",
+  observacoes: "",
+};
+
 const STATUS_BADGE: Record<string, string> = { Ativo: "badge-green", "Em acompanhamento": "badge-blue", Inativo: "badge-neutral" };
 
 function formatMoney(v: number): string {
@@ -109,6 +136,8 @@ export function PatientDetail() {
   const [media, setMedia] = useState<PatientMediaItem[]>([]);
   const [documents, setDocuments] = useState<PatientDocument[]>([]);
   const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
+  const [transactions, setTransactions] = useState<PatientTransaction[]>([]);
+  const [treatmentTypes, setTreatmentTypes] = useState<TreatmentTypeOption[]>([]);
 
   const [tab, setTab] = useState<TabId>("geral");
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +149,11 @@ export function PatientDetail() {
   const [showEventForm, setShowEventForm] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+  const [paymentDraft, setPaymentDraft] = useState(EMPTY_PAYMENT_DRAFT);
+  const [savingPayment, setSavingPayment] = useState(false);
 
   function load() {
     if (!id) return;
@@ -135,13 +169,71 @@ export function PatientDetail() {
     api.get<{ items: PatientMediaItem[] }>(`/patients/${id}/media`).then((r) => setMedia(r.items)).catch(() => {});
     api.get<{ items: PatientDocument[] }>(`/patients/${id}/documents`).then((r) => setDocuments(r.items)).catch(() => {});
     api.get<{ items: StaffOption[] }>("/staff").then((r) => setStaffOptions(r.items)).catch(() => {});
+    api.get<{ items: PatientTransaction[] }>(`/patients/${id}/transactions`).then((r) => setTransactions(r.items)).catch(() => {});
+    api.get<{ items: TreatmentTypeOption[] }>("/procedures").then((r) => setTreatmentTypes(r.items)).catch(() => {});
   }
 
   useEffect(load, [id]);
 
-  // /finance não filtra por paciente - o resumo financeiro usa os últimos pagamentos
-  // já presentes na timeline (type: "payment"), sem duplicar lógica de agregação aqui.
-  const payments = timeline.filter((t) => t.type === "payment").slice(0, 8);
+  const lastPayment = [...transactions].filter((t) => t.status === "pago").sort((a, b) => b.occurred_on.localeCompare(a.occurred_on))[0] || null;
+
+  function openPaymentForm() {
+    setEditingTransactionId(null);
+    setPaymentDraft(EMPTY_PAYMENT_DRAFT);
+    setShowPaymentForm(true);
+  }
+
+  function startEditPayment(t: PatientTransaction) {
+    setEditingTransactionId(t.id);
+    setPaymentDraft({
+      amount: String(t.amount),
+      method: t.method || "Pix",
+      status: t.status,
+      occurred_on: t.occurred_on,
+      procedureId: t.procedure_id || "",
+      observacoes: "",
+    });
+    setShowPaymentForm(true);
+  }
+
+  async function handleSavePayment(e: FormEvent) {
+    e.preventDefault();
+    if (!id || !paymentDraft.amount) return;
+    setSavingPayment(true);
+    setError(null);
+    try {
+      const procedureName = treatmentTypes.find((t) => t.id === paymentDraft.procedureId)?.name;
+      const description = [procedureName || "Pagamento", paymentDraft.observacoes.trim()].filter(Boolean).join(" — ");
+      const payload = {
+        amount: Number(paymentDraft.amount),
+        method: paymentDraft.method,
+        status: paymentDraft.status,
+        occurred_on: paymentDraft.occurred_on,
+        description,
+      };
+      if (editingTransactionId) {
+        await api.patch(`/finance/transactions/${editingTransactionId}`, payload);
+      } else {
+        await api.post("/finance/transactions", { ...payload, type: "receita", patient_id: id, procedure_id: paymentDraft.procedureId || null });
+      }
+      setShowPaymentForm(false);
+      load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSavingPayment(false);
+    }
+  }
+
+  async function handleDeletePayment(transactionId: string) {
+    if (!window.confirm("Excluir este pagamento?")) return;
+    try {
+      await api.delete(`/finance/transactions/${transactionId}`);
+      load();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
 
   async function toggleDoNotContact() {
     if (!patient) return;
@@ -449,20 +541,106 @@ export function PatientDetail() {
               <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Ticket médio</div>
             </div>
             <div className="card">
+              <div className="kpi-value" style={{ fontSize: 18 }}>{lastPayment ? formatDate(lastPayment.occurred_on) : "—"}</div>
+              <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Último pagamento</div>
+            </div>
+            <div className="card">
               <div className="kpi-value" style={{ fontSize: 15 }}>Nenhum pacote ativo</div>
-              <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Pacotes</div>
+              <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Pacote ativo</div>
             </div>
           </div>
 
-          <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 10 }}>Últimos pagamentos</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div style={{ fontSize: 14.5, fontWeight: 600 }}>Pagamentos</div>
+            <button className="btn" style={{ height: 34, fontSize: 12.5 }} onClick={openPaymentForm}>
+              + Registrar pagamento
+            </button>
+          </div>
+
           <div className="card" style={{ padding: 0 }}>
-            {payments.length === 0 && <div className="empty-state">Nenhum pagamento registrado ainda.</div>}
-            {payments.map((p, i) => (
-              <div key={i} style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-soft)" }}>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{p.title}</div>
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{p.detail}</div>
+            {transactions.length === 0 && <div className="empty-state">Nenhum pagamento registrado ainda.</div>}
+            {transactions
+              .sort((a, b) => b.occurred_on.localeCompare(a.occurred_on))
+              .map((t) => (
+                <div key={t.id} style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-soft)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{formatMoney(t.amount)}</div>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                      {formatDate(t.occurred_on)} · {t.method || "—"}
+                      {t.procedureName ? ` · ${t.procedureName}` : ""}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span className={`badge ${t.status === "pago" ? "badge-green" : "badge-yellow"}`}>{t.status === "pago" ? "Pago" : "Pendente"}</span>
+                    <button className="btn btn-secondary" style={{ height: 30, padding: "0 10px", fontSize: 11.5 }} onClick={() => startEditPayment(t)}>
+                      Editar
+                    </button>
+                    <button className="btn-danger" style={{ height: 30, padding: "0 10px", fontSize: 11.5 }} onClick={() => handleDeletePayment(t.id)}>
+                      Excluir
+                    </button>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {showPaymentForm && (
+        <div className="modal-overlay" onClick={() => setShowPaymentForm(false)}>
+          <div className="modal-card" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 14 }}>{editingTransactionId ? "Editar pagamento" : "Registrar pagamento"}</div>
+            <form onSubmit={handleSavePayment} style={{ display: "grid", gap: 12 }}>
+              <div>
+                <label className="field-label">Valor (R$)</label>
+                <input className="input" type="number" step="0.01" required value={paymentDraft.amount} onChange={(e) => setPaymentDraft({ ...paymentDraft, amount: e.target.value })} />
               </div>
-            ))}
+              <div>
+                <label className="field-label">Forma de pagamento</label>
+                <select className="input" value={paymentDraft.method} onChange={(e) => setPaymentDraft({ ...paymentDraft, method: e.target.value })}>
+                  {PAYMENT_METHODS.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="field-label">Status</label>
+                <select className="input" value={paymentDraft.status} onChange={(e) => setPaymentDraft({ ...paymentDraft, status: e.target.value as "pago" | "pendente" })}>
+                  <option value="pago">Pago</option>
+                  <option value="pendente">Pendente</option>
+                </select>
+              </div>
+              <div>
+                <label className="field-label">Data</label>
+                <input className="input" type="date" required value={paymentDraft.occurred_on} onChange={(e) => setPaymentDraft({ ...paymentDraft, occurred_on: e.target.value })} />
+              </div>
+              {!editingTransactionId && (
+                <div>
+                  <label className="field-label">Procedimento relacionado (opcional)</label>
+                  <select className="input" value={paymentDraft.procedureId} onChange={(e) => setPaymentDraft({ ...paymentDraft, procedureId: e.target.value })}>
+                    <option value="">Nenhum</option>
+                    {treatmentTypes.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="field-label">Observações (opcional)</label>
+                <input className="input" value={paymentDraft.observacoes} onChange={(e) => setPaymentDraft({ ...paymentDraft, observacoes: e.target.value })} />
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button className="btn" type="submit" disabled={savingPayment}>
+                  {savingPayment ? "Salvando..." : "Salvar"}
+                </button>
+                <button className="btn btn-secondary" type="button" onClick={() => setShowPaymentForm(false)}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

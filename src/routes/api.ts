@@ -44,6 +44,7 @@ import {
   listPatientMedia,
   listPatientNotes,
   listPatients,
+  listPatientTransactions,
   updatePatient,
   updatePatientGoal,
 } from "../controllers/api/patientController";
@@ -93,6 +94,7 @@ apiRouter.patch("/patients/:id", staffOrAbove, updatePatient);
 apiRouter.delete("/patients/:id", staffOrAbove, deletePatient);
 
 apiRouter.get("/patients/:id/summary", getPatientSummary);
+apiRouter.get("/patients/:id/transactions", listPatientTransactions);
 apiRouter.get("/patients/:id/suggestions", getPatientSuggestions);
 apiRouter.get("/patients/:id/timeline", getPatientTimeline);
 

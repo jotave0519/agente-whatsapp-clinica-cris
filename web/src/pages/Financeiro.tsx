@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { FormSheet } from "../components/FormSheet";
+import { PatientPicker } from "../components/PatientPicker";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 import { ChevronLeftIcon, ChevronRightIcon } from "../components/icons";
@@ -13,6 +15,14 @@ interface Transaction {
   method: string | null;
   status: "pago" | "pendente";
   occurred_on: string;
+  patient_id: string | null;
+  patientName: string | null;
+}
+
+interface PatientOption {
+  id: string;
+  name: string;
+  phone: string;
 }
 
 interface FinanceData {
@@ -57,6 +67,8 @@ export function Financeiro() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [patient, setPatient] = useState<PatientOption | null>(null);
+  const [linkedPatientName, setLinkedPatientName] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -75,6 +87,8 @@ export function Financeiro() {
   function openForm(type: "receita" | "despesa") {
     setEditingId(null);
     setForm({ ...EMPTY_FORM, type });
+    setPatient(null);
+    setLinkedPatientName(null);
     setShowForm(true);
   }
 
@@ -88,6 +102,8 @@ export function Financeiro() {
       method: t.method || "",
       status: t.status,
     });
+    setPatient(null);
+    setLinkedPatientName(t.patientName);
     setShowForm(true);
   }
 
@@ -95,7 +111,7 @@ export function Financeiro() {
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const payload = {
+    const payload: Record<string, unknown> = {
       type: form.type,
       description: form.description,
       category: form.category || null,
@@ -103,6 +119,10 @@ export function Financeiro() {
       method: form.method || null,
       status: form.status,
     };
+    // patient_id so e enviado na criacao de uma receita nova - editar nao
+    // permite trocar o paciente vinculado (evita ambiguidade sobre o que
+    // acontece com o vinculo original).
+    if (!editingId && form.type === "receita") payload.patient_id = patient?.id ?? null;
     try {
       if (editingId) {
         await api.patch(`/finance/transactions/${editingId}`, payload);
@@ -165,6 +185,15 @@ export function Financeiro() {
             <option value="pendente">Pendente</option>
           </select>
         </div>
+      )}
+      {form.type === "receita" && !editingId && (
+        <div>
+          <label className="field-label">Paciente (opcional)</label>
+          <PatientPicker value={patient} onChange={setPatient} />
+        </div>
+      )}
+      {form.type === "receita" && editingId && linkedPatientName && (
+        <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>Paciente vinculado: {linkedPatientName}</div>
       )}
       <div style={{ display: "flex", gap: 10 }}>
         <button className="btn" type="submit" disabled={saving}>
@@ -274,6 +303,13 @@ export function Financeiro() {
                 <div className="mobile-list-row">
                   <span>{r.method || "—"}</span>
                   <span className={`badge ${r.status === "pago" ? "badge-green" : "badge-yellow"}`}>{r.status === "pago" ? "Pago" : "Pendente"}</span>
+                  {r.patient_id ? (
+                    <Link to={`/pacientes/${r.patient_id}`} className="badge badge-blue">
+                      {r.patientName || "Paciente"}
+                    </Link>
+                  ) : (
+                    <span style={{ color: "var(--text-faint)" }}>—</span>
+                  )}
                 </div>
                 <div className="mobile-list-actions">
                   <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => openEdit(r)}>
@@ -288,7 +324,17 @@ export function Financeiro() {
               <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 18px", borderBottom: "1px solid var(--border-soft)" }}>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13.5 }}>{r.description}</div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{r.method || "—"}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 6 }}>
+                    {r.method || "—"}
+                    {r.patient_id && (
+                      <>
+                        {" · "}
+                        <Link to={`/pacientes/${r.patient_id}`} style={{ color: "var(--accent-dark)", fontWeight: 600 }}>
+                          {r.patientName || "Paciente"}
+                        </Link>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ textAlign: "right" }}>

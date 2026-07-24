@@ -68,7 +68,7 @@ function greeting(): string {
 }
 
 export function Dashboard() {
-  const { session } = useAuth();
+  const { session, staff } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -106,7 +106,7 @@ export function Dashboard() {
     );
   }
 
-  const name = session?.user.email?.split("@")[0] || "";
+  const name = staff?.name || session?.user.email?.split("@")[0] || "";
   const today = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const chartData = isMobile ? data.revenueChart.slice(-6) : data.revenueChart;
 

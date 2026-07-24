@@ -11,6 +11,7 @@ export async function createSchedule(params: {
   googleEventId: string;
   notes?: string | null;
   durationMinutes?: number | null;
+  staffId?: string | null;
 }): Promise<Schedule> {
   const { data, error } = await getSupabaseClient()
     .from("schedules")
@@ -25,10 +26,18 @@ export async function createSchedule(params: {
       notes: params.notes ?? null,
       status: "Agendado",
       duration_minutes: params.durationMinutes ?? null,
+      staff_id: params.staffId ?? null,
     })
     .select("*")
     .single();
 
+  if (error) throw error;
+  return data;
+}
+
+/** Usado pela Ficha do Paciente ao registrar quem realizou um procedimento ja concluido. */
+export async function updateStaff(scheduleId: string, staffId: string | null): Promise<Schedule> {
+  const { data, error } = await getSupabaseClient().from("schedules").update({ staff_id: staffId, updated_at: new Date().toISOString() }).eq("id", scheduleId).select("*").single();
   if (error) throw error;
   return data;
 }

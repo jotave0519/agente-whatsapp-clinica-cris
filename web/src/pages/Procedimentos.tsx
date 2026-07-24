@@ -12,6 +12,7 @@ interface ProcedureItem {
   notes: string | null;
   pre_instructions: string | null;
   post_instructions: string | null;
+  recommended_interval_days: number | null;
   active: boolean;
 }
 
@@ -23,6 +24,7 @@ const EMPTY_FORM = {
   notes: "",
   pre_instructions: "",
   post_instructions: "",
+  recommended_interval_days: "",
   active: true,
 };
 
@@ -64,6 +66,7 @@ export function Procedimentos() {
       notes: p.notes || "",
       pre_instructions: p.pre_instructions || "",
       post_instructions: p.post_instructions || "",
+      recommended_interval_days: p.recommended_interval_days != null ? String(p.recommended_interval_days) : "",
       active: p.active,
     });
     setShowForm(true);
@@ -81,6 +84,7 @@ export function Procedimentos() {
       notes: form.notes || null,
       pre_instructions: form.pre_instructions || null,
       post_instructions: form.post_instructions || null,
+      recommended_interval_days: form.recommended_interval_days ? Number(form.recommended_interval_days) : null,
       active: form.active,
     };
     try {
@@ -154,6 +158,16 @@ export function Procedimentos() {
           rows={2}
           value={form.post_instructions}
           onChange={(e) => setForm({ ...form, post_instructions: e.target.value })}
+        />
+      </div>
+      <div>
+        <label className="field-label">Sugerir retorno após (dias)</label>
+        <input
+          className="input"
+          type="number"
+          placeholder="Ex: 180 (deixe em branco para não sugerir retorno)"
+          value={form.recommended_interval_days}
+          onChange={(e) => setForm({ ...form, recommended_interval_days: e.target.value })}
         />
       </div>
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5 }}>

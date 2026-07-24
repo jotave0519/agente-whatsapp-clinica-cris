@@ -22,7 +22,31 @@ import {
 } from "../controllers/api/inventoryController";
 import { getMe } from "../controllers/api/meController";
 import { listMessageTemplates, updateMessageTemplate } from "../controllers/api/messageTemplateController";
-import { createPatient, deletePatient, getPatient, getPatientHistory, listPatients, updatePatient } from "../controllers/api/patientController";
+import {
+  createPatient,
+  createPatientDocument,
+  createPatientGoal,
+  createPatientMedia,
+  createPatientNote,
+  createPatientTimelineEvent,
+  deletePatient,
+  deletePatientDocument,
+  deletePatientGoal,
+  deletePatientMedia,
+  deletePatientNote,
+  getPatient,
+  getPatientHistory,
+  getPatientSuggestions,
+  getPatientSummary,
+  getPatientTimeline,
+  listPatientDocuments,
+  listPatientGoals,
+  listPatientMedia,
+  listPatientNotes,
+  listPatients,
+  updatePatient,
+  updatePatientGoal,
+} from "../controllers/api/patientController";
 import { createProcedure, deleteProcedure, listProcedures, updateProcedure } from "../controllers/api/procedureController";
 import {
   createFlow as createPostAttendanceFlow,
@@ -39,7 +63,7 @@ import {
   listCampaigns,
   updateCampaign,
 } from "../controllers/api/reactivationController";
-import { cancelSchedule, createSchedule, listSchedules, updateOutcome } from "../controllers/api/scheduleController";
+import { cancelSchedule, createSchedule, listSchedules, updateOutcome, updateScheduleStaff } from "../controllers/api/scheduleController";
 import { getSettings, updateSettings } from "../controllers/api/settingsController";
 import { createStaff, deleteStaff, listStaff, updateStaff } from "../controllers/api/staffController";
 import { disconnect, getQrCode, getStatus } from "../controllers/api/whatsappController";
@@ -68,10 +92,34 @@ apiRouter.post("/patients", staffOrAbove, createPatient);
 apiRouter.patch("/patients/:id", staffOrAbove, updatePatient);
 apiRouter.delete("/patients/:id", staffOrAbove, deletePatient);
 
+apiRouter.get("/patients/:id/summary", getPatientSummary);
+apiRouter.get("/patients/:id/suggestions", getPatientSuggestions);
+apiRouter.get("/patients/:id/timeline", getPatientTimeline);
+
+apiRouter.get("/patients/:id/notes", listPatientNotes);
+apiRouter.post("/patients/:id/notes", staffOrAbove, createPatientNote);
+apiRouter.delete("/patients/:id/notes/:noteId", staffOrAbove, deletePatientNote);
+
+apiRouter.get("/patients/:id/goals", listPatientGoals);
+apiRouter.post("/patients/:id/goals", staffOrAbove, createPatientGoal);
+apiRouter.patch("/patients/:id/goals/:goalId", staffOrAbove, updatePatientGoal);
+apiRouter.delete("/patients/:id/goals/:goalId", staffOrAbove, deletePatientGoal);
+
+apiRouter.get("/patients/:id/media", listPatientMedia);
+apiRouter.post("/patients/:id/media", staffOrAbove, createPatientMedia);
+apiRouter.delete("/patients/:id/media/:mediaId", staffOrAbove, deletePatientMedia);
+
+apiRouter.get("/patients/:id/documents", listPatientDocuments);
+apiRouter.post("/patients/:id/documents", staffOrAbove, createPatientDocument);
+apiRouter.delete("/patients/:id/documents/:docId", staffOrAbove, deletePatientDocument);
+
+apiRouter.post("/patients/:id/timeline-events", staffOrAbove, createPatientTimelineEvent);
+
 apiRouter.get("/schedules", listSchedules);
 apiRouter.post("/schedules", staffOrAbove, createSchedule);
 apiRouter.delete("/schedules/:id", staffOrAbove, cancelSchedule);
 apiRouter.patch("/schedules/:id/outcome", staffOrAbove, updateOutcome);
+apiRouter.patch("/schedules/:id/staff", staffOrAbove, updateScheduleStaff);
 
 apiRouter.get("/conversations", staffOrAbove, listConversations);
 apiRouter.get("/conversations/:id", staffOrAbove, getConversation);
@@ -96,7 +144,10 @@ apiRouter.delete("/inventory/items/:id", requireAdmin, deleteItem);
 apiRouter.post("/inventory/movements", requireAdmin, createMovement);
 apiRouter.patch("/inventory/movements/:id", requireAdmin, updateMovement);
 
-apiRouter.get("/staff", requireAdmin, listStaff);
+// Listagem (so nome/role) liberada pra staffOrAbove - a recepcao precisa
+// escolher o "profissional responsavel" ao marcar um procedimento como
+// realizado. Gestao de contas (criar/editar/excluir) continua admin-only.
+apiRouter.get("/staff", staffOrAbove, listStaff);
 apiRouter.post("/staff", requireAdmin, createStaff);
 apiRouter.patch("/staff/:id", requireAdmin, updateStaff);
 apiRouter.delete("/staff/:id", requireAdmin, deleteStaff);

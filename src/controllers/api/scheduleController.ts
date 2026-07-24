@@ -30,7 +30,7 @@ export async function listSchedules(req: Request, res: Response): Promise<void> 
 
 export async function createSchedule(req: Request, res: Response): Promise<void> {
   try {
-    const { userId, newPatient, procedure, start, durationMinutes, notes } = req.body;
+    const { userId, newPatient, procedure, start, durationMinutes, notes, staffId } = req.body;
     if ((!userId && !newPatient) || !procedure || !start) {
       res.status(400).json({ error: "userId (ou newPatient), procedure e start sao obrigatorios." });
       return;
@@ -60,6 +60,7 @@ export async function createSchedule(req: Request, res: Response): Promise<void>
       start,
       durationMinutes,
       notes,
+      staffId,
     });
     res.status(201).json(schedule);
   } catch (err) {
@@ -108,7 +109,7 @@ export async function cancelSchedule(req: Request, res: Response): Promise<void>
 export async function updateOutcome(req: Request, res: Response): Promise<void> {
   try {
     const { id } = req.params;
-    const { outcome } = req.body;
+    const { outcome, staffId } = req.body;
     if (outcome !== "completed" && outcome !== "no_show") {
       res.status(400).json({ error: "outcome deve ser 'completed' ou 'no_show'." });
       return;
@@ -116,7 +117,8 @@ export async function updateOutcome(req: Request, res: Response): Promise<void> 
 
     const status: "Concluido" | "Faltou" = outcome === "completed" ? "Concluido" : "Faltou";
     logger.info(SCOPE, "Marcando desfecho do agendamento via CRM", { staffId: req.staff?.id, scheduleId: id, outcome });
-    const schedule = await scheduleRepository.updateScheduleStatus(id, status);
+    let schedule = await scheduleRepository.updateScheduleStatus(id, status);
+    if (staffId !== undefined) schedule = await scheduleRepository.updateStaff(id, staffId);
     await scheduleEventRepository.record(id, outcome === "completed" ? "completed" : "no_show");
 
     res.json(schedule);
@@ -134,5 +136,17 @@ export async function updateOutcome(req: Request, res: Response): Promise<void> 
   } catch (err) {
     logger.error(SCOPE, "Erro ao marcar desfecho do agendamento", err);
     res.status(500).json({ error: "Erro ao marcar desfecho do agendamento." });
+  }
+}
+
+/** Usado pela Ficha do Paciente para atribuir/corrigir o profissional responsavel por um agendamento/procedimento. */
+export async function updateScheduleStaff(req: Request, res: Response): Promise<void> {
+  try {
+    const { staffId } = req.body;
+    const schedule = await scheduleRepository.updateStaff(req.params.id, staffId ?? null);
+    res.json(schedule);
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao atualizar profissional responsavel", err);
+    res.status(500).json({ error: "Erro ao atualizar profissional responsavel." });
   }
 }

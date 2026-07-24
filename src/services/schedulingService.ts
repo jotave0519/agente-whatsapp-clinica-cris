@@ -43,6 +43,7 @@ export async function createAppointment(params: {
   start: string;
   durationMinutes?: number;
   notes?: string | null;
+  staffId?: string | null;
 }): Promise<Schedule> {
   const event = await googleCalendar.createEvent({
     name: params.name,
@@ -65,6 +66,7 @@ export async function createAppointment(params: {
     googleEventId: event.id!,
     notes: params.notes,
     durationMinutes: params.durationMinutes ?? null,
+    staffId: params.staffId ?? null,
   });
 
   // Nunca deixa uma falha do motor de lembretes mascarar como falha do

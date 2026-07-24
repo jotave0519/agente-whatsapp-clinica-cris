@@ -87,7 +87,7 @@ export async function deleteUser(id: string): Promise<void> {
 
 export async function updatePatient(
   id: string,
-  params: Partial<{ name: string; phone: string; email: string | null; active: boolean; do_not_contact: boolean }>
+  params: Partial<{ name: string; phone: string; email: string | null; active: boolean; do_not_contact: boolean; photo_path: string | null }>
 ): Promise<User> {
   const { data, error } = await getSupabaseClient()
     .from("users")

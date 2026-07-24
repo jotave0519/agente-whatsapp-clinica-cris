@@ -13,6 +13,18 @@ export async function listByDateRange(startDate: string, endDate: string): Promi
   return data || [];
 }
 
+/** Usado pelo resumo financeiro da Ficha do Paciente. */
+export async function findByUserId(patientId: string): Promise<Transaction[]> {
+  const { data, error } = await getSupabaseClient()
+    .from("transactions")
+    .select("*")
+    .eq("patient_id", patientId)
+    .order("occurred_on", { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
 export async function listRecentByType(type: TransactionType, limit = 10): Promise<Transaction[]> {
   const { data, error } = await getSupabaseClient()
     .from("transactions")

@@ -16,7 +16,7 @@ export async function listProcedures(_req: Request, res: Response): Promise<void
 
 export async function createProcedure(req: Request, res: Response): Promise<void> {
   try {
-    const { name, category, price, description, duration_minutes, notes, pre_instructions, post_instructions, active } = req.body;
+    const { name, category, price, description, duration_minutes, notes, pre_instructions, post_instructions, recommended_interval_days, active } = req.body;
     if (!name) {
       res.status(400).json({ error: "name e obrigatorio." });
       return;
@@ -32,6 +32,7 @@ export async function createProcedure(req: Request, res: Response): Promise<void
       notes,
       pre_instructions,
       post_instructions,
+      recommended_interval_days,
       active,
     });
     res.status(201).json(procedure);

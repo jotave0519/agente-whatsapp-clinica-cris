@@ -5,6 +5,7 @@ export interface User {
   email: string | null;
   active: boolean;
   do_not_contact: boolean;
+  photo_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -29,8 +30,58 @@ export interface Schedule {
   confirmed_at: string | null;
   was_rescheduled: boolean;
   duration_minutes: number | null;
+  staff_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface PatientNote {
+  id: string;
+  user_id: string;
+  author_staff_id: string | null;
+  body: string;
+  created_at: string;
+}
+
+export type PatientGoalStatus = "ativo" | "concluido";
+
+export interface PatientGoal {
+  id: string;
+  user_id: string;
+  description: string;
+  status: PatientGoalStatus;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export type PatientMediaKind = "antes" | "depois";
+
+export interface PatientMedia {
+  id: string;
+  user_id: string;
+  schedule_id: string | null;
+  kind: PatientMediaKind;
+  storage_path: string;
+  created_at: string;
+}
+
+export interface PatientDocument {
+  id: string;
+  user_id: string;
+  name: string;
+  category: string | null;
+  storage_path: string;
+  created_at: string;
+}
+
+export interface PatientTimelineEvent {
+  id: string;
+  user_id: string;
+  title: string;
+  detail: string | null;
+  occurred_at: string;
+  created_by: string | null;
+  created_at: string;
 }
 
 /** 'confirmation' (pedido inicial) ou 'nudge_N' (N-esimo lembrete de nao-resposta) - N e configuravel, nao um enum fixo. */
@@ -377,6 +428,7 @@ export interface Procedure {
   notes: string | null;
   pre_instructions: string | null;
   post_instructions: string | null;
+  recommended_interval_days: number | null;
   active: boolean;
   created_at: string;
   updated_at: string;

@@ -22,6 +22,7 @@ export async function create(params: {
   notes?: string | null;
   pre_instructions?: string | null;
   post_instructions?: string | null;
+  recommended_interval_days?: number | null;
   active?: boolean;
 }): Promise<Procedure> {
   const { data, error } = await getSupabaseClient()
@@ -44,6 +45,7 @@ export async function update(
     notes: string | null;
     pre_instructions: string | null;
     post_instructions: string | null;
+    recommended_interval_days: number | null;
     active: boolean;
   }>
 ): Promise<Procedure> {

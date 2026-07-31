@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useToast } from "../context/ToastContext";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { api } from "../lib/api";
 import { XIcon } from "./icons";
@@ -12,6 +13,11 @@ interface StatusResponse {
   connectionStatus: string;
 }
 
+interface ConnectLinkResponse {
+  token: string;
+  expiresAt: number;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -19,31 +25,74 @@ interface Props {
 }
 
 type QrState = "idle" | "loading" | "ready" | "error";
-type CodeState = "idle" | "loading" | "ready" | "error";
+type LinkState = "idle" | "loading" | "ready" | "error";
 
 const STATUS_POLL_MS = 3000;
 
-/** "WZYEH1YY" -> "WZYE-H1YY", so pra ficar no formato que o proprio WhatsApp mostra. */
-function formatPairingCode(code: string): string {
-  const clean = code.replace(/[^A-Za-z0-9]/g, "");
-  if (clean.length <= 4) return clean;
-  return `${clean.slice(0, 4)}-${clean.slice(4, 8)}`;
-}
-
+/**
+ * So QR Code - testado ao vivo contra a instancia real (Evolution API v2.3.7,
+ * integracao WHATSAPP-BAILEYS): GET /instance/connect/{instance}?number=...
+ * responde 200 mas `pairingCode` sempre volta null nessa versao/instancia,
+ * mesmo com um numero valido. Mesmo sintoma relatado em issues abertas no
+ * repositorio oficial da Evolution API pra essa faixa de versao. Por isso a
+ * opcao de pareamento por codigo foi removida da interface (nao faz sentido
+ * deixar um botao que so gera erro).
+ *
+ * O backend (evolutionApiClient.getConnectQrCode) ja aceita um numero de
+ * telefone opcional e repassa via ?number= sem quebrar nada - se uma versao
+ * futura da Evolution API corrigir isso, basta reintroduzir aqui a aba/form
+ * de telefone chamando `/whatsapp/qrcode?number=...`, sem precisar mexer no
+ * backend.
+ */
 export function WhatsAppConnectModal({ open, onClose, onConnected }: Props) {
   useBodyScrollLock(open);
-  const [tab, setTab] = useState<"qr" | "code">("qr");
+  const showToast = useToast();
 
   const [qrState, setQrState] = useState<QrState>("idle");
   const [qrBase64, setQrBase64] = useState<string | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
 
-  const [phone, setPhone] = useState("");
-  const [codeState, setCodeState] = useState<CodeState>("idle");
-  const [pairingCode, setPairingCode] = useState<string | null>(null);
-  const [codeError, setCodeError] = useState<string | null>(null);
+  const [linkState, setLinkState] = useState<LinkState>("idle");
+  const [linkUrl, setLinkUrl] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   const requestedQrOnce = useRef(false);
+
+  async function generateLink() {
+    setLinkState("loading");
+    setLinkError(null);
+    try {
+      const r = await api.post<ConnectLinkResponse>("/whatsapp/connect-link", {});
+      setLinkUrl(`${window.location.origin}/conectar-whatsapp/${r.token}`);
+      setLinkState("ready");
+    } catch (e: any) {
+      setLinkError(e.message || "Não foi possível gerar o link.");
+      setLinkState("error");
+    }
+  }
+
+  async function copyLink() {
+    if (!linkUrl) return;
+    try {
+      await navigator.clipboard.writeText(linkUrl);
+      showToast("✓ Link copiado.");
+    } catch {
+      showToast("Não foi possível copiar o link.");
+    }
+  }
+
+  async function shareLink() {
+    if (!linkUrl) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Conectar WhatsApp da clínica", url: linkUrl });
+      } catch {
+        // usuario cancelou o compartilhamento - nada a fazer
+      }
+    } else {
+      copyLink();
+    }
+  }
 
   async function generateQr() {
     setQrState("loading");
@@ -63,30 +112,10 @@ export function WhatsAppConnectModal({ open, onClose, onConnected }: Props) {
     }
   }
 
-  async function generateCode(e: FormEvent) {
-    e.preventDefault();
-    if (!phone.trim()) return;
-    setCodeState("loading");
-    setCodeError(null);
-    try {
-      const r = await api.get<QrResponse>(`/whatsapp/qrcode?number=${encodeURIComponent(phone.trim())}`);
-      if (r.pairingCode) {
-        setPairingCode(r.pairingCode);
-        setCodeState("ready");
-      } else {
-        setCodeError("Não foi possível gerar o código de pareamento. Tente escanear o QR Code.");
-        setCodeState("error");
-      }
-    } catch {
-      setCodeError("Não foi possível gerar o código de pareamento. Tente escanear o QR Code.");
-      setCodeState("error");
-    }
-  }
-
   // Gera o QR automaticamente ao abrir (o usuario ja clicou "Conectar WhatsApp"
   // pra chegar aqui, nao precisa de mais um clique pra ver o QR).
   useEffect(() => {
-    if (open && tab === "qr" && !requestedQrOnce.current) {
+    if (open && !requestedQrOnce.current) {
       requestedQrOnce.current = true;
       generateQr();
     }
@@ -95,18 +124,16 @@ export function WhatsAppConnectModal({ open, onClose, onConnected }: Props) {
       setQrState("idle");
       setQrBase64(null);
       setQrError(null);
-      setTab("qr");
-      setPhone("");
-      setCodeState("idle");
-      setPairingCode(null);
-      setCodeError(null);
+      setLinkState("idle");
+      setLinkUrl(null);
+      setLinkError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, tab]);
+  }, [open]);
 
   // Enquanto o modal estiver aberto, verifica a cada poucos segundos se a
-  // sessao foi conectada (depois de escanear o QR ou digitar o codigo no
-  // celular) - detecta e fecha sozinho, sem precisar atualizar a pagina.
+  // sessao foi conectada (depois de escanear o QR) - detecta e fecha sozinho,
+  // sem precisar atualizar a pagina.
   useEffect(() => {
     if (!open) return;
     const interval = setInterval(async () => {
@@ -128,7 +155,7 @@ export function WhatsAppConnectModal({ open, onClose, onConnected }: Props) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card" style={{ maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 4 }}>
           <div style={{ fontSize: 16, fontWeight: 600 }}>Conectar WhatsApp</div>
           <button className="mobile-icon-btn" style={{ marginTop: -6, marginRight: -8, flexShrink: 0 }} onClick={onClose}>
@@ -140,100 +167,86 @@ export function WhatsAppConnectModal({ open, onClose, onConnected }: Props) {
           automaticamente.
         </p>
 
-        <div className="segmented" style={{ marginBottom: 18 }}>
-          <span className={`segmented-item${tab === "qr" ? " active" : ""}`} style={{ cursor: "pointer" }} onClick={() => setTab("qr")}>
-            Escanear QR Code
-          </span>
-          <span className={`segmented-item${tab === "code" ? " active" : ""}`} style={{ cursor: "pointer" }} onClick={() => setTab("code")}>
-            Conectar com código
-          </span>
+        <div style={{ textAlign: "center" }}>
+          <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>
+            Abra o WhatsApp → Dispositivos conectados → Conectar dispositivo → Escaneie este QR Code.
+          </p>
+
+          {qrState === "loading" && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "24px 0" }}>
+              <span className="spinner" />
+              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Gerando QR Code...</span>
+            </div>
+          )}
+
+          {qrState === "ready" && qrBase64 && (
+            <>
+              <img
+                src={qrBase64.startsWith("data:") ? qrBase64 : `data:image/png;base64,${qrBase64}`}
+                alt="QR code de conexão do WhatsApp"
+                style={{ width: 220, height: 220, borderRadius: 12, margin: "0 auto" }}
+              />
+              <button className="btn btn-secondary" style={{ marginTop: 14 }} onClick={generateQr}>
+                Atualizar QR
+              </button>
+            </>
+          )}
+
+          {qrState === "error" && (
+            <div style={{ padding: "16px 0" }}>
+              <p style={{ fontSize: 13, color: "var(--red)", marginBottom: 12 }}>❌ {qrError}</p>
+              <button className="btn btn-secondary" onClick={generateQr}>
+                Tentar novamente
+              </button>
+            </div>
+          )}
         </div>
 
-        {tab === "qr" && (
-          <div style={{ textAlign: "center" }}>
-            <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>
-              Abra o WhatsApp → Dispositivos conectados → Conectar dispositivo → Escaneie este QR Code.
-            </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0" }}>
+          <div style={{ flex: 1, height: 1, background: "var(--border-soft)" }} />
+          <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>ou</span>
+          <div style={{ flex: 1, height: 1, background: "var(--border-soft)" }} />
+        </div>
 
-            {qrState === "loading" && (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "24px 0" }}>
-                <span className="spinner" />
-                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Gerando QR Code...</span>
+        <div style={{ textAlign: "center" }}>
+          <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12 }}>
+            Só com o celular em mãos? Gere um link para abrir o QR Code em outro aparelho (computador, tablet ou outro celular).
+          </p>
+
+          {linkState !== "ready" && (
+            <button className="btn btn-secondary" onClick={generateLink} disabled={linkState === "loading"}>
+              {linkState === "loading" ? "Gerando link..." : "🔗 Gerar link para abrir em outro aparelho"}
+            </button>
+          )}
+
+          {linkState === "error" && <p style={{ fontSize: 12.5, color: "var(--red)", marginTop: 10 }}>❌ {linkError}</p>}
+
+          {linkState === "ready" && linkUrl && (
+            <div>
+              <p style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 8 }}>Link válido por 10 minutos:</p>
+              <div
+                style={{
+                  fontSize: 12,
+                  wordBreak: "break-all",
+                  background: "var(--border-soft)",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  marginBottom: 10,
+                }}
+              >
+                {linkUrl}
               </div>
-            )}
-
-            {qrState === "ready" && qrBase64 && (
-              <>
-                <img
-                  src={qrBase64.startsWith("data:") ? qrBase64 : `data:image/png;base64,${qrBase64}`}
-                  alt="QR code de conexão do WhatsApp"
-                  style={{ width: 220, height: 220, borderRadius: 12, margin: "0 auto" }}
-                />
-                <button className="btn btn-secondary" style={{ marginTop: 14 }} onClick={generateQr}>
-                  Atualizar QR
+              <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+                <button className="btn btn-secondary" onClick={copyLink}>
+                  Copiar link
                 </button>
-              </>
-            )}
-
-            {qrState === "error" && (
-              <div style={{ padding: "16px 0" }}>
-                <p style={{ fontSize: 13, color: "var(--red)", marginBottom: 12 }}>❌ {qrError}</p>
-                <button className="btn btn-secondary" onClick={generateQr}>
-                  Tentar novamente
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {tab === "code" && (
-          <div>
-            {codeState !== "ready" && (
-              <form onSubmit={generateCode} style={{ display: "grid", gap: 12 }}>
-                <div>
-                  <label className="field-label">Telefone da clínica</label>
-                  <input
-                    className="input"
-                    type="tel"
-                    inputMode="tel"
-                    placeholder="+55 11 99999-9999"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                  />
-                </div>
-                {codeState === "error" && <p style={{ fontSize: 12.5, color: "var(--red)" }}>❌ {codeError}</p>}
-                <button className="btn" type="submit" disabled={codeState === "loading"}>
-                  {codeState === "loading" ? "Gerando..." : "Gerar código"}
-                </button>
-              </form>
-            )}
-
-            {codeState === "ready" && pairingCode && (
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 6 }}>Código:</div>
-                <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 16 }}>{formatPairingCode(pairingCode)}</div>
-                <p style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.7, textAlign: "left" }}>
-                  No WhatsApp:
-                  <br />
-                  Configurações → Dispositivos conectados → Conectar dispositivo → Conectar usando código
-                  <br />
-                  Digite o código acima.
-                </p>
-                <button
-                  className="btn btn-secondary"
-                  style={{ marginTop: 10 }}
-                  onClick={() => {
-                    setCodeState("idle");
-                    setPairingCode(null);
-                  }}
-                >
-                  Gerar novo código
+                <button className="btn btn-secondary" onClick={shareLink}>
+                  Compartilhar
                 </button>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

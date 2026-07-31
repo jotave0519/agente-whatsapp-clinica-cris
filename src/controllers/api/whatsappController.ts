@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as conversationRepository from "../../repositories/conversationRepository";
 import * as evolutionApiClient from "../../integrations/evolutionApiClient";
+import * as whatsappConnectLinkService from "../../services/whatsappConnectLinkService";
 import { logger } from "../../utils/logger";
 
 const SCOPE = "api.whatsapp";
@@ -55,5 +56,44 @@ export async function disconnect(req: Request, res: Response): Promise<void> {
   } catch (err) {
     logger.error(SCOPE, "Erro ao desconectar instancia", err);
     res.status(500).json({ error: "Erro ao desconectar instancia." });
+  }
+}
+
+/**
+ * Gera um link temporario (10 min) pra abrir o QR Code de conexao numa
+ * pagina publica, sem login - util quando a clinica so tem o celular em
+ * maos e precisa escanear o QR a partir de outro aparelho.
+ */
+export async function createConnectLink(req: Request, res: Response): Promise<void> {
+  logger.info(SCOPE, "Link de conexao gerado", { staffId: req.staff?.id });
+  const { token, expiresAt } = whatsappConnectLinkService.createConnectLinkToken();
+  res.json({ token, expiresAt });
+}
+
+export async function getPublicQrCode(req: Request, res: Response): Promise<void> {
+  if (!whatsappConnectLinkService.isConnectLinkTokenValid(req.params.token)) {
+    res.status(410).json({ error: "Link expirado ou inválido. Gere um novo link na plataforma." });
+    return;
+  }
+  try {
+    const qr = await evolutionApiClient.getConnectQrCode();
+    res.json(qr);
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao gerar QR code (link publico)", err);
+    res.status(500).json({ error: "Erro ao gerar QR code." });
+  }
+}
+
+export async function getPublicStatus(req: Request, res: Response): Promise<void> {
+  if (!whatsappConnectLinkService.isConnectLinkTokenValid(req.params.token)) {
+    res.status(410).json({ error: "Link expirado ou inválido. Gere um novo link na plataforma." });
+    return;
+  }
+  try {
+    const instance = await evolutionApiClient.getInstanceInfo();
+    res.json({ connectionStatus: instance.connectionStatus });
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao buscar status (link publico)", err);
+    res.status(500).json({ error: "Erro ao buscar status." });
   }
 }

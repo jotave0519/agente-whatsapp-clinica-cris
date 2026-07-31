@@ -67,7 +67,7 @@ import {
 import { cancelSchedule, createSchedule, listSchedules, updateOutcome, updateScheduleStaff } from "../controllers/api/scheduleController";
 import { getSettings, updateSettings } from "../controllers/api/settingsController";
 import { createStaff, deleteStaff, listStaff, updateStaff } from "../controllers/api/staffController";
-import { disconnect, getQrCode, getStatus } from "../controllers/api/whatsappController";
+import { createConnectLink, disconnect, getQrCode, getStatus } from "../controllers/api/whatsappController";
 import { requireAdmin } from "../middleware/requireAdmin";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
@@ -173,6 +173,7 @@ apiRouter.delete("/business-hours/slots/:id", requireAdmin, deleteSlot);
 
 apiRouter.get("/whatsapp/status", staffOrAbove, getStatus);
 apiRouter.get("/whatsapp/qrcode", staffOrAbove, getQrCode);
+apiRouter.post("/whatsapp/connect-link", staffOrAbove, createConnectLink);
 apiRouter.post("/whatsapp/disconnect", requireAdmin, disconnect);
 
 apiRouter.get("/reactivation-campaigns", requireAdmin, listCampaigns);

@@ -8,6 +8,7 @@ import { ToastProvider } from "./context/ToastContext";
 import { Agenda } from "./pages/Agenda";
 import { CampanhasReativacao } from "./pages/CampanhasReativacao";
 import { Configuracoes } from "./pages/Configuracoes";
+import { ConnectWhatsAppLink } from "./pages/ConnectWhatsAppLink";
 import { Conversas } from "./pages/Conversas";
 import { Dashboard } from "./pages/Dashboard";
 import { DadosClinica } from "./pages/DadosClinica";
@@ -34,6 +35,7 @@ export function App() {
           <AuthProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/conectar-whatsapp/:token" element={<ConnectWhatsAppLink />} />
               <Route element={<ProtectedRoute />}>
                 <Route
                   element={

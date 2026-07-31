@@ -51,6 +51,9 @@ export const MoreIcon = (props: SVGProps<SVGSVGElement>) => (
   <Icon {...props} d="M4 12h.01M12 12h.01M20 12h.01M4 12a1 1 0 1 0 2 0 1 1 0 0 0-2 0ZM11 12a1 1 0 1 0 2 0 1 1 0 0 0-2 0ZM19 12a1 1 0 1 0 2 0 1 1 0 0 0-2 0Z" />
 );
 export const XIcon = (props: SVGProps<SVGSVGElement>) => <Icon {...props} d="M18 6 6 18M6 6l12 12" />;
+export const InfoIcon = (props: SVGProps<SVGSVGElement>) => (
+  <Icon {...props} d="M12 2a10 10 0 1 0 0.01 0Z M12 16v-4M12 8h.01" />
+);
 export const ArrowLeftIcon = (props: SVGProps<SVGSVGElement>) => <Icon {...props} d="M19 12H5M12 19l-7-7 7-7" />;
 export const SettingsIcon = (props: SVGProps<SVGSVGElement>) => (
   <Icon

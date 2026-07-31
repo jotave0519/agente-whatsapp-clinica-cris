@@ -1,6 +1,16 @@
 import { FormEvent, useEffect, useState } from "react";
 import { BackHeader } from "../components/BackHeader";
+import { useToast } from "../context/ToastContext";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
+
+const FIELD_TYPES: Partial<Record<keyof ClinicSettings, { type: string; inputMode?: "tel" | "email" | "numeric" }>> = {
+  phone: { type: "tel", inputMode: "tel" },
+  whatsapp: { type: "tel", inputMode: "tel" },
+  email: { type: "email", inputMode: "email" },
+  zip_code: { type: "text", inputMode: "numeric" },
+  website: { type: "url" },
+};
 
 interface ClinicSettings {
   name: string;
@@ -21,9 +31,10 @@ interface ClinicSettings {
 }
 
 export function DadosClinica() {
+  const isMobile = useIsMobile();
+  const showToast = useToast();
   const [clinic, setClinic] = useState<ClinicSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -37,11 +48,10 @@ export function DadosClinica() {
     e.preventDefault();
     if (!clinic) return;
     setSaving(true);
-    setSaved(false);
     setError(null);
     try {
       await api.patch("/settings", { clinic });
-      setSaved(true);
+      showToast("✓ Informações salvas.");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -53,11 +63,14 @@ export function DadosClinica() {
   if (!clinic) return <div className="empty-state">Carregando...</div>;
 
   function field(label: string, key: keyof ClinicSettings) {
+    const typeInfo = FIELD_TYPES[key];
     return (
       <div>
         <label className="field-label">{label}</label>
         <input
           className="input"
+          type={typeInfo?.type || "text"}
+          inputMode={typeInfo?.inputMode}
           value={(clinic as any)[key] || ""}
           onChange={(e) => setClinic({ ...(clinic as ClinicSettings), [key]: e.target.value })}
         />
@@ -70,11 +83,10 @@ export function DadosClinica() {
       <BackHeader title="Dados da Clínica" subtitle="Usados pela IA para responder dúvidas sobre a clínica no WhatsApp" backTo="/configuracoes" />
 
       {error && <div className="error-text">{error}</div>}
-      {saved && <div style={{ color: "var(--green)", fontSize: 12.5 }}>Informações salvas.</div>}
 
       <div className="card">
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Dados básicos</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14 }}>
           {field("Nome da clínica", "name")}
           {field("Nome da responsável", "responsible_name")}
           {field("Especialidade", "specialty")}

@@ -1,20 +1,23 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
+import { useToast } from "../context/ToastContext";
 import { MoonIcon, SunIcon } from "../components/icons";
+import { WhatsAppConnectModal } from "../components/WhatsAppConnectModal";
 import { api } from "../lib/api";
 
 interface StatusData {
   connectionStatus: string;
   phone: string | null;
   profileName: string | null;
+  connectedSince: string | null;
 }
 
 export function Configuracoes() {
   const { theme, setTheme } = useTheme();
+  const showToast = useToast();
   const [status, setStatus] = useState<StatusData | null>(null);
-  const [qr, setQr] = useState<{ base64: string | null; pairingCode: string | null } | null>(null);
-  const [loadingQr, setLoadingQr] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function loadStatus() {
@@ -32,25 +35,13 @@ export function Configuracoes() {
     return () => clearInterval(interval);
   }, []);
 
-  async function handleGenerateQr() {
-    setLoadingQr(true);
-    setError(null);
-    try {
-      const r = await api.get<{ base64: string | null; pairingCode: string | null }>("/whatsapp/qrcode");
-      setQr(r);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoadingQr(false);
-    }
-  }
-
   async function handleDisconnect() {
     if (!window.confirm("Desconectar o WhatsApp da clínica? O atendimento automático para de funcionar até reconectar.")) return;
     setError(null);
     try {
       await api.post("/whatsapp/disconnect", {});
       await loadStatus();
+      showToast("✓ WhatsApp desconectado.");
     } catch (e: any) {
       setError(e.message);
     }
@@ -75,12 +66,21 @@ export function Configuracoes() {
         </Link>
 
         <div className="card">
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: qr?.base64 || !connected ? 14 : 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 600 }}>WhatsApp da clínica</div>
-              <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>{status?.phone ? `+${status.phone}` : "Conexão do canal de atendimento"}</div>
+              <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>
+                {connected && status?.phone ? `+${status.phone}` : "Conexão do canal de atendimento"}
+              </div>
+              {connected && status?.connectedSince && (
+                <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 2 }}>
+                  Conectado desde {new Date(status.connectedSince).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                </div>
+              )}
             </div>
-            <span className={`badge ${connected ? "badge-green" : "badge-red"}`}>{status === null ? "..." : connected ? "Conectado" : "Desconectado"}</span>
+            <span className={`badge ${connected ? "badge-green" : "badge-red"}`}>
+              {status === null ? "..." : connected ? "🟢 Conectado" : "🔴 Desconectado"}
+            </span>
           </div>
 
           {connected ? (
@@ -88,17 +88,20 @@ export function Configuracoes() {
               Desconectar
             </button>
           ) : (
-            <div>
-              {qr?.base64 ? (
-                <img src={qr.base64.startsWith("data:") ? qr.base64 : `data:image/png;base64,${qr.base64}`} alt="QR code" style={{ width: 160, height: 160, borderRadius: 12 }} />
-              ) : (
-                <button className="btn btn-secondary" onClick={handleGenerateQr} disabled={loadingQr}>
-                  {loadingQr ? "Gerando..." : "Conectar WhatsApp"}
-                </button>
-              )}
-            </div>
+            <button className="btn btn-secondary" onClick={() => setShowConnectModal(true)}>
+              Conectar WhatsApp
+            </button>
           )}
         </div>
+
+        <WhatsAppConnectModal
+          open={showConnectModal}
+          onClose={() => setShowConnectModal(false)}
+          onConnected={() => {
+            loadStatus();
+            showToast("✓ WhatsApp conectado.");
+          }}
+        />
 
         <div className="card">
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>Preferências</div>

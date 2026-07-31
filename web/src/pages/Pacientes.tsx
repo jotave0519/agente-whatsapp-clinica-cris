@@ -115,11 +115,11 @@ export function Pacientes() {
       </div>
       <div>
         <label className="field-label">Telefone</label>
-        <input className="input" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        <input className="input" type="tel" inputMode="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
       </div>
       <div>
         <label className="field-label">E-mail</label>
-        <input className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <input className="input" type="email" inputMode="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
       </div>
       <div style={{ display: "flex", gap: 10 }}>
         <button className="btn" type="submit" disabled={saving}>

@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { canAccessPage } from "../lib/permissions";
 import { LogOutIcon, XIcon } from "./icons";
 
@@ -21,6 +22,7 @@ interface Props {
 export function MobileMoreSheet({ onClose }: Props) {
   const { session, staff, signOut } = useAuth();
   const visibleItems = ITEMS.filter((item) => canAccessPage(staff?.role, item.to));
+  useBodyScrollLock(true);
 
   return (
     <div className="modal-overlay" onClick={onClose}>

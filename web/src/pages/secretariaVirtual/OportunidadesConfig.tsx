@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { BackHeader } from "../../components/BackHeader";
+import { useToast } from "../../context/ToastContext";
 import { api } from "../../lib/api";
 
 interface Settings {
@@ -10,10 +11,10 @@ interface Settings {
 }
 
 export function OportunidadesConfig() {
+  const showToast = useToast();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     api
@@ -26,11 +27,10 @@ export function OportunidadesConfig() {
     e.preventDefault();
     if (!settings) return;
     setSaving(true);
-    setSaved(false);
     setError(null);
     try {
       await api.patch("/settings", { clinic: settings });
-      setSaved(true);
+      showToast("✓ Configuração salva.");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -40,7 +40,12 @@ export function OportunidadesConfig() {
 
   return (
     <div>
-      <BackHeader title="Oportunidades comerciais" subtitle="Ajustes finos do acompanhamento automático de pacientes que ainda não converteram" backTo="/secretaria-virtual" />
+      <BackHeader
+        title="Oportunidades comerciais"
+        subtitle="Acompanha pacientes interessados que ainda não fecharam e retoma contato para aumentar a conversão"
+        backTo="/secretaria-virtual"
+        help="Sempre que a IA percebe, numa conversa, que um paciente se interessou por um procedimento sem agendar, ela cria uma oportunidade no Kanban. A partir daí, envia mensagens de follow-up nos intervalos configurados até o paciente agendar, recusar, ou a oportunidade expirar — sem precisar de nenhuma ação manual da recepção."
+      />
 
       {error && <div className="error-text">{error}</div>}
       {!settings ? (
@@ -97,7 +102,6 @@ export function OportunidadesConfig() {
             paciente responder.
           </p>
 
-          {saved && <div style={{ color: "var(--green)", fontSize: 12.5 }}>Configurações salvas.</div>}
           <button className="btn" type="submit" disabled={saving}>
             {saving ? "Salvando..." : "Salvar"}
           </button>

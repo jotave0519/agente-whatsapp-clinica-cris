@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { BackHeader } from "../../components/BackHeader";
 import { FormSheet } from "../../components/FormSheet";
+import { useToast } from "../../context/ToastContext";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { api } from "../../lib/api";
 
@@ -16,6 +17,7 @@ const EMPTY_FORM = { question: "", answer: "", active: true };
 
 export function Faq() {
   const isMobile = useIsMobile();
+  const showToast = useToast();
   const [items, setItems] = useState<FaqItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -60,6 +62,7 @@ export function Faq() {
       }
       setShowForm(false);
       await load();
+      showToast(editingId ? "✓ FAQ atualizado." : "✓ Pergunta criada com sucesso.");
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -72,6 +75,7 @@ export function Faq() {
     try {
       await api.delete(`/faq/${f.id}`);
       await load();
+      showToast("✓ Pergunta excluída.");
     } catch (e: any) {
       setError(e.message);
     }
@@ -81,6 +85,7 @@ export function Faq() {
     try {
       await api.patch(`/faq/${f.id}`, { active: !f.active });
       await load();
+      showToast(f.active ? "✓ Pergunta desativada." : "✓ Pergunta ativada.");
     } catch (e: any) {
       setError(e.message);
     }
@@ -114,7 +119,12 @@ export function Faq() {
 
   return (
     <div>
-      <BackHeader title="Perguntas frequentes" subtitle="A IA consulta esta lista antes de responder no WhatsApp" backTo="/secretaria-virtual" />
+      <BackHeader
+        title="Perguntas frequentes"
+        subtitle="Respostas prontas que a IA consulta antes de responder dúvidas comuns dos pacientes"
+        backTo="/secretaria-virtual"
+        help="Toda vez que um paciente pergunta algo pelo WhatsApp, a IA verifica primeiro se a pergunta bate com alguma cadastrada aqui. Se bater, ela responde com o texto exato que você escreveu — garantindo que informações sensíveis (preço, contraindicações etc.) sejam sempre respondidas do jeito que a clínica aprovou."
+      />
 
       {error && !items && <div className="empty-state">{error}</div>}
       {!items ? (

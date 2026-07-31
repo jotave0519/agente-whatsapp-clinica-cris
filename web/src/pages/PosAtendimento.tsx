@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { BackHeader } from "../components/BackHeader";
 import { FormSheet } from "../components/FormSheet";
+import { useToast } from "../context/ToastContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 
@@ -81,6 +82,7 @@ function delayLabel(m: FlowMessage): string {
 
 export function PosAtendimento() {
   const isMobile = useIsMobile();
+  const showToast = useToast();
   const [tab, setTab] = useState<"fluxos" | "historico">("fluxos");
 
   const [flows, setFlows] = useState<Flow[] | null>(null);
@@ -166,6 +168,7 @@ export function PosAtendimento() {
       }
       setShowForm(false);
       loadFlows();
+      showToast(editingId ? "✓ Fluxo atualizado." : "✓ Fluxo criado com sucesso.");
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -177,6 +180,7 @@ export function PosAtendimento() {
     try {
       await api.patch(`/post-attendance-flows/${f.id}`, { active: !f.active });
       loadFlows();
+      showToast(f.active ? "✓ Fluxo pausado." : "✓ Fluxo ativado.");
     } catch (e: any) {
       setError(e.message);
     }
@@ -187,6 +191,7 @@ export function PosAtendimento() {
     try {
       await api.delete(`/post-attendance-flows/${f.id}`);
       loadFlows();
+      showToast("✓ Fluxo excluído.");
     } catch (e: any) {
       setError(e.message);
     }
@@ -296,7 +301,12 @@ export function PosAtendimento() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 18, flexWrap: "wrap" }}>
-        <BackHeader title="Acompanhar depois da consulta" subtitle="Mensagens automáticas enviadas ao paciente após o atendimento" backTo="/secretaria-virtual" />
+        <BackHeader
+          title="Acompanhar depois da consulta"
+          subtitle="Pergunta como o paciente está após o atendimento e alerta a clínica em caso de problema"
+          backTo="/secretaria-virtual"
+          help="Algumas horas depois da consulta (o prazo é configurável), a IA manda uma mensagem perguntando como o paciente está se sentindo. A resposta fica registrada no histórico do paciente. Se ele relatar dor, reação ou insatisfação, a clínica recebe um alerta para entrar em contato o quanto antes."
+        />
         {tab === "fluxos" && (
           <button
             onClick={startCreate}

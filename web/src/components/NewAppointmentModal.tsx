@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { api } from "../lib/api";
 
 interface PatientMatch {
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function NewAppointmentModal({ onClose, onCreated }: Props) {
+  useBodyScrollLock(true);
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<PatientMatch[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<PatientMatch | null>(null);
@@ -124,7 +126,7 @@ export function NewAppointmentModal({ onClose, onCreated }: Props) {
             {creatingNew ? (
               <div style={{ display: "grid", gap: 8 }}>
                 <input className="input" placeholder="Nome completo" value={newName} onChange={(e) => setNewName(e.target.value)} />
-                <input className="input" placeholder="Telefone (com DDD)" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
+                <input className="input" type="tel" inputMode="tel" placeholder="Telefone (com DDD)" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
                 <button
                   type="button"
                   style={{ fontSize: 12, color: "var(--accent)", textAlign: "left" }}

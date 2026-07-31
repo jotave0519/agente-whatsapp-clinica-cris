@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BackHeader } from "../../components/BackHeader";
+import { useToast } from "../../context/ToastContext";
 import { api } from "../../lib/api";
 
 interface ClinicSettings {
@@ -14,6 +15,7 @@ interface ClinicSettings {
 const HOURS_SHORTCUTS = [24, 12, 6, 2];
 
 export function Confirmacao() {
+  const showToast = useToast();
   const [settings, setSettings] = useState<ClinicSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +35,7 @@ export function Confirmacao() {
     setError(null);
     try {
       await api.patch("/settings", { clinic: patch });
+      showToast("✓ Configuração salva.");
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -42,7 +45,12 @@ export function Confirmacao() {
 
   return (
     <div>
-      <BackHeader title="Confirmação de consultas" subtitle="Envia um pedido de confirmação pelo WhatsApp antes de cada consulta" backTo="/secretaria-virtual" />
+      <BackHeader
+        title="Confirmação de consultas"
+        subtitle="Pede confirmação pelo WhatsApp antes de cada consulta e avisa a clínica sobre a resposta do paciente"
+        backTo="/secretaria-virtual"
+        help="A IA envia automaticamente um pedido de confirmação alguns dias antes da consulta. Se o paciente confirmar, o agendamento é marcado como confirmado na Agenda. Se ele pedir para remarcar ou não responder no prazo, a clínica é avisada para agir. Isso reduz faltas e mantém a agenda sempre atualizada."
+      />
 
       {error && <div className="error-text">{error}</div>}
       {!settings ? (

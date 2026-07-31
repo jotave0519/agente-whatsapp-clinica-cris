@@ -51,7 +51,8 @@ export function SecretariaVirtual() {
         <div className="card" style={{ padding: 0, maxWidth: 620 }}>
           <ToggleCard
             title="Confirmação de consultas"
-            description="Pede confirmação pelo WhatsApp antes de cada consulta"
+            description="Pede confirmação pelo WhatsApp antes de cada consulta e avisa a clínica quando o paciente confirma, remarca ou não responde."
+            help="A IA envia automaticamente um pedido de confirmação alguns dias antes da consulta. Se o paciente confirmar, o agendamento é marcado como confirmado na Agenda. Se ele pedir para remarcar ou não responder no prazo, a clínica é avisada para agir. Isso reduz faltas e mantém a agenda sempre atualizada."
             checked={settings.confirmation_enabled}
             disabled={savingKey === "confirmation_enabled"}
             onToggle={() => toggle("confirmation_enabled")}
@@ -59,7 +60,8 @@ export function SecretariaVirtual() {
           />
           <ToggleCard
             title="Recuperar pacientes que sumiram"
-            description="Retoma contato com quem ficou muito tempo sem aparecer"
+            description="Identifica pacientes que não retornam há um tempo e inicia uma campanha personalizada de reativação pelo WhatsApp."
+            help="Com base no tempo de inatividade que você define (ex: 60 dias sem consulta), a IA seleciona os pacientes do perfil escolhido e envia mensagens no tom configurado, espalhadas ao longo dos dias para não parecer spam. Ela registra quem respondeu, remarcou ou não teve interesse, e nunca contata quem já tem consulta futura ou pediu para não ser contatado."
             checked={settings.reactivation_enabled}
             disabled={savingKey === "reactivation_enabled"}
             onToggle={() => toggle("reactivation_enabled")}
@@ -67,7 +69,8 @@ export function SecretariaVirtual() {
           />
           <ToggleCard
             title="Acompanhar depois da consulta"
-            description="Manda mensagens de acompanhamento após o atendimento"
+            description="Envia mensagens após o atendimento perguntando como o paciente está e alerta a clínica em caso de dor, desconforto ou qualquer problema relatado."
+            help="Algumas horas depois da consulta (o prazo é configurável), a IA manda uma mensagem perguntando como o paciente está se sentindo. A resposta fica registrada no histórico do paciente. Se ele relatar dor, reação ou insatisfação, a clínica recebe um alerta para entrar em contato o quanto antes."
             checked={settings.post_attendance_enabled}
             disabled={savingKey === "post_attendance_enabled"}
             onToggle={() => toggle("post_attendance_enabled")}
@@ -75,7 +78,8 @@ export function SecretariaVirtual() {
           />
           <ToggleCard
             title="Oportunidades comerciais"
-            description="Acompanha quem demonstrou interesse mas ainda não fechou"
+            description="Acompanha pacientes que demonstraram interesse em um procedimento mas ainda não fecharam, e retoma contato para aumentar a conversão."
+            help="Sempre que a IA percebe, numa conversa, que um paciente se interessou por um procedimento sem agendar, ela cria uma oportunidade no Kanban. A partir daí, envia mensagens de follow-up nos intervalos configurados até o paciente agendar, recusar, ou a oportunidade expirar — sem precisar de nenhuma ação manual da recepção."
             checked={settings.commercial_ai_enabled}
             disabled={savingKey === "commercial_ai_enabled"}
             onToggle={() => toggle("commercial_ai_enabled")}
@@ -83,13 +87,15 @@ export function SecretariaVirtual() {
           />
           <ToggleCard
             title="Perguntas frequentes"
-            description="Respostas que a IA usa para dúvidas comuns"
+            description="Respostas prontas que a IA consulta antes de responder dúvidas comuns dos pacientes, como preço, funcionamento e preparo."
+            help="Toda vez que um paciente pergunta algo pelo WhatsApp, a IA verifica primeiro se a pergunta bate com alguma cadastrada aqui. Se bater, ela responde com o texto exato que você escreveu — garantindo que informações sensíveis (preço, contraindicações etc.) sejam sempre respondidas do jeito que a clínica aprovou."
             adjustTo="/secretaria-virtual/faq"
             adjustLabel="Editar"
           />
           <ToggleCard
             title="Avisar quando o cliente some no meio da conversa"
-            description="Pergunta se o cliente ainda está por aqui após alguns minutos sem resposta"
+            description="Pergunta gentilmente se o paciente ainda está por aqui quando ele para de responder no meio de um atendimento, evitando abandonos silenciosos."
+            help="Se um paciente parar de responder no meio de uma conversa (por exemplo, durante um agendamento), a IA aguarda alguns minutos e envia uma mensagem perguntando se ele ainda está por aí. Isso ajuda a recuperar conversas que ficariam paradas e reduz agendamentos abandonados pela metade."
             checked={settings.inactivity_nudge_enabled}
             disabled={savingKey === "inactivity_nudge_enabled"}
             onToggle={() => toggle("inactivity_nudge_enabled")}

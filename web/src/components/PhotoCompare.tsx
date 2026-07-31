@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { getSignedMediaUrl } from "../lib/patientMediaUpload";
 import { XIcon } from "./icons";
 
@@ -40,7 +42,9 @@ function Thumb({ path, onClick }: { path: string; onClick: () => void }) {
 }
 
 export function PhotoCompare({ items, onDelete }: { items: PatientMediaItem[]; onDelete?: (id: string) => void }) {
+  const isMobile = useIsMobile();
   const [compareGroup, setCompareGroup] = useState<Group | null>(null);
+  useBodyScrollLock(!!compareGroup);
   const groups = groupByDay(items);
 
   if (groups.length === 0) return <div className="empty-state">Nenhuma foto adicionada ainda.</div>;
@@ -89,7 +93,7 @@ export function PhotoCompare({ items, onDelete }: { items: PatientMediaItem[]; o
                 <XIcon />
               </button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14 }}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Antes</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

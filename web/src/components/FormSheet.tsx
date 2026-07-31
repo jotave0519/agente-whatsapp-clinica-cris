@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { useIsMobile } from "../hooks/useIsMobile";
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
  */
 export function FormSheet({ open, onClose, children }: Props) {
   const isMobile = useIsMobile();
+  useBodyScrollLock(open && isMobile);
 
   if (!open) return null;
   if (!isMobile) return <>{children}</>;

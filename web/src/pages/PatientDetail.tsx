@@ -5,6 +5,7 @@ import { PhotoCompare, PatientMediaItem } from "../components/PhotoCompare";
 import { Skeleton, SkeletonKpiGrid } from "../components/Skeleton";
 import { Timeline, TimelineItem } from "../components/Timeline";
 import { useToast } from "../context/ToastContext";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { api } from "../lib/api";
 import { uploadPatientDocument, uploadPatientMedia, getSignedDocumentUrl } from "../lib/patientMediaUpload";
 import { getDisplayStatus } from "../lib/scheduleStatus";
@@ -154,6 +155,7 @@ export function PatientDetail() {
   const [uploadingDoc, setUploadingDoc] = useState(false);
 
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  useBodyScrollLock(showPaymentForm);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [paymentDraft, setPaymentDraft] = useState(EMPTY_PAYMENT_DRAFT);
   const [savingPayment, setSavingPayment] = useState(false);

@@ -75,16 +75,23 @@ export async function getInstanceInfo(): Promise<InstanceInfo> {
 }
 
 /**
- * QR code para vincular/reconectar o dispositivo. So gera um pareamento novo
- * se a instancia estiver desconectada - com a instancia ja conectada, a
- * Evolution API retorna apenas o estado atual, sem efeito colateral.
+ * QR code (ou codigo de pareamento, se phoneNumber for passado) para
+ * vincular/reconectar o dispositivo. So gera um pareamento novo se a
+ * instancia estiver desconectada - com a instancia ja conectada, a Evolution
+ * API retorna apenas o estado atual, sem efeito colateral.
+ *
+ * Pairing code: a Evolution API aceita `?number=<DDI+DDD+numero>` no mesmo
+ * endpoint de connect (confirmado na doc oficial e em exemplos da comunidade -
+ * https://docs.evolutionfoundation.com.br/evolution-api/connect-instance).
+ * Sem o parametro, so QR code e retornado (pairingCode vem null).
  */
-export async function getConnectQrCode(): Promise<{ base64: string | null; pairingCode: string | null }> {
+export async function getConnectQrCode(phoneNumber?: string): Promise<{ base64: string | null; pairingCode: string | null }> {
   requireConfig();
   const url = `${env.evolutionApiUrl.replace(/\/$/, "")}/instance/connect/${env.evolutionInstanceName}`;
+  const params = phoneNumber ? { number: phoneNumber.replace(/\D/g, "") } : undefined;
 
   try {
-    const response = await axios.get(url, { headers: { apikey: env.evolutionApiKey }, timeout: 15000 });
+    const response = await axios.get(url, { headers: { apikey: env.evolutionApiKey }, params, timeout: 15000 });
     return {
       base64: response.data?.base64 || response.data?.qrcode?.base64 || null,
       pairingCode: response.data?.pairingCode || null,

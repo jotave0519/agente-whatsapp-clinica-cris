@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { BackHeader } from "../components/BackHeader";
 import { FormSheet } from "../components/FormSheet";
+import { useToast } from "../context/ToastContext";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 
@@ -139,6 +141,7 @@ function buildPreviewMessage(tone: string, customStyle: string, procedure: strin
 
 export function CampanhasReativacao() {
   const isMobile = useIsMobile();
+  const showToast = useToast();
   const [items, setItems] = useState<Campaign[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -147,6 +150,7 @@ export function CampanhasReativacao() {
   const [saving, setSaving] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [statsFor, setStatsFor] = useState<CampaignStats | null>(null);
+  useBodyScrollLock(!!statsFor);
 
   function load() {
     api
@@ -224,6 +228,7 @@ export function CampanhasReativacao() {
       }
       setShowForm(false);
       load();
+      showToast(editingId ? "✓ Campanha atualizada." : "✓ Campanha criada com sucesso.");
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -236,6 +241,7 @@ export function CampanhasReativacao() {
     try {
       await api.patch(`/reactivation-campaigns/${c.id}`, { active: !c.active });
       load();
+      showToast(c.active ? "✓ Campanha pausada." : "✓ Campanha ativada.");
     } catch (e: any) {
       setError(e.message);
     }
@@ -246,6 +252,7 @@ export function CampanhasReativacao() {
     try {
       await api.post(`/reactivation-campaigns/${c.id}/duplicate`, {});
       load();
+      showToast("✓ Campanha duplicada.");
     } catch (e: any) {
       setError(e.message);
     }
@@ -257,6 +264,7 @@ export function CampanhasReativacao() {
     try {
       await api.delete(`/reactivation-campaigns/${c.id}`);
       load();
+      showToast("✓ Campanha excluída.");
     } catch (e: any) {
       setError(e.message);
     }
@@ -461,7 +469,12 @@ export function CampanhasReativacao() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 22, flexWrap: "wrap" }}>
-        <BackHeader title="Recuperar pacientes que sumiram" subtitle="Retoma contato com pacientes inativos de forma natural e contextualizada" backTo="/secretaria-virtual" />
+        <BackHeader
+          title="Recuperar pacientes que sumiram"
+          subtitle="Identifica pacientes inativos e inicia uma campanha personalizada de reativação pelo WhatsApp"
+          backTo="/secretaria-virtual"
+          help="Com base no tempo de inatividade que você define (ex: 60 dias sem consulta), a IA seleciona os pacientes do perfil escolhido e envia mensagens no tom configurado, espalhadas ao longo dos dias para não parecer spam. Ela registra quem respondeu, remarcou ou não teve interesse, e nunca contata quem já tem consulta futura ou pediu para não ser contatado."
+        />
         <button
           onClick={startCreate}
           style={{ display: "flex", alignItems: "center", gap: 7, height: 38, padding: "0 15px", borderRadius: 11, background: "var(--text)", color: "var(--bg)", fontSize: 13.5, fontWeight: 500 }}

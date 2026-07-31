@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAppointmentModal } from "../context/AppointmentModalContext";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 import { getDisplayStatus } from "../lib/scheduleStatus";
@@ -60,6 +61,7 @@ export function Agenda() {
   const [items, setItems] = useState<ScheduleItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ScheduleItem | null>(null);
+  useBodyScrollLock(!!selected);
   const [cancelling, setCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [acting, setActing] = useState(false);

@@ -1,5 +1,6 @@
 import { sendWhatsAppMessage } from "../integrations/evolutionApiClient";
 import * as conversationRepository from "../repositories/conversationRepository";
+import * as settingsRepository from "../repositories/settingsRepository";
 import { Schedule } from "../types";
 import { logger } from "../utils/logger";
 import * as aiKnowledgeService from "./aiKnowledgeService";
@@ -23,6 +24,12 @@ function weekdayDateLabel(dateStr: string): string {
  * que cancelou, nao faz sentido avisa-lo do proprio cancelamento.
  */
 export async function notifyAndOfferReschedule(schedule: Schedule, reason?: string | null): Promise<void> {
+  const settings = await settingsRepository.getClinicSettings();
+  if (!settings.cancellation_notify_enabled) {
+    logger.info(SCOPE, "Aviso de cancelamento desativado nas configuracoes - nao notificando", { scheduleId: schedule.id });
+    return;
+  }
+
   if (!schedule.phone) {
     logger.warn(SCOPE, "Agendamento sem telefone, nao e possivel notificar", { scheduleId: schedule.id });
     return;

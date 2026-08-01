@@ -8,6 +8,7 @@ interface Settings {
   post_attendance_enabled: boolean;
   commercial_ai_enabled: boolean;
   inactivity_nudge_enabled: boolean;
+  cancellation_notify_enabled: boolean;
   [key: string]: unknown;
 }
 
@@ -57,6 +58,14 @@ export function SecretariaVirtual() {
             disabled={savingKey === "confirmation_enabled"}
             onToggle={() => toggle("confirmation_enabled")}
             adjustTo="/secretaria-virtual/confirmacao"
+          />
+          <ToggleCard
+            title="Notificar cancelamentos feitos pela clínica"
+            description="Quando um agendamento for cancelado manualmente pela clínica, a IA avisa o paciente pelo WhatsApp e oferece remarcar."
+            help="Quando a doutora cancela uma consulta pela Agenda, a IA envia automaticamente uma mensagem ao paciente informando o cancelamento (com o motivo, se um foi informado) e oferecendo remarcar direto pelo WhatsApp. Desativar isso não muda nada no cancelamento em si — só impede o disparo dessa mensagem automática; o Calendar e o CRM continuam sendo atualizados normalmente."
+            checked={settings.cancellation_notify_enabled}
+            disabled={savingKey === "cancellation_notify_enabled"}
+            onToggle={() => toggle("cancellation_notify_enabled")}
           />
           <ToggleCard
             title="Recuperar pacientes que sumiram"

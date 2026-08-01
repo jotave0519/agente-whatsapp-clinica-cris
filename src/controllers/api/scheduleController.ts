@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { CalendarUnavailableError } from "../../integrations/googleCalendarClient";
 import * as scheduleEventRepository from "../../repositories/scheduleEventRepository";
 import * as scheduleRepository from "../../repositories/scheduleRepository";
 import * as userRepository from "../../repositories/userRepository";
@@ -8,6 +9,9 @@ import * as schedulingService from "../../services/schedulingService";
 import { getOrCreateUserByPhone } from "../../services/userService";
 import { AppError } from "../../utils/appError";
 import { logger } from "../../utils/logger";
+
+const CALENDAR_UNAVAILABLE_MESSAGE =
+  "Não foi possível falar com o Google Calendar agora (provavelmente a autorização expirou e precisa ser renovada). O agendamento não foi criado - avise o suporte técnico.";
 
 const SCOPE = "api.schedule";
 
@@ -65,6 +69,10 @@ export async function createSchedule(req: Request, res: Response): Promise<void>
     res.status(201).json(schedule);
   } catch (err) {
     logger.error(SCOPE, "Erro ao criar agendamento", err);
+    if (err instanceof CalendarUnavailableError) {
+      res.status(503).json({ error: CALENDAR_UNAVAILABLE_MESSAGE });
+      return;
+    }
     if (err instanceof AppError) {
       res.status(400).json({ error: err.message });
       return;
@@ -97,6 +105,10 @@ export async function cancelSchedule(req: Request, res: Response): Promise<void>
     }
   } catch (err) {
     logger.error(SCOPE, "Erro ao cancelar agendamento", err);
+    if (err instanceof CalendarUnavailableError) {
+      res.status(503).json({ error: CALENDAR_UNAVAILABLE_MESSAGE });
+      return;
+    }
     if (err instanceof AppError) {
       res.status(400).json({ error: err.message });
       return;

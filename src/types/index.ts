@@ -505,6 +505,7 @@ export interface ClinicSettings {
   reactivation_enabled: boolean;
   inactivity_nudge_enabled: boolean;
   post_attendance_enabled: boolean;
+  cancellation_notify_enabled: boolean;
   responsible_name: string | null;
   specialty: string | null;
   city: string | null;

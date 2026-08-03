@@ -168,10 +168,16 @@ export async function getTimeline(userId: string): Promise<TimelineItem[]> {
   const items: TimelineItem[] = [];
 
   for (const ev of scheduleEvents as any[]) {
+    // "created" com detail preenchido = essa consulta e uma Avaliacao criada
+    // por substituicao automatica (procedures.requires_evaluation) - mostra o
+    // procedimento que o paciente pediu de verdade, pra clinica saber o motivo.
+    const isEvaluationRequest = ev.event_type === "created" && ev.detail;
     items.push({
       type: "schedule_event",
-      title: SCHEDULE_EVENT_LABELS[ev.event_type] || ev.event_type,
-      detail: `${ev.schedule_procedure} — ${ev.schedule_date} às ${ev.schedule_time}`,
+      title: isEvaluationRequest ? "Avaliação agendada" : SCHEDULE_EVENT_LABELS[ev.event_type] || ev.event_type,
+      detail: isEvaluationRequest
+        ? `${ev.schedule_procedure} — ${ev.schedule_date} às ${ev.schedule_time} · Solicitação original: ${ev.detail}`
+        : `${ev.schedule_procedure} — ${ev.schedule_date} às ${ev.schedule_time}`,
       occurred_at: ev.created_at,
     });
   }

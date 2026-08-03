@@ -2,6 +2,7 @@ import * as faqRepository from "../repositories/faqRepository";
 import * as messageTemplateRepository from "../repositories/messageTemplateRepository";
 import * as procedureRepository from "../repositories/procedureRepository";
 import * as settingsRepository from "../repositories/settingsRepository";
+import { Procedure } from "../types";
 import { logger } from "../utils/logger";
 import * as businessHoursService from "./businessHoursService";
 
@@ -88,32 +89,36 @@ export async function getContextExpiryMinutes(): Promise<number> {
   return cachedContextExpiry;
 }
 
-/** Casamento simples (case-insensitive) do nome do procedimento informado pelo cliente contra o cadastro. */
-export async function findProcedureDuration(procedureName: string): Promise<number | null> {
+/** Casamento simples (case-insensitive, exato ou por substring) do nome do procedimento informado pelo cliente contra o cadastro. */
+function matchProcedure(procedures: Procedure[], procedureName: string): Procedure | null {
+  const needle = procedureName.trim().toLowerCase();
+  return (
+    procedures.find((p) => p.active && p.name.trim().toLowerCase() === needle) ||
+    procedures.find((p) => p.active && (needle.includes(p.name.trim().toLowerCase()) || p.name.trim().toLowerCase().includes(needle))) ||
+    null
+  );
+}
+
+/** Mesmo casamento usado por findProcedureDuration/findProcedurePrice, mas devolve o procedimento inteiro - usado pela etapa de agendamento pra checar requires_evaluation. */
+export async function findProcedureMatch(procedureName: string): Promise<Procedure | null> {
   try {
     const procedures = await procedureRepository.listAll();
-    const needle = procedureName.trim().toLowerCase();
-    const match = procedures.find((p) => p.active && p.name.trim().toLowerCase() === needle) ||
-      procedures.find((p) => p.active && (needle.includes(p.name.trim().toLowerCase()) || p.name.trim().toLowerCase().includes(needle)));
-    return match?.duration_minutes ?? null;
+    return matchProcedure(procedures, procedureName);
   } catch (err) {
-    logger.error(SCOPE, "Falha ao buscar duracao do procedimento", err);
+    logger.error(SCOPE, "Falha ao buscar procedimento", err);
     return null;
   }
 }
 
-/** Mesmo casamento de findProcedureDuration, mas devolve o valor medio (Procedure.price) - usado pela IA Comercial para estimar receita recuperada no momento da conversao. */
+export async function findProcedureDuration(procedureName: string): Promise<number | null> {
+  const match = await findProcedureMatch(procedureName);
+  return match?.duration_minutes ?? null;
+}
+
+/** Usado pela IA Comercial para estimar receita recuperada no momento da conversao. */
 export async function findProcedurePrice(procedureName: string): Promise<number | null> {
-  try {
-    const procedures = await procedureRepository.listAll();
-    const needle = procedureName.trim().toLowerCase();
-    const match = procedures.find((p) => p.active && p.name.trim().toLowerCase() === needle) ||
-      procedures.find((p) => p.active && (needle.includes(p.name.trim().toLowerCase()) || p.name.trim().toLowerCase().includes(needle)));
-    return match?.price ?? null;
-  } catch (err) {
-    logger.error(SCOPE, "Falha ao buscar valor medio do procedimento", err);
-    return null;
-  }
+  const match = await findProcedureMatch(procedureName);
+  return match?.price ?? null;
 }
 
 /**
@@ -151,6 +156,12 @@ export async function getClinicInfoText(): Promise<string> {
     lines.push(settings.about_text);
   }
 
+  // Nao mencionar requires_evaluation aqui de proposito: se o modelo souber de
+  // antemao que um procedimento exige avaliacao, ele resolve a substituicao
+  // sozinho em texto livre ANTES de chamar begin_scheduling/provide_procedure
+  // com o nome original - e a etapa de agendamento (unico lugar que registra
+  // requested_procedure pro Calendar/CRM) nunca chega a ver o pedido original.
+  // A logica de substituicao So deve acontecer nas tools de agendamento.
   const activeProcedures = procedures.filter((p) => p.active);
   if (activeProcedures.length > 0) {
     lines.push(`\n## Procedimentos realizados`);

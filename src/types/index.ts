@@ -31,6 +31,7 @@ export interface Schedule {
   was_rescheduled: boolean;
   duration_minutes: number | null;
   staff_id: string | null;
+  requested_procedure: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -373,6 +374,8 @@ export type ConversationFlowState =
 export interface FlowStateData {
   name?: string;
   procedure?: string;
+  /** Preenchido so quando `procedure` foi substituido por uma Avaliacao (procedures.requires_evaluation) - guarda o que o paciente pediu de verdade. */
+  requestedProcedure?: string;
   durationMinutes?: number;
   /** Data (YYYY-MM-DD) ja mencionada pelo cliente antes de nome/procedimento serem conhecidos - consumida assim que ambos forem coletados, nunca perdida. */
   pendingDate?: string;
@@ -429,6 +432,7 @@ export interface Procedure {
   pre_instructions: string | null;
   post_instructions: string | null;
   recommended_interval_days: number | null;
+  requires_evaluation: boolean;
   active: boolean;
   created_at: string;
   updated_at: string;

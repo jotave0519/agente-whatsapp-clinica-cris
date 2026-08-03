@@ -44,6 +44,7 @@ export async function createAppointment(params: {
   durationMinutes?: number;
   notes?: string | null;
   staffId?: string | null;
+  requestedProcedure?: string | null;
 }): Promise<Schedule> {
   const event = await googleCalendar.createEvent({
     name: params.name,
@@ -52,6 +53,7 @@ export async function createAppointment(params: {
     start: params.start,
     durationMinutes: params.durationMinutes,
     notes: params.notes,
+    requestedProcedure: params.requestedProcedure,
   });
 
   const { date, time } = toSaoPauloDateTimeParts(new Date(params.start));
@@ -67,6 +69,7 @@ export async function createAppointment(params: {
     notes: params.notes,
     durationMinutes: params.durationMinutes ?? null,
     staffId: params.staffId ?? null,
+    requestedProcedure: params.requestedProcedure ?? null,
   });
 
   // Nunca deixa uma falha do motor de lembretes mascarar como falha do

@@ -226,11 +226,13 @@ export async function createEvent(params: {
   start: string;
   durationMinutes?: number;
   notes?: string | null;
+  requestedProcedure?: string | null;
 }): Promise<CalendarEvent> {
   const startDate = new Date(params.start);
   const endDate = new Date(startDate.getTime() + (params.durationMinutes ?? DEFAULT_SLOT_MINUTES) * 60 * 1000);
   const description =
     `Paciente: ${params.name}\nTelefone: ${params.phone}\nProcedimento: ${params.service}` +
+    (params.requestedProcedure ? `\nSolicitação original: ${params.requestedProcedure}` : "") +
     (params.notes ? `\nObservacoes: ${params.notes}` : "");
 
   return calendarRequest<CalendarEvent>("post", eventsPath(), {

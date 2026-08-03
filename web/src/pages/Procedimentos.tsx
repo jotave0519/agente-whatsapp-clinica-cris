@@ -13,6 +13,7 @@ interface ProcedureItem {
   pre_instructions: string | null;
   post_instructions: string | null;
   recommended_interval_days: number | null;
+  requires_evaluation: boolean;
   active: boolean;
 }
 
@@ -25,6 +26,7 @@ const EMPTY_FORM = {
   pre_instructions: "",
   post_instructions: "",
   recommended_interval_days: "",
+  requires_evaluation: false,
   active: true,
 };
 
@@ -67,6 +69,7 @@ export function Procedimentos() {
       pre_instructions: p.pre_instructions || "",
       post_instructions: p.post_instructions || "",
       recommended_interval_days: p.recommended_interval_days != null ? String(p.recommended_interval_days) : "",
+      requires_evaluation: p.requires_evaluation,
       active: p.active,
     });
     setShowForm(true);
@@ -85,6 +88,7 @@ export function Procedimentos() {
       pre_instructions: form.pre_instructions || null,
       post_instructions: form.post_instructions || null,
       recommended_interval_days: form.recommended_interval_days ? Number(form.recommended_interval_days) : null,
+      requires_evaluation: form.requires_evaluation,
       active: form.active,
     };
     try {
@@ -170,6 +174,18 @@ export function Procedimentos() {
           onChange={(e) => setForm({ ...form, recommended_interval_days: e.target.value })}
         />
       </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 0", borderTop: "1px solid var(--border-soft)", borderBottom: "1px solid var(--border-soft)" }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600 }}>Exige avaliação prévia</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+            Antes de realizar este procedimento, será necessário agendar uma avaliação com a clínica.
+          </div>
+        </div>
+        <label className="switch">
+          <input type="checkbox" checked={form.requires_evaluation} onChange={(e) => setForm({ ...form, requires_evaluation: e.target.checked })} />
+          <span className="switch-track" />
+        </label>
+      </div>
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5 }}>
         <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
         Ativo
@@ -242,6 +258,11 @@ export function Procedimentos() {
               <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{p.duration_minutes ? `${p.duration_minutes} min` : "—"}</span>
               <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{p.price != null ? `R$ ${p.price.toFixed(2)}` : "Sob avaliação"}</span>
             </div>
+            {p.requires_evaluation && (
+              <span className="badge badge-blue" style={{ marginTop: 10, alignSelf: "flex-start" }}>
+                Exige avaliação prévia
+              </span>
+            )}
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => startEdit(p)}>
                 Editar

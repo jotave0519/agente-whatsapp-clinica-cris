@@ -57,7 +57,9 @@ async function buildTemplateText(key: string, schedule: Schedule): Promise<strin
 
 /** Chamado por schedulingService.createAppointment logo apos a criacao ter sucesso. */
 export async function scheduleConfirmationForAppointment(schedule: Schedule): Promise<void> {
-  await scheduleEventRepository.record(schedule.id, "created");
+  // detail guarda o procedimento originalmente pedido quando este agendamento
+  // e na verdade uma avaliacao (substituicao automatica) - null em agendamentos normais.
+  await scheduleEventRepository.record(schedule.id, "created", schedule.requested_procedure);
 
   const settings = await settingsRepository.getClinicSettings();
   if (!settings.confirmation_enabled) return;

@@ -12,6 +12,47 @@ import { ABANDON_TOOL, CALENDAR_UNAVAILABLE_INSTRUCTION, SLOT_TAKEN_INSTRUCTION,
 const SCOPE = "conversation.scheduling";
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+// Nome usado quando um procedimento com requires_evaluation e substituido -
+// centralizado aqui de proposito (nunca espalhado em varios lugares) pra
+// facilitar trocar por avaliacoes de tipos diferentes (facial/corporal/
+// capilar) no futuro sem precisar refatorar o fluxo.
+const EVALUATION_PROCEDURE_NAME = "Avaliação";
+
+interface ProcedureResolution {
+  procedure: string;
+  requestedProcedure?: string;
+  durationMinutes?: number;
+  /** Instrucao pro modelo explicar a substituicao ao cliente - so definida quando ela acontece. */
+  evaluationNotice?: string;
+}
+
+/**
+ * Verifica se o procedimento pedido exige avaliacao previa
+ * (Procedimentos > "Exige avaliacao previa" no CRM). Se exigir, substitui o
+ * agendamento por uma Avaliacao, preservando o pedido original em
+ * requestedProcedure (aparece no Calendar e no historico do paciente) -
+ * nunca bloqueia o agendamento, so troca o alvo.
+ */
+async function resolveProcedureForBooking(rawProcedure: string): Promise<ProcedureResolution> {
+  const matched = await aiKnowledgeService.findProcedureMatch(rawProcedure);
+
+  if (matched?.requires_evaluation) {
+    const evaluationMatch = await aiKnowledgeService.findProcedureMatch(EVALUATION_PROCEDURE_NAME);
+    return {
+      procedure: EVALUATION_PROCEDURE_NAME,
+      requestedProcedure: matched.name,
+      durationMinutes: evaluationMatch?.duration_minutes ?? undefined,
+      evaluationNotice:
+        `O procedimento "${matched.name}" exige uma avaliação prévia antes de ser realizado - a Dra. precisa analisar o caso do paciente e indicar ` +
+        'o tratamento mais adequado. NUNCA diga que "não é possível agendar" esse procedimento - explique isso de forma natural e acolhedora ' +
+        "(ex: mencionando que a avaliação é o primeiro passo para um tratamento personalizado) e pergunte se o cliente quer agendar essa avaliação. " +
+        "A partir daqui, conduza o agendamento normalmente, mas como uma Avaliação.",
+    };
+  }
+
+  return { procedure: rawProcedure, durationMinutes: matched?.duration_minutes ?? undefined };
+}
+
 /**
  * Consulta disponibilidade real no Google Calendar para a data informada.
  * Usada tanto pela etapa SCHEDULING_DATE quanto por begin_scheduling quando
@@ -109,13 +150,16 @@ export async function provideDate(ctx: FlowContext, baseData: FlowStateData, dat
  */
 export const beginScheduling: ToolHandler = async (ctx, input) => {
   const data: FlowStateData = {};
-  if (input.procedure) data.procedure = input.procedure;
   if (input.name) data.name = input.name;
   logger.info(SCOPE, "Iniciando fluxo de agendamento", { conversationId: ctx.conversation.id, input });
 
-  if (data.procedure) {
-    const duration = await aiKnowledgeService.findProcedureDuration(data.procedure);
-    if (duration) data.durationMinutes = duration;
+  let evaluationNotice: string | undefined;
+  if (input.procedure) {
+    const resolved = await resolveProcedureForBooking(input.procedure);
+    data.procedure = resolved.procedure;
+    data.requestedProcedure = resolved.requestedProcedure;
+    if (resolved.durationMinutes) data.durationMinutes = resolved.durationMinutes;
+    evaluationNotice = resolved.evaluationNotice;
   }
 
   if (!data.name && looksLikeFullName(ctx.user.name)) {
@@ -133,10 +177,11 @@ export const beginScheduling: ToolHandler = async (ctx, input) => {
   const pendingDate = input.date && ISO_DATE.test(input.date) ? input.date : undefined;
 
   if (!data.name) {
+    const baseMessage = "Fluxo de agendamento iniciado. Peça o nome completo do paciente para realizar o cadastro (explique rapidamente o motivo).";
     return {
       nextStep: "SCHEDULING_NAME",
       data: { ...data, pendingDate },
-      message: "Fluxo de agendamento iniciado. Peça o nome completo do paciente para realizar o cadastro (explique rapidamente o motivo).",
+      message: evaluationNotice ? `${evaluationNotice} Antes disso, ${baseMessage.charAt(0).toLowerCase()}${baseMessage.slice(1)}` : baseMessage,
     };
   }
 
@@ -148,9 +193,12 @@ export const beginScheduling: ToolHandler = async (ctx, input) => {
     };
   }
   if (pendingDate) {
-    return provideDate(ctx, data, pendingDate);
+    const result = await provideDate(ctx, data, pendingDate);
+    if (evaluationNotice) result.message = `${evaluationNotice} ${result.message}`;
+    return result;
   }
-  return { nextStep: "SCHEDULING_DATE", data, message: `Procedimento registrado: ${data.procedure}. Nome já conhecido (${data.name}), não precisa perguntar de novo. Peça a data desejada.` };
+  const baseMessage = `Procedimento registrado: ${data.procedure}. Nome já conhecido (${data.name}), não precisa perguntar de novo. Peça a data desejada.`;
+  return { nextStep: "SCHEDULING_DATE", data, message: evaluationNotice ? `${evaluationNotice} Peça a data desejada para a avaliação.` : baseMessage };
 };
 
 export const procedureStep: StepDefinition = {
@@ -171,15 +219,29 @@ export const procedureStep: StepDefinition = {
   handlers: {
     provide_procedure: async (ctx, input) => {
       const { pendingDate, ...rest } = ctx.conversation.state_data;
-      const data: FlowStateData = { ...rest, procedure: input.procedure };
-      const duration = await aiKnowledgeService.findProcedureDuration(input.procedure);
-      if (duration) data.durationMinutes = duration;
-      logger.info(SCOPE, "Procedimento registrado", { conversationId: ctx.conversation.id, procedure: input.procedure, durationMinutes: data.durationMinutes });
+      const resolved = await resolveProcedureForBooking(input.procedure);
+      const data: FlowStateData = { ...rest, procedure: resolved.procedure, requestedProcedure: resolved.requestedProcedure };
+      if (resolved.durationMinutes) data.durationMinutes = resolved.durationMinutes;
+      logger.info(SCOPE, "Procedimento registrado", {
+        conversationId: ctx.conversation.id,
+        procedure: data.procedure,
+        requestedProcedure: data.requestedProcedure,
+        durationMinutes: data.durationMinutes,
+      });
       // Nome ja e conhecido nesta etapa (SCHEDULING_PROCEDURE so e alcancada
       // depois do nome) - se o cliente ja tinha mencionado uma data na
       // primeira mensagem, usa ela agora em vez de perguntar de novo.
-      if (pendingDate) return provideDate(ctx, data, pendingDate);
-      return { nextStep: "SCHEDULING_DATE", data, message: `Procedimento registrado: ${input.procedure}. Peça a data desejada.` };
+      if (pendingDate) {
+        const result = await provideDate(ctx, data, pendingDate);
+        if (resolved.evaluationNotice) result.message = `${resolved.evaluationNotice} ${result.message}`;
+        return result;
+      }
+      const baseMessage = `Procedimento registrado: ${data.procedure}. Peça a data desejada.`;
+      return {
+        nextStep: "SCHEDULING_DATE",
+        data,
+        message: resolved.evaluationNotice ? `${resolved.evaluationNotice} Peça a data desejada para a avaliação.` : baseMessage,
+      };
     },
     abandon_flow: abandonFlow,
   },
@@ -321,7 +383,7 @@ export const timeStep: StepDefinition = {
 };
 
 export async function confirmScheduling(ctx: FlowContext): Promise<StepResult> {
-  const { name, procedure, selectedStart, durationMinutes, date } = ctx.conversation.state_data;
+  const { name, procedure, selectedStart, durationMinutes, date, requestedProcedure } = ctx.conversation.state_data;
 
   if (!name || !procedure || !selectedStart) {
     logger.warn(SCOPE, "confirmScheduling chamado sem dados completos", ctx.conversation.state_data);
@@ -364,6 +426,7 @@ export async function confirmScheduling(ctx: FlowContext): Promise<StepResult> {
       service: procedure,
       start: selectedStart,
       durationMinutes,
+      requestedProcedure,
     });
     logger.info(SCOPE, "Agendamento criado com sucesso", { conversationId: ctx.conversation.id });
 

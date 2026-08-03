@@ -12,6 +12,7 @@ export async function createSchedule(params: {
   notes?: string | null;
   durationMinutes?: number | null;
   staffId?: string | null;
+  requestedProcedure?: string | null;
 }): Promise<Schedule> {
   const { data, error } = await getSupabaseClient()
     .from("schedules")
@@ -27,6 +28,7 @@ export async function createSchedule(params: {
       status: "Agendado",
       duration_minutes: params.durationMinutes ?? null,
       staff_id: params.staffId ?? null,
+      requested_procedure: params.requestedProcedure ?? null,
     })
     .select("*")
     .single();

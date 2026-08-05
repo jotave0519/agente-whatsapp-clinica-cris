@@ -1168,3 +1168,163 @@ a {
   }
 }
 
+/* ---------- Agenda (grade de horarios) ---------- */
+
+.agenda-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+
+.agenda-hour-col {
+  flex: 0 0 54px;
+  padding-top: 6px;
+}
+
+.agenda-hour-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-faint);
+  text-align: right;
+  padding-right: 10px;
+  position: relative;
+  top: -7px;
+}
+
+.agenda-day-col {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.agenda-now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  z-index: 4;
+  pointer-events: none;
+}
+
+.agenda-now-dot {
+  position: absolute;
+  left: -4px;
+  top: -3.5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.agenda-event {
+  position: absolute;
+  border-radius: 9px;
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(35, 32, 28, 0.05);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.agenda-event:active {
+  transform: scale(0.98);
+}
+
+.agenda-event-inner {
+  height: 100%;
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.agenda-event-time {
+  font-size: 10.5px;
+  font-weight: 700;
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agenda-event-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agenda-event-procedure {
+  font-size: 10.5px;
+  opacity: 0.72;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agenda-event-status {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.agenda-week-day {
+  flex: 1;
+  text-align: center;
+  padding: 13px 6px;
+  border-left: 1px solid var(--border-soft);
+}
+
+.agenda-week-day-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.agenda-week-day-label.is-today {
+  color: var(--accent);
+}
+
+.agenda-week-day-number {
+  font-size: 15px;
+  font-weight: 600;
+  margin-top: 2px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+}
+
+.agenda-week-day-number.is-today {
+  color: #fff;
+  background: var(--accent);
+}
+
+/* Tablet: nem o layout apertado do celular, nem o espaçamento largo do
+   desktop - coluna de horario um pouco mais estreita, textos ligeiramente
+   maiores que no celular. */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .agenda-hour-col {
+    flex-basis: 46px;
+  }
+  .agenda-event-name {
+    font-size: 12.5px;
+  }
+  .agenda-event-inner {
+    padding: 5px 9px;
+  }
+}
+

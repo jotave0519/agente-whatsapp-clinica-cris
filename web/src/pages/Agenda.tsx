@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppointmentModal } from "../context/AppointmentModalContext";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
+import { layoutDayEvents } from "../lib/calendarLayout";
 import { getDisplayStatus } from "../lib/scheduleStatus";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
 import { DayStrip } from "../components/DayStrip";
@@ -20,6 +21,7 @@ interface ScheduleItem {
   confirmation_status: "pending" | "awaiting" | "confirmed" | "cancelled";
   was_rescheduled: boolean;
   notes: string | null;
+  duration_minutes: number | null;
 }
 
 const APPT_COLORS: { bg: string; border: string }[] = [
@@ -35,7 +37,13 @@ function hashColor(name: string): { bg: string; border: string } {
   return APPT_COLORS[hash % APPT_COLORS.length];
 }
 
-const HOUR_HEIGHT = 56;
+// HOUR_HEIGHT maior que antes (era 56) - da mais "respiro" pra grade inteira
+// (pedido explicito de espaçamento), e ajuda a diferenciar melhor a duracao
+// visual de consultas curtas vs longas.
+const HOUR_HEIGHT = 64;
+const MIN_EVENT_HEIGHT = 46;
+const EVENT_GAP = 3;
+const DEFAULT_DURATION_MINUTES = 30;
 const WEEKDAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
 function startOfWeek(d: Date): Date {
@@ -65,6 +73,19 @@ export function Agenda() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [acting, setActing] = useState(false);
+
+  // Encolhe o FAB enquanto o usuario rola a grade (celular) - nunca deixa o
+  // botao coberto/cobrindo um agendamento por muito tempo.
+  const [fabHidden, setFabHidden] = useState(false);
+  const scrollHideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (scrollHideTimeout.current) clearTimeout(scrollHideTimeout.current);
+  }, []);
+  function handleAgendaScroll() {
+    setFabHidden(true);
+    if (scrollHideTimeout.current) clearTimeout(scrollHideTimeout.current);
+    scrollHideTimeout.current = setTimeout(() => setFabHidden(false), 500);
+  }
 
   const weekDays = useMemo(
     () =>
@@ -149,10 +170,10 @@ export function Agenda() {
 
   function renderHourColumn() {
     return (
-      <div style={{ width: 52, flex: "0 0 52px", paddingTop: 6 }}>
+      <div className="agenda-hour-col">
         {Array.from({ length: 13 }, (_, i) => i + 7).map((h) => (
-          <div key={h} style={{ height: HOUR_HEIGHT, textAlign: "right", paddingRight: 8 }}>
-            <span style={{ fontSize: 11, color: "var(--text-faint)", position: "relative", top: -7 }}>{String(h).padStart(2, "0")}:00</span>
+          <div key={h} style={{ height: HOUR_HEIGHT }}>
+            <span className="agenda-hour-label">{String(h).padStart(2, "0")}:00</span>
           </div>
         ))}
       </div>
@@ -166,20 +187,27 @@ export function Agenda() {
     const now = new Date();
     const nowOffset = isToday ? ((now.getHours() - 7) * 60 + now.getMinutes()) * (HOUR_HEIGHT / 60) : -1;
 
+    const positioned = layoutDayEvents(
+      dayItems.map((it) => ({ ...it, durationMinutes: it.duration_minutes || DEFAULT_DURATION_MINUTES })),
+      HOUR_HEIGHT / 60,
+      7,
+      MIN_EVENT_HEIGHT,
+      EVENT_GAP
+    );
+
     return (
       <div
         key={dateStr}
+        className="agenda-day-col"
         style={{
-          flex: 1,
-          position: "relative",
           height: 13 * HOUR_HEIGHT,
           borderLeft: "1px solid var(--border-soft)",
           backgroundImage: `repeating-linear-gradient(var(--surface), var(--surface) ${HOUR_HEIGHT - 1}px, var(--border-soft) ${HOUR_HEIGHT}px)`,
         }}
       >
         {isToday && nowOffset >= 0 && nowOffset <= 13 * HOUR_HEIGHT && (
-          <div style={{ position: "absolute", left: 0, right: 0, top: nowOffset, height: 1.5, background: "var(--accent)", zIndex: 3 }}>
-            <span style={{ position: "absolute", left: -4, top: -3.5, width: 8, height: 8, borderRadius: "50%", background: "var(--accent)" }} />
+          <div className="agenda-now-line" style={{ top: nowOffset }}>
+            <span className="agenda-now-dot" />
           </div>
         )}
         {items === null && (
@@ -188,47 +216,34 @@ export function Agenda() {
             <Skeleton style={{ height: 32, borderRadius: 8 }} />
           </div>
         )}
-        {dayItems.map((it) => {
-          const [h, m] = it.time.split(":").map(Number);
-          const top = ((h - 7) * 60 + m) * (HOUR_HEIGHT / 60);
+        {positioned.map(({ item: it, top, height, left, width }) => {
           const color = hashColor(it.procedure);
+          const showProcedure = height >= 44;
+          const showName = height >= 28;
           return (
             <div
               key={it.id}
+              className="agenda-event"
               onClick={() => {
                 setSelected(it);
                 setCancelling(false);
                 setCancelReason("");
               }}
               style={{
-                position: "absolute",
-                left: 4,
-                right: 4,
                 top,
-                minHeight: 40,
-                borderRadius: 8,
-                padding: "5px 8px",
+                height,
+                left: `calc(${left}% + 2px)`,
+                width: `calc(${width}% - 4px)`,
                 background: color.bg,
                 borderLeft: `3px solid ${color.border}`,
-                cursor: "pointer",
               }}
             >
-              <span
-                style={{
-                  position: "absolute",
-                  top: 5,
-                  right: 5,
-                  width: 7,
-                  height: 7,
-                  borderRadius: "50%",
-                  background: getDisplayStatus(it).dot || "var(--text-faint)",
-                }}
-              />
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", opacity: 0.85 }}>{it.time}</div>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {it.patient_name}
+              <span className="agenda-event-status" style={{ background: getDisplayStatus(it).dot || "var(--text-faint)" }} />
+              <div className="agenda-event-inner">
+                <div className="agenda-event-time">{it.time.slice(0, 5)}</div>
+                {showName && <div className="agenda-event-name">{it.patient_name}</div>}
+                {showProcedure && <div className="agenda-event-procedure">{it.procedure}</div>}
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.procedure}</div>
             </div>
           );
         })}
@@ -345,14 +360,14 @@ export function Agenda() {
         {error && <div className="error-text">{error}</div>}
 
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-          <div style={{ display: "flex", maxHeight: "calc(100dvh - 320px)", overflowY: "auto" }}>
+          <div className="agenda-scroll" style={{ display: "flex", maxHeight: "calc(100dvh - 320px)" }} onScroll={handleAgendaScroll}>
             {renderHourColumn()}
             {visibleDays.map((d) => renderDayColumn(d))}
           </div>
         </div>
 
         {renderActionSheet()}
-        <NewAppointmentFab />
+        <NewAppointmentFab hidden={fabHidden} />
       </div>
     );
   }
@@ -406,38 +421,20 @@ export function Agenda() {
 
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ display: "flex", borderBottom: "1px solid var(--border)", background: "var(--border-soft)" }}>
-          <div style={{ width: 52, flex: "0 0 52px" }} />
-          {visibleDays.map((d, i) => {
+          <div className="agenda-hour-col" style={{ paddingTop: 0 }} />
+          {visibleDays.map((d) => {
             const dateStr = toDateStr(d);
             const isToday = dateStr === todayStr;
             return (
-              <div key={dateStr} style={{ flex: 1, textAlign: "center", padding: "13px 6px", borderLeft: "1px solid var(--border-soft)" }}>
-                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".05em", textTransform: "uppercase", color: isToday ? "var(--accent)" : "var(--text-faint)" }}>
-                  {WEEKDAY_LABELS[(d.getDay() + 6) % 7]}
-                </div>
-                <div
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 600,
-                    marginTop: 2,
-                    color: isToday ? "#fff" : "var(--text)",
-                    background: isToday ? "var(--accent)" : "transparent",
-                    width: 26,
-                    height: 26,
-                    borderRadius: "50%",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {d.getDate()}
-                </div>
+              <div key={dateStr} className="agenda-week-day">
+                <div className={`agenda-week-day-label${isToday ? " is-today" : ""}`}>{WEEKDAY_LABELS[(d.getDay() + 6) % 7]}</div>
+                <div className={`agenda-week-day-number${isToday ? " is-today" : ""}`}>{d.getDate()}</div>
               </div>
             );
           })}
         </div>
 
-        <div style={{ display: "flex", maxHeight: 620, overflowY: "auto" }}>
+        <div className="agenda-scroll" style={{ display: "flex", maxHeight: "calc(100vh - 260px)" }}>
           {renderHourColumn()}
           {visibleDays.map((d) => renderDayColumn(d))}
         </div>

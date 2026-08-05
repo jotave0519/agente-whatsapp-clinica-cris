@@ -3,15 +3,111 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+
+    <!-- Le o tema salvo ANTES do primeiro paint, pra splash/app nunca piscarem
+         no tema errado (mesma chave que ThemeContext.tsx usa). -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("crm-theme");
+          if (t !== "light" && t !== "dark") {
+            t = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          }
+          document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+      })();
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Instrument+Serif:ital@0;1&display=swap"
       rel="stylesheet"
     />
+
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
+    <meta name="theme-color" content="#a76b63" />
+
+    <!-- iOS: o manifest sozinho nao basta pra "Adicionar a Tela de Inicio" se comportar como app -->
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="CRM Clínica" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
     <title>CRM — Clínica Dra. Cristiane Zangelmi</title>
+
+    <style>
+      #app-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        background: #f7f5f2;
+        transition: opacity 0.22s ease;
+      }
+      html[data-theme="dark"] #app-splash {
+        background: #1a1714;
+      }
+      #app-splash img {
+        width: 72px;
+        height: 72px;
+        border-radius: 18px;
+        box-shadow: 0 8px 24px rgba(126, 74, 68, 0.28);
+      }
+      #app-splash .splash-title {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 21px;
+        color: #23201c;
+        letter-spacing: -0.01em;
+      }
+      html[data-theme="dark"] #app-splash .splash-title {
+        color: #f3ece4;
+      }
+      #app-splash .splash-sub {
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 12.5px;
+        color: #8a8178;
+        letter-spacing: 0.02em;
+        margin-top: -8px;
+      }
+      #app-splash .splash-spinner {
+        width: 22px;
+        height: 22px;
+        margin-top: 6px;
+        border: 2.5px solid rgba(167, 107, 99, 0.25);
+        border-top-color: #a76b63;
+        border-radius: 50%;
+        animation: splash-spin 0.7s linear infinite;
+      }
+      @keyframes splash-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      #app-splash.splash-hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #app-splash .splash-spinner {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="app-splash">
+      <img src="/icons/icon-192.png" alt="" width="72" height="72" />
+      <div class="splash-title">Clínica Zangelmi</div>
+      <div class="splash-sub">Sistema de Gestão</div>
+      <div class="splash-spinner"></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

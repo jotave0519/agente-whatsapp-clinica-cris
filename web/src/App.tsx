@@ -1,6 +1,9 @@
+import { useEffect } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { InstallPrompt } from "./components/InstallPrompt";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { UpdatePrompt } from "./components/UpdatePrompt";
 import { AppointmentModalProvider } from "./context/AppointmentModalContext";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -28,9 +31,22 @@ import { OportunidadesConfig } from "./pages/secretariaVirtual/OportunidadesConf
 import { Usuarios } from "./pages/Usuarios";
 
 export function App() {
+  // Some a splash critica assim que o React montou (ver index.html) - nunca
+  // deixa o app "sumir" antes dela: so escondemos depois que ha algo real
+  // pra mostrar no lugar.
+  useEffect(() => {
+    const splash = document.getElementById("app-splash");
+    if (!splash) return;
+    splash.classList.add("splash-hide");
+    const timeout = setTimeout(() => splash.remove(), 250);
+    return () => clearTimeout(timeout);
+  }, []);
+
   return (
     <ThemeProvider>
       <ToastProvider>
+        <InstallPrompt />
+        <UpdatePrompt />
         <BrowserRouter>
           <AuthProvider>
             <Routes>

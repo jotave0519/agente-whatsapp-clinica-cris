@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAppointmentModal } from "../context/AppointmentModalContext";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { useIsMobile } from "../hooks/useIsMobile";
@@ -135,6 +135,7 @@ export function Agenda() {
 
   const todayStr = toDateStr(new Date());
   const totalAppts = (items || []).length;
+  const selectedDayAppts = (items || []).filter((it) => it.date === toDateStr(selectedDay)).length;
 
   async function handleCancel() {
     if (!selected) return;
@@ -251,6 +252,90 @@ export function Agenda() {
     );
   }
 
+  /**
+   * Mobile: lista cronologica agrupada por hora, em vez da grade com
+   * colunas usada no desktop/tablet - o problema relatado ("3 conflitos =
+   * 3 colunas ilegiveis") e do MODELO de visualizacao, nao de CSS, entao no
+   * celular a agenda abandona posicionamento absoluto/colunas por completo.
+   * Cartoes sempre ocupam 100% da largura; conflitos apenas empilham
+   * (a lista cresce em altura, nunca encolhe em largura).
+   */
+  function renderMobileAgendaList() {
+    const dateStr = toDateStr(selectedDay);
+    const isToday = dateStr === todayStr;
+
+    if (items === null) {
+      return (
+        <div style={{ padding: 12, display: "grid", gap: 10 }}>
+          <Skeleton style={{ height: 60, borderRadius: 12 }} />
+          <Skeleton style={{ height: 60, borderRadius: 12 }} />
+          <Skeleton style={{ height: 60, borderRadius: 12 }} />
+        </div>
+      );
+    }
+
+    const dayItems = items.filter((it) => it.date === dateStr).slice().sort((a, b) => a.time.localeCompare(b.time));
+
+    if (dayItems.length === 0) {
+      return <div className="empty-state">Nenhum atendimento agendado para este dia.</div>;
+    }
+
+    const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+    const rows: ReactNode[] = [];
+    let lastHour: string | null = null;
+    let nowInserted = !isToday;
+
+    const nowMarker = (
+      <div key="now-marker" className="agenda-mobile-now">
+        Agora
+      </div>
+    );
+
+    for (const it of dayItems) {
+      const [h, m] = it.time.split(":").map(Number);
+      const itemMinutes = h * 60 + m;
+
+      if (!nowInserted && itemMinutes >= nowMinutes) {
+        rows.push(nowMarker);
+        nowInserted = true;
+      }
+
+      const hourLabel = it.time.slice(0, 2);
+      if (hourLabel !== lastHour) {
+        rows.push(
+          <div key={`hour-${hourLabel}`} className="agenda-mobile-hour-header">
+            {hourLabel}:00
+          </div>
+        );
+        lastHour = hourLabel;
+      }
+
+      const color = hashColor(it.procedure);
+      rows.push(
+        <div
+          key={it.id}
+          className="agenda-mobile-card"
+          style={{ borderLeftColor: color.border }}
+          onClick={() => {
+            setSelected(it);
+            setCancelling(false);
+            setCancelReason("");
+          }}
+        >
+          <div className="agenda-mobile-card-time">{it.time.slice(0, 5)}</div>
+          <div className="agenda-mobile-card-body">
+            <div className="agenda-mobile-card-name">{it.patient_name}</div>
+            <div className="agenda-mobile-card-procedure">{it.procedure}</div>
+          </div>
+          <span className="agenda-mobile-card-status" style={{ background: getDisplayStatus(it).dot || "var(--text-faint)" }} />
+        </div>
+      );
+    }
+    if (!nowInserted) rows.push(nowMarker);
+
+    return <div className="agenda-mobile-list">{rows}</div>;
+  }
+
   function renderActionSheet() {
     if (!selected) return null;
     return (
@@ -341,7 +426,7 @@ export function Agenda() {
       <div>
         <h1 className="page-title">Agenda</h1>
         <p className="page-subtitle">
-          <strong style={{ color: "var(--text)", fontWeight: 600 }}>{totalAppts} atendimento(s)</strong> nesta semana
+          <strong style={{ color: "var(--text)", fontWeight: 600 }}>{selectedDayAppts} atendimento(s)</strong> neste dia
         </p>
 
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
@@ -360,9 +445,8 @@ export function Agenda() {
         {error && <div className="error-text">{error}</div>}
 
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-          <div className="agenda-scroll" style={{ display: "flex", maxHeight: "calc(100dvh - 320px)" }} onScroll={handleAgendaScroll}>
-            {renderHourColumn()}
-            {visibleDays.map((d) => renderDayColumn(d))}
+          <div className="agenda-scroll" style={{ maxHeight: "calc(100dvh - 320px)" }} onScroll={handleAgendaScroll}>
+            {renderMobileAgendaList()}
           </div>
         </div>
 

@@ -1313,6 +1313,111 @@ a {
   background: var(--accent);
 }
 
+/* ---------- Agenda mobile: lista fluida (sem grade/colunas) ----------
+   O modelo de grade com colunas (usado no desktop/tablet acima) funciona mal
+   no celular: 3+ conflitos viram colunas ilegiveis. No mobile a agenda vira
+   uma lista cronologica agrupada por hora - cada cartao ocupa 100% da
+   largura sempre, empilhados verticalmente quando ha conflito (a altura da
+   lista so cresce, nunca a largura encolhe). */
+
+.agenda-mobile-list {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 4px 16px;
+}
+
+.agenda-mobile-hour-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-faint);
+  letter-spacing: 0.03em;
+  padding: 16px 4px 6px;
+}
+
+.agenda-mobile-hour-header:first-child {
+  padding-top: 4px;
+}
+
+.agenda-mobile-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 56px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-left: 4px solid var(--accent);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.agenda-mobile-card:active {
+  transform: scale(0.98);
+}
+
+.agenda-mobile-card-time {
+  flex: 0 0 auto;
+  min-width: 38px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding-top: 1px;
+}
+
+.agenda-mobile-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.agenda-mobile-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.agenda-mobile-card-procedure {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agenda-mobile-card-status {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-top: 4px;
+  border-radius: 50%;
+}
+
+.agenda-mobile-now {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 4px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.agenda-mobile-now::before,
+.agenda-mobile-now::after {
+  content: "";
+  flex: 1;
+  height: 1.5px;
+  background: var(--accent);
+  opacity: 0.45;
+}
+
 /* Tablet: nem o layout apertado do celular, nem o espaçamento largo do
    desktop - coluna de horario um pouco mais estreita, textos ligeiramente
    maiores que no celular. */

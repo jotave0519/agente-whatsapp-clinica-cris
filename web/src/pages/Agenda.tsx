@@ -137,6 +137,30 @@ export function Agenda() {
   const totalAppts = (items || []).length;
   const selectedDayAppts = (items || []).filter((it) => it.date === toDateStr(selectedDay)).length;
 
+  // Rotulo do dia selecionado (usado so no header mobile) - compara por
+  // dia de calendario (toDateStr), nunca por timestamp direto, seguindo o
+  // mesmo padrao ja usado em todo o resto do arquivo.
+  const selectedDayStr = toDateStr(selectedDay);
+  let selectedDayLabel: string;
+  if (selectedDayStr === todayStr) {
+    selectedDayLabel = "Hoje";
+  } else {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (selectedDayStr === toDateStr(tomorrow)) {
+      selectedDayLabel = "Amanhã";
+    } else if (selectedDayStr === toDateStr(yesterday)) {
+      selectedDayLabel = "Ontem";
+    } else {
+      const weekday = WEEKDAY_LABELS[(selectedDay.getDay() + 6) % 7];
+      const dd = String(selectedDay.getDate()).padStart(2, "0");
+      const mm = String(selectedDay.getMonth() + 1).padStart(2, "0");
+      selectedDayLabel = `${weekday}, ${dd}/${mm}`;
+    }
+  }
+
   async function handleCancel() {
     if (!selected) return;
     setActing(true);
@@ -434,7 +458,7 @@ export function Agenda() {
             <ChevronLeftIcon color="var(--text-muted)" />
           </button>
           <button style={{ flex: 1, fontSize: 12.5, fontWeight: 500, color: "var(--accent)", textAlign: "center" }} onClick={goToToday}>
-            Hoje
+            {selectedDayLabel}
           </button>
           <button style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => goToWeek(1)}>
             <ChevronRightIcon color="var(--text-muted)" />

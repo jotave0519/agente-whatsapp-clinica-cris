@@ -1,4 +1,3 @@
-import { CalendarUnavailableError } from "../../integrations/googleCalendarClient";
 import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as schedulingService from "../../services/schedulingService";
 import * as settingsRepository from "../../repositories/settingsRepository";
@@ -439,10 +438,6 @@ export async function confirmScheduling(ctx: FlowContext): Promise<StepResult> {
     });
     return { nextStep: "MENU", data: {}, message };
   } catch (err) {
-    if (err instanceof CalendarUnavailableError) {
-      logger.error(SCOPE, "Falha ao criar agendamento (Calendar indisponivel)", err);
-      return { nextStep: "SCHEDULING_CONFIRM", data: ctx.conversation.state_data, message: CALENDAR_UNAVAILABLE_INSTRUCTION };
-    }
     logger.error(SCOPE, "Falha ao criar agendamento", err);
     const message = await aiKnowledgeService.getMessageTemplate("confirm_scheduling_failure", { error: "tente novamente em instantes" });
     return { nextStep: "SCHEDULING_CONFIRM", data: ctx.conversation.state_data, message };

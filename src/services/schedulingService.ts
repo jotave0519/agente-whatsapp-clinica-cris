@@ -5,12 +5,46 @@ import { Schedule } from "../types";
 import { AppError } from "../utils/appError";
 import { logger } from "../utils/logger";
 import { toSaoPauloDateTimeParts } from "../utils/timezone";
+import * as businessHoursService from "./businessHoursService";
 import * as reminderEngine from "./reminderEngine";
 
 const SCOPE = "schedulingService";
+const DEFAULT_SLOT_MINUTES = 30;
 
-export async function checkAvailability(date: string, durationMinutes?: number): Promise<string[]> {
-  return googleCalendar.checkAvailability(date, durationMinutes);
+function todayIsoDateSaoPaulo(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+/**
+ * Fonte de verdade da disponibilidade e o proprio banco (agendamentos com
+ * status "Agendado" no dia), nunca o Google Calendar - a Agenda precisa
+ * continuar funcionando (WhatsApp/IA e CRM) mesmo com o Google fora do ar,
+ * com token expirado, ou desconectado. Os horarios candidatos continuam
+ * vindo de business_hour_slots, como antes.
+ */
+export async function checkAvailability(date: string, durationMinutes: number = DEFAULT_SLOT_MINUTES): Promise<string[]> {
+  const { enabled, slots } = await businessHoursService.getDaySlots(date);
+  if (!enabled) return [];
+
+  const busySchedules = await scheduleRepository.findSchedulesByDate(date);
+  const busy = busySchedules.map((s) => {
+    const start = new Date(`${s.date}T${s.time.slice(0, 5)}:00-03:00`);
+    const end = new Date(start.getTime() + (s.duration_minutes ?? DEFAULT_SLOT_MINUTES) * 60_000);
+    return { start, end };
+  });
+
+  const isToday = date === todayIsoDateSaoPaulo();
+  const minStartMs = Date.now() + 20 * 60_000;
+
+  const results: string[] = [];
+  for (const slotTime of slots) {
+    const start = new Date(`${date}T${slotTime}:00-03:00`);
+    if (isToday && start.getTime() < minStartMs) continue;
+    const end = new Date(start.getTime() + durationMinutes * 60_000);
+    const overlaps = busy.some((b) => start.getTime() < b.end.getTime() && end.getTime() > b.start.getTime());
+    if (!overlaps) results.push(start.toISOString());
+  }
+  return results;
 }
 
 /**
@@ -46,18 +80,10 @@ export async function createAppointment(params: {
   staffId?: string | null;
   requestedProcedure?: string | null;
 }): Promise<Schedule> {
-  const event = await googleCalendar.createEvent({
-    name: params.name,
-    phone: params.phone,
-    service: params.service,
-    start: params.start,
-    durationMinutes: params.durationMinutes,
-    notes: params.notes,
-    requestedProcedure: params.requestedProcedure,
-  });
-
   const { date, time } = toSaoPauloDateTimeParts(new Date(params.start));
 
+  // O banco e a fonte de verdade da Agenda - o agendamento precisa existir
+  // aqui independente do Google Calendar estar disponivel ou nao.
   const schedule = await scheduleRepository.createSchedule({
     userId: params.userId,
     patientName: params.name,
@@ -65,15 +91,36 @@ export async function createAppointment(params: {
     procedure: params.service,
     date,
     time,
-    googleEventId: event.id!,
     notes: params.notes,
     durationMinutes: params.durationMinutes ?? null,
     staffId: params.staffId ?? null,
     requestedProcedure: params.requestedProcedure ?? null,
   });
 
+  // Sincronizacao com o Google Calendar e best-effort: token expirado, Google
+  // fora do ar ou qualquer outro erro aqui nunca pode desfazer/impedir um
+  // agendamento que ja existe no banco. Se der certo, guarda o google_event_id
+  // pra permitir remarcacao/cancelamento sincronizados depois.
+  try {
+    const event = await googleCalendar.createEvent({
+      name: params.name,
+      phone: params.phone,
+      service: params.service,
+      start: params.start,
+      durationMinutes: params.durationMinutes,
+      notes: params.notes,
+      requestedProcedure: params.requestedProcedure,
+    });
+    if (event.id) {
+      await scheduleRepository.updateGoogleEventId(schedule.id, event.id);
+      schedule.google_event_id = event.id;
+    }
+  } catch (err) {
+    logger.error(SCOPE, "Falha ao sincronizar novo agendamento com o Google Calendar (agendamento ja criado com sucesso no banco)", err);
+  }
+
   // Nunca deixa uma falha do motor de lembretes mascarar como falha do
-  // proprio agendamento (que ja foi criado com sucesso no Calendar/banco).
+  // proprio agendamento (que ja foi criado com sucesso no banco).
   try {
     await reminderEngine.scheduleConfirmationForAppointment(schedule);
   } catch (err) {
@@ -94,13 +141,20 @@ export async function rescheduleAppointment(
 ): Promise<Schedule> {
   const schedule = await scheduleRepository.findScheduleById(scheduleId);
   if (!schedule) throw new AppError(`Agendamento nao encontrado: ${scheduleId}`);
-  if (!schedule.google_event_id) throw new AppError(`Agendamento sem evento no Google Calendar: ${scheduleId}`);
-
-  await googleCalendar.updateEvent(schedule.google_event_id, newStart, durationMinutes);
 
   const { date, time } = toSaoPauloDateTimeParts(new Date(newStart));
 
+  // Banco primeiro (fonte de verdade), Google depois e best-effort - mesmo
+  // padrao de createAppointment.
   const updated = await scheduleRepository.updateScheduleDateTime(scheduleId, date, time);
+
+  if (schedule.google_event_id) {
+    try {
+      await googleCalendar.updateEvent(schedule.google_event_id, newStart, durationMinutes);
+    } catch (err) {
+      logger.error(SCOPE, "Falha ao sincronizar remarcacao com o Google Calendar (remarcacao ja concluida com sucesso no banco)", err);
+    }
+  }
 
   try {
     await reminderEngine.rescheduleRemindersForAppointment(updated);
@@ -115,11 +169,17 @@ export async function cancelAppointment(scheduleId: string): Promise<Schedule> {
   const schedule = await scheduleRepository.findScheduleById(scheduleId);
   if (!schedule) throw new AppError(`Agendamento nao encontrado: ${scheduleId}`);
 
-  if (schedule.google_event_id) {
-    await googleCalendar.cancelEvent(schedule.google_event_id);
-  }
-
+  // Banco primeiro (fonte de verdade), Google depois e best-effort - mesmo
+  // padrao de createAppointment/rescheduleAppointment.
   const updated = await scheduleRepository.updateScheduleStatus(scheduleId, "Cancelado");
+
+  if (schedule.google_event_id) {
+    try {
+      await googleCalendar.cancelEvent(schedule.google_event_id);
+    } catch (err) {
+      logger.error(SCOPE, "Falha ao sincronizar cancelamento com o Google Calendar (cancelamento ja concluido com sucesso no banco)", err);
+    }
+  }
 
   try {
     await reminderEngine.cancelRemindersForAppointment(scheduleId);

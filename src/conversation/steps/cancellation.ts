@@ -1,10 +1,9 @@
-import { CalendarUnavailableError } from "../../integrations/googleCalendarClient";
 import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as schedulingService from "../../services/schedulingService";
 import { logger } from "../../utils/logger";
 import { describeCandidates } from "../prompt";
 import { FlowContext, StepDefinition, StepResult, ToolHandler } from "../types";
-import { ABANDON_TOOL, CALENDAR_UNAVAILABLE_INSTRUCTION, abandonFlow } from "./shared";
+import { ABANDON_TOOL, abandonFlow } from "./shared";
 
 const SCOPE = "conversation.cancellation";
 
@@ -94,10 +93,6 @@ export async function confirmCancellation(ctx: FlowContext): Promise<StepResult>
     const message = await aiKnowledgeService.getMessageTemplate("confirm_cancellation_success");
     return { nextStep: "MENU", data: {}, message };
   } catch (err) {
-    if (err instanceof CalendarUnavailableError) {
-      logger.error(SCOPE, "Falha ao cancelar (Calendar indisponivel)", err);
-      return { nextStep: "CANCELING_CONFIRM", data: ctx.conversation.state_data, message: CALENDAR_UNAVAILABLE_INSTRUCTION };
-    }
     logger.error(SCOPE, "Falha ao cancelar", err);
     const message = await aiKnowledgeService.getMessageTemplate("confirm_cancellation_failure", { error: "tente novamente em instantes" });
     return { nextStep: "CANCELING_CONFIRM", data: ctx.conversation.state_data, message };

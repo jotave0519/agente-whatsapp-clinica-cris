@@ -8,7 +8,7 @@ export async function createSchedule(params: {
   procedure: string;
   date: string;
   time: string;
-  googleEventId: string;
+  googleEventId?: string | null;
   notes?: string | null;
   durationMinutes?: number | null;
   staffId?: string | null;
@@ -23,7 +23,7 @@ export async function createSchedule(params: {
       procedure: params.procedure,
       date: params.date,
       time: params.time,
-      google_event_id: params.googleEventId,
+      google_event_id: params.googleEventId ?? null,
       notes: params.notes ?? null,
       status: "Agendado",
       duration_minutes: params.durationMinutes ?? null,
@@ -35,6 +35,21 @@ export async function createSchedule(params: {
 
   if (error) throw error;
   return data;
+}
+
+/**
+ * Preenche o google_event_id depois que o agendamento ja existe no banco -
+ * usado pela sincronizacao best-effort com o Google Calendar (ver
+ * schedulingService), nunca no momento da criacao em si. O banco e sempre a
+ * fonte de verdade; isso so guarda a referencia pra sincronizacoes futuras.
+ */
+export async function updateGoogleEventId(scheduleId: string, googleEventId: string): Promise<void> {
+  const { error } = await getSupabaseClient()
+    .from("schedules")
+    .update({ google_event_id: googleEventId, updated_at: new Date().toISOString() })
+    .eq("id", scheduleId);
+
+  if (error) throw error;
 }
 
 /** Usado pela Ficha do Paciente ao registrar quem realizou um procedimento ja concluido. */

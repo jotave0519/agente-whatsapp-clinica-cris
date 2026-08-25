@@ -1,4 +1,3 @@
-import { CalendarUnavailableError } from "../../integrations/googleCalendarClient";
 import * as aiKnowledgeService from "../../services/aiKnowledgeService";
 import * as schedulingService from "../../services/schedulingService";
 import { FlowStateData } from "../../types";
@@ -262,10 +261,6 @@ export async function confirmRescheduling(ctx: FlowContext): Promise<StepResult>
     });
     return { nextStep: "MENU", data: {}, message };
   } catch (err) {
-    if (err instanceof CalendarUnavailableError) {
-      logger.error(SCOPE, "Falha ao remarcar (Calendar indisponivel)", err);
-      return { nextStep: "RESCHEDULING_CONFIRM", data: ctx.conversation.state_data, message: CALENDAR_UNAVAILABLE_INSTRUCTION };
-    }
     logger.error(SCOPE, "Falha ao remarcar", err);
     const message = await aiKnowledgeService.getMessageTemplate("confirm_rescheduling_failure", { error: "tente novamente em instantes" });
     return { nextStep: "RESCHEDULING_CONFIRM", data: ctx.conversation.state_data, message };

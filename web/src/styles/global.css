@@ -1025,6 +1025,78 @@ a {
   color: var(--bg);
 }
 
+/* Grade da visualizacao "Mes" - mesma linguagem visual da faixa de dias
+   (bolinha de selecao), compartilhada entre celular e desktop. */
+.month-grid-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+
+.month-grid-weekday {
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 6px 0;
+}
+
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.month-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  aspect-ratio: 1;
+  border: none;
+  background: none;
+  border-radius: 10px;
+  transition: background 150ms ease;
+}
+
+.month-cell:active {
+  background: var(--border-soft);
+}
+
+.month-cell.is-outside .month-cell-number {
+  color: var(--text-faint);
+}
+
+.month-cell-number {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.month-cell-number.is-today {
+  color: var(--accent);
+}
+
+.month-cell-number.active {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.month-cell-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
 .mobile-list-item {
   display: flex;
   flex-direction: column;

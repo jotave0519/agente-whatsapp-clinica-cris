@@ -59,13 +59,28 @@ function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+// "Hoje" precisa ser calculado no timezone da clinica, nunca em UTC direto:
+// toISOString() muda de dia ~3h antes da meia-noite local (America/Sao_Paulo
+// e UTC-3), o que fazia o dia seguinte aparecer como "hoje" a partir das 21h.
+function todayStrSaoPaulo(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+// selectedDay precisa nascer na meia-noite local do dia de hoje (nao no
+// instante atual): um "new Date()" puro carrega a hora corrente junto, e
+// toDateStr() nele sofre o mesmo desvio de UTC do bug do "Hoje" - a Agenda
+// abriria mostrando os agendamentos do dia seguinte a partir das 21h.
+function todayLocalMidnight(): Date {
+  return new Date(`${todayStrSaoPaulo()}T00:00:00`);
+}
+
 export function Agenda() {
   const { open: openNewAppointment, lastCreatedAt } = useAppointmentModal();
   const showToast = useToast();
   const isMobile = useIsMobile();
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
-  const [view, setView] = useState<"dia" | "semana">("semana");
-  const [selectedDay, setSelectedDay] = useState(() => new Date());
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(todayLocalMidnight()));
+  const [view, setView] = useState<"dia" | "semana" | "mes">("semana");
+  const [selectedDay, setSelectedDay] = useState(() => todayLocalMidnight());
   const [items, setItems] = useState<ScheduleItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ScheduleItem | null>(null);
@@ -111,15 +126,72 @@ export function Agenda() {
   }
 
   function goToToday() {
-    setWeekStart(startOfWeek(new Date()));
-    setSelectedDay(new Date());
+    setWeekStart(startOfWeek(todayLocalMidnight()));
+    setSelectedDay(todayLocalMidnight());
   }
 
-  const visibleDays = isMobile ? [selectedDay] : view === "dia" ? [weekDays.find((d) => toDateStr(d) === toDateStr(new Date())) || weekDays[0]] : weekDays;
+  function goToDay(deltaDays: number) {
+    const next = new Date(selectedDay);
+    next.setDate(next.getDate() + deltaDays);
+    setSelectedDay(next);
+    setWeekStart(startOfWeek(next));
+  }
+
+  function goToMonth(deltaMonths: number) {
+    const next = new Date(selectedDay);
+    next.setDate(1);
+    next.setMonth(next.getMonth() + deltaMonths);
+    setSelectedDay(next);
+    setWeekStart(startOfWeek(next));
+  }
+
+  // As setas de navegacao mudam de passo conforme a visualizacao ativa -
+  // um dia (Dia), uma semana (Semana) ou um mes (Mes).
+  function goToPrevious() {
+    if (view === "dia") goToDay(-1);
+    else if (view === "mes") goToMonth(-1);
+    else goToWeek(-1);
+  }
+
+  function goToNext() {
+    if (view === "dia") goToDay(1);
+    else if (view === "mes") goToMonth(1);
+    else goToWeek(1);
+  }
+
+  const visibleDays = isMobile ? [selectedDay] : view === "dia" ? [weekDays.find((d) => toDateStr(d) === toDateStr(selectedDay)) || weekDays[0]] : weekDays;
+
+  // Grade do mes (Visualizacao "Mes") - sempre semanas completas (Seg-Dom),
+  // incluindo dias do mes anterior/seguinte pra preencher a primeira/ultima
+  // semana, do mesmo jeito que qualquer calendario mensal convencional.
+  const monthGridDays = useMemo(() => {
+    const first = new Date(selectedDay.getFullYear(), selectedDay.getMonth(), 1);
+    const gridStart = startOfWeek(first);
+    const last = new Date(selectedDay.getFullYear(), selectedDay.getMonth() + 1, 0);
+    const gridEnd = startOfWeek(last);
+    gridEnd.setDate(gridEnd.getDate() + 6);
+    const days: Date[] = [];
+    const cursor = new Date(gridStart);
+    while (cursor <= gridEnd) {
+      days.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return days;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDay.getFullYear(), selectedDay.getMonth()]);
 
   function loadSchedules() {
-    const from = toDateStr(weekDays[0]);
-    const to = toDateStr(weekDays[6]);
+    let from: string;
+    let to: string;
+    if (view === "mes") {
+      const first = new Date(selectedDay.getFullYear(), selectedDay.getMonth(), 1);
+      const last = new Date(selectedDay.getFullYear(), selectedDay.getMonth() + 1, 0);
+      from = toDateStr(first);
+      to = toDateStr(last);
+    } else {
+      from = toDateStr(weekDays[0]);
+      to = toDateStr(weekDays[6]);
+    }
     setItems(null);
     setError(null);
     api
@@ -131,9 +203,19 @@ export function Agenda() {
   useEffect(() => {
     loadSchedules();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weekStart, lastCreatedAt]);
+  }, [view, weekStart, selectedDay.getFullYear(), selectedDay.getMonth(), lastCreatedAt]);
 
-  const todayStr = toDateStr(new Date());
+  // Quantidade de atendimentos por dia (usado pelos pontinhos da grade do
+  // mes) - deriva de "items", que ja vem filtrado certo pra cada visualizacao.
+  const countsByDate = useMemo(() => {
+    const map: Record<string, number> = {};
+    (items || []).forEach((it) => {
+      map[it.date] = (map[it.date] || 0) + 1;
+    });
+    return map;
+  }, [items]);
+
+  const todayStr = todayStrSaoPaulo();
   const totalAppts = (items || []).length;
   const selectedDayAppts = (items || []).filter((it) => it.date === toDateStr(selectedDay)).length;
 
@@ -145,9 +227,14 @@ export function Agenda() {
   if (selectedDayStr === todayStr) {
     selectedDayLabel = "Hoje";
   } else {
-    const tomorrow = new Date();
+    // Parte de todayStr (ja calculado certo, no timezone da clinica) e nao
+    // de "new Date()" direto - somar/subtrair dia num Date criado agora
+    // carrega a hora atual junto, e caindo perto da meia-noite o mesmo
+    // desvio de UTC do bug do "Hoje" tambem quebrava Amanha/Ontem.
+    const todayLocalMidnight = new Date(`${todayStr}T00:00:00`);
+    const tomorrow = new Date(todayLocalMidnight);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const yesterday = new Date();
+    const yesterday = new Date(todayLocalMidnight);
     yesterday.setDate(yesterday.getDate() - 1);
     if (selectedDayStr === toDateStr(tomorrow)) {
       selectedDayLabel = "Amanhã";
@@ -167,6 +254,26 @@ export function Agenda() {
     const raw = selectedDay.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   })();
+
+  // Intervalo da semana visivel (usado na visualizacao "Semana"), ex:
+  // "07 - 13 de setembro". Mes de referencia e o do ultimo dia da semana.
+  const weekRangeHeading = (() => {
+    const monthName = weekDays[6].toLocaleDateString("pt-BR", { month: "long" });
+    return `${weekDays[0].getDate()} - ${weekDays[6].getDate()} de ${monthName}`;
+  })();
+
+  // Mes/ano da visualizacao "Mes", ex: "Setembro 2026".
+  const monthYearLabel = (() => {
+    const raw = selectedDay.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  })();
+
+  // Rotulo central do nav (setas < >) - muda de acordo com a visualizacao
+  // ativa, pra sempre descrever o periodo que esta sendo exibido.
+  const navCenterLabel = view === "dia" ? selectedDayLabel : view === "mes" ? monthYearLabel : "Esta semana";
+
+  const subtitleCount = view === "dia" ? selectedDayAppts : totalAppts;
+  const subtitleSuffix = view === "dia" ? "neste dia" : view === "semana" ? "nesta semana" : "neste mês";
 
   async function handleCancel() {
     if (!selected) return;
@@ -367,6 +474,116 @@ export function Agenda() {
     return <div className="agenda-mobile-list">{rows}</div>;
   }
 
+  /**
+   * Visualizacao "Semana" no celular: mesma lista cronologica de cartoes ja
+   * usada na visualizacao "Dia", so que agrupada por dia (em vez de por
+   * hora) e cobrindo os 7 dias da semana visivel. Reaproveita 100% dos
+   * dados e componentes visuais ja existentes - nenhuma logica nova de
+   * agendamento, so uma forma diferente de agrupar os mesmos "items".
+   */
+  function renderMobileWeekList() {
+    if (items === null) {
+      return (
+        <div style={{ padding: 12, display: "grid", gap: 10 }}>
+          <Skeleton style={{ height: 60, borderRadius: 12 }} />
+          <Skeleton style={{ height: 60, borderRadius: 12 }} />
+          <Skeleton style={{ height: 60, borderRadius: 12 }} />
+        </div>
+      );
+    }
+
+    const rows: ReactNode[] = [];
+    for (const day of weekDays) {
+      const dateStr = toDateStr(day);
+      const dayItems = items.filter((it) => it.date === dateStr).slice().sort((a, b) => a.time.localeCompare(b.time));
+      if (dayItems.length === 0) continue;
+
+      const isToday = dateStr === todayStr;
+      const dd = String(day.getDate()).padStart(2, "0");
+      const mm = String(day.getMonth() + 1).padStart(2, "0");
+      rows.push(
+        <div key={`day-${dateStr}`} className="agenda-mobile-hour-header">
+          {WEEKDAY_LABELS[(day.getDay() + 6) % 7]}, {dd}/{mm}
+          {isToday ? " · Hoje" : ""}
+        </div>
+      );
+
+      for (const it of dayItems) {
+        const color = hashColor(it.procedure);
+        rows.push(
+          <div
+            key={it.id}
+            className="agenda-mobile-card"
+            style={{ borderLeftColor: color.border }}
+            onClick={() => {
+              setSelected(it);
+              setCancelling(false);
+              setCancelReason("");
+            }}
+          >
+            <div className="agenda-mobile-card-time">{it.time.slice(0, 5)}</div>
+            <div className="agenda-mobile-card-body">
+              <div className="agenda-mobile-card-name">{it.patient_name}</div>
+              <div className="agenda-mobile-card-procedure">{it.procedure}</div>
+            </div>
+            <span className="agenda-mobile-card-status" style={{ background: getDisplayStatus(it).dot || "var(--text-faint)" }} />
+          </div>
+        );
+      }
+    }
+
+    if (rows.length === 0) {
+      return <div className="empty-state">Nenhum atendimento agendado nesta semana.</div>;
+    }
+
+    return <div className="agenda-mobile-list">{rows}</div>;
+  }
+
+  /**
+   * Visualizacao "Mes" - grade de calendario convencional (compartilhada
+   * entre celular e desktop). So leitura: cada dia mostra um marcador se
+   * tiver algum atendimento (via countsByDate), e clicar num dia troca pra
+   * visualizacao "Dia" naquela data - nenhum dado e criado/alterado aqui.
+   */
+  function renderMonthGrid() {
+    const monthIndex = selectedDay.getMonth();
+    const selectedStr = toDateStr(selectedDay);
+    return (
+      <div>
+        <div className="month-grid-weekdays">
+          {WEEKDAY_LABELS.map((w) => (
+            <div key={w} className="month-grid-weekday">
+              {w}
+            </div>
+          ))}
+        </div>
+        <div className="month-grid">
+          {monthGridDays.map((d) => {
+            const dateStr = toDateStr(d);
+            const isCurrentMonth = d.getMonth() === monthIndex;
+            const isToday = dateStr === todayStr;
+            const isSelected = dateStr === selectedStr;
+            const count = countsByDate[dateStr] || 0;
+            return (
+              <button
+                key={dateStr}
+                className={`month-cell${isCurrentMonth ? "" : " is-outside"}`}
+                onClick={() => {
+                  setSelectedDay(d);
+                  setWeekStart(startOfWeek(d));
+                  setView("dia");
+                }}
+              >
+                <span className={`month-cell-number${isSelected ? " active" : ""}${!isSelected && isToday ? " is-today" : ""}`}>{d.getDate()}</span>
+                {count > 0 && <span className="month-cell-dot" />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   function renderActionSheet() {
     if (!selected) return null;
     return (
@@ -457,30 +674,53 @@ export function Agenda() {
       <div>
         <h1 className="page-title">Agenda</h1>
         <p className="page-subtitle">
-          <strong style={{ color: "var(--text)", fontWeight: 600 }}>{selectedDayAppts} atendimento(s)</strong> neste dia
+          <strong style={{ color: "var(--text)", fontWeight: 600 }}>{subtitleCount} atendimento(s)</strong> {subtitleSuffix}
         </p>
 
+        <div className="segmented" style={{ marginBottom: 14 }}>
+          <span className={`segmented-item${view === "dia" ? " active" : ""}`} onClick={() => setView("dia")} style={{ flex: 1, textAlign: "center", cursor: "pointer" }}>
+            Dia
+          </span>
+          <span className={`segmented-item${view === "semana" ? " active" : ""}`} onClick={() => setView("semana")} style={{ flex: 1, textAlign: "center", cursor: "pointer" }}>
+            Semana
+          </span>
+          <span className={`segmented-item${view === "mes" ? " active" : ""}`} onClick={() => setView("mes")} style={{ flex: 1, textAlign: "center", cursor: "pointer" }}>
+            Mês
+          </span>
+        </div>
+
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-          <button style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => goToWeek(-1)}>
+          <button style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={goToPrevious}>
             <ChevronLeftIcon color="var(--text-muted)" />
           </button>
           <button style={{ flex: 1, fontSize: 15, fontWeight: 600, color: "var(--text)", textAlign: "center" }} onClick={goToToday}>
-            {selectedDayLabel}
+            {navCenterLabel}
           </button>
-          <button style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => goToWeek(1)}>
+          <button style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={goToNext}>
             <ChevronRightIcon color="var(--text-muted)" />
           </button>
         </div>
-        <DayStrip days={weekDays} selected={selectedDay} onSelect={setSelectedDay} />
-        <div style={{ fontSize: 14.5, fontWeight: 600, margin: "14px 0 10px" }}>{fullDayHeading}</div>
+
+        {view !== "mes" && (
+          <>
+            <DayStrip days={weekDays} selected={selectedDay} onSelect={setSelectedDay} />
+            <div style={{ fontSize: 14.5, fontWeight: 600, margin: "14px 0 10px" }}>{view === "dia" ? fullDayHeading : weekRangeHeading}</div>
+          </>
+        )}
 
         {error && <div className="error-text">{error}</div>}
 
-        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-          <div className="agenda-scroll" style={{ maxHeight: "calc(100dvh - 320px)" }} onScroll={handleAgendaScroll}>
-            {renderMobileAgendaList()}
+        {view === "mes" ? (
+          <div className="card" style={{ padding: 12 }}>
+            {renderMonthGrid()}
           </div>
-        </div>
+        ) : (
+          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+            <div className="agenda-scroll" style={{ maxHeight: "calc(100dvh - 320px)" }} onScroll={handleAgendaScroll}>
+              {view === "dia" ? renderMobileAgendaList() : renderMobileWeekList()}
+            </div>
+          </div>
+        )}
 
         {renderActionSheet()}
         <NewAppointmentFab hidden={fabHidden} />
@@ -494,24 +734,23 @@ export function Agenda() {
         <div>
           <h1 className="page-title">Agenda</h1>
           <p className="page-subtitle">
-            {weekDays[0].toLocaleDateString("pt-BR")} — {weekDays[6].toLocaleDateString("pt-BR")} ·{" "}
-            <strong style={{ color: "var(--text)", fontWeight: 600 }}>{totalAppts} atendimento(s)</strong> nesta semana
+            <strong style={{ color: "var(--text)", fontWeight: 600 }}>{subtitleCount} atendimento(s)</strong> {subtitleSuffix}
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
           <div style={{ display: "flex", alignItems: "center", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 11, padding: 3 }}>
             <button
               style={{ width: 32, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}
-              onClick={() => goToWeek(-1)}
+              onClick={goToPrevious}
             >
               <ChevronLeftIcon color="var(--text-muted)" />
             </button>
             <span style={{ fontSize: 13, fontWeight: 500, padding: "0 8px", cursor: "pointer" }} onClick={goToToday}>
-              Esta semana
+              {navCenterLabel}
             </span>
             <button
               style={{ width: 32, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}
-              onClick={() => goToWeek(1)}
+              onClick={goToNext}
             >
               <ChevronRightIcon color="var(--text-muted)" />
             </button>
@@ -522,6 +761,9 @@ export function Agenda() {
             </span>
             <span className={`segmented-item${view === "semana" ? " active" : ""}`} onClick={() => setView("semana")} style={{ cursor: "pointer" }}>
               Semana
+            </span>
+            <span className={`segmented-item${view === "mes" ? " active" : ""}`} onClick={() => setView("mes")} style={{ cursor: "pointer" }}>
+              Mês
             </span>
           </div>
           <button
@@ -535,26 +777,32 @@ export function Agenda() {
 
       {error && <div className="error-text">{error}</div>}
 
-      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        <div style={{ display: "flex", borderBottom: "1px solid var(--border)", background: "var(--border-soft)" }}>
-          <div className="agenda-hour-col" style={{ paddingTop: 0 }} />
-          {visibleDays.map((d) => {
-            const dateStr = toDateStr(d);
-            const isToday = dateStr === todayStr;
-            return (
-              <div key={dateStr} className="agenda-week-day">
-                <div className={`agenda-week-day-label${isToday ? " is-today" : ""}`}>{WEEKDAY_LABELS[(d.getDay() + 6) % 7]}</div>
-                <div className={`agenda-week-day-number${isToday ? " is-today" : ""}`}>{d.getDate()}</div>
-              </div>
-            );
-          })}
+      {view === "mes" ? (
+        <div className="card" style={{ padding: 20 }}>
+          {renderMonthGrid()}
         </div>
+      ) : (
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{ display: "flex", borderBottom: "1px solid var(--border)", background: "var(--border-soft)" }}>
+            <div className="agenda-hour-col" style={{ paddingTop: 0 }} />
+            {visibleDays.map((d) => {
+              const dateStr = toDateStr(d);
+              const isToday = dateStr === todayStr;
+              return (
+                <div key={dateStr} className="agenda-week-day">
+                  <div className={`agenda-week-day-label${isToday ? " is-today" : ""}`}>{WEEKDAY_LABELS[(d.getDay() + 6) % 7]}</div>
+                  <div className={`agenda-week-day-number${isToday ? " is-today" : ""}`}>{d.getDate()}</div>
+                </div>
+              );
+            })}
+          </div>
 
-        <div className="agenda-scroll" style={{ display: "flex", maxHeight: "calc(100vh - 260px)" }}>
-          {renderHourColumn()}
-          {visibleDays.map((d) => renderDayColumn(d))}
+          <div className="agenda-scroll" style={{ display: "flex", maxHeight: "calc(100vh - 260px)" }}>
+            {renderHourColumn()}
+            {visibleDays.map((d) => renderDayColumn(d))}
+          </div>
         </div>
-      </div>
+      )}
 
       {renderActionSheet()}
     </div>

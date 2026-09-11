@@ -4,6 +4,13 @@ function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+// "Hoje" precisa ser calculado no timezone da clinica, nunca em UTC direto:
+// toISOString() muda de dia ~3h antes da meia-noite local (America/Sao_Paulo
+// e UTC-3), o que fazia o dia seguinte aparecer como "hoje" a partir das 21h.
+function todayStrSaoPaulo(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
 interface Props {
   days: Date[];
   selected: Date;
@@ -11,7 +18,7 @@ interface Props {
 }
 
 export function DayStrip({ days, selected, onSelect }: Props) {
-  const todayStr = toDateStr(new Date());
+  const todayStr = todayStrSaoPaulo();
   const selectedStr = toDateStr(selected);
 
   return (

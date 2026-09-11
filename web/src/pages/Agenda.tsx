@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAppointmentModal } from "../context/AppointmentModalContext";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { useIsMobile } from "../hooks/useIsMobile";
@@ -79,7 +79,7 @@ export function Agenda() {
   const showToast = useToast();
   const isMobile = useIsMobile();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(todayLocalMidnight()));
-  const [view, setView] = useState<"dia" | "semana" | "mes">("semana");
+  const [view, setView] = useState<"dia" | "semana" | "mes">("dia");
   const [selectedDay, setSelectedDay] = useState(() => todayLocalMidnight());
   const [items, setItems] = useState<ScheduleItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -88,19 +88,6 @@ export function Agenda() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [acting, setActing] = useState(false);
-
-  // Encolhe o FAB enquanto o usuario rola a grade (celular) - nunca deixa o
-  // botao coberto/cobrindo um agendamento por muito tempo.
-  const [fabHidden, setFabHidden] = useState(false);
-  const scrollHideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => {
-    if (scrollHideTimeout.current) clearTimeout(scrollHideTimeout.current);
-  }, []);
-  function handleAgendaScroll() {
-    setFabHidden(true);
-    if (scrollHideTimeout.current) clearTimeout(scrollHideTimeout.current);
-    scrollHideTimeout.current = setTimeout(() => setFabHidden(false), 500);
-  }
 
   const weekDays = useMemo(
     () =>
@@ -715,15 +702,19 @@ export function Agenda() {
             {renderMonthGrid()}
           </div>
         ) : (
+          // Sem altura/scroll proprios: a lista flui dentro do scroll unico da
+          // pagina (".main", ja com padding inferior calculado pra nunca ficar
+          // atras da barra de navegacao/area segura). Um container filho com
+          // altura estimada + "overscroll-behavior: contain" travava o gesto
+          // de arrastar assim que a rolagem interna acabava, escondendo o
+          // ultimo atendimento sem deixar chegar nele de jeito nenhum.
           <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-            <div className="agenda-scroll" style={{ maxHeight: "calc(100dvh - 320px)" }} onScroll={handleAgendaScroll}>
-              {view === "dia" ? renderMobileAgendaList() : renderMobileWeekList()}
-            </div>
+            {view === "dia" ? renderMobileAgendaList() : renderMobileWeekList()}
           </div>
         )}
 
         {renderActionSheet()}
-        <NewAppointmentFab hidden={fabHidden} />
+        <NewAppointmentFab />
       </div>
     );
   }

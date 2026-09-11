@@ -1422,10 +1422,14 @@ a {
    largura sempre, empilhados verticalmente quando ha conflito (a altura da
    lista so cresce, nunca a largura encolhe). */
 
+/* padding-bottom cobre a altura do FAB (56px) + a folga entre ele e a barra
+   de navegacao (16px) + respiro extra (24px) - o ultimo atendimento do dia
+   precisa rolar pra cima do FAB, nunca ficar atras dele. O espaco pra barra
+   de navegacao/area segura em si ja vem de ".main" (ver global .main). */
 .agenda-mobile-list {
   display: flex;
   flex-direction: column;
-  padding: 4px 4px 16px;
+  padding: 4px 4px 96px;
 }
 
 .agenda-mobile-hour-header {

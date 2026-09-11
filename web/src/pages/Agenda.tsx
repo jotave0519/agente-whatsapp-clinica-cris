@@ -7,7 +7,6 @@ import { layoutDayEvents } from "../lib/calendarLayout";
 import { getDisplayStatus } from "../lib/scheduleStatus";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
 import { DayStrip } from "../components/DayStrip";
-import { NewAppointmentFab } from "../components/NewAppointmentFab";
 import { Skeleton } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
 
@@ -261,6 +260,11 @@ export function Agenda() {
 
   const subtitleCount = view === "dia" ? selectedDayAppts : totalAppts;
   const subtitleSuffix = view === "dia" ? "neste dia" : view === "semana" ? "nesta semana" : "neste mês";
+
+  // Chave usada so pra forcar o React a remontar o card de conteudo (troca
+  // de view, navegacao de dia/semana/mes) - reaproveita a animacao de
+  // entrada que ".card" ja tem no resto do app, sem CSS/JS de transicao novo.
+  const contentKey = view === "mes" ? `mes-${selectedDay.getFullYear()}-${selectedDay.getMonth()}` : `${view}-${toDateStr(weekStart)}-${toDateStr(selectedDay)}`;
 
   async function handleCancel() {
     if (!selected) return;
@@ -659,10 +663,21 @@ export function Agenda() {
   if (isMobile) {
     return (
       <div>
-        <h1 className="page-title">Agenda</h1>
-        <p className="page-subtitle">
-          <strong style={{ color: "var(--text)", fontWeight: 600 }}>{subtitleCount} atendimento(s)</strong> {subtitleSuffix}
-        </p>
+        {/* Sticky: fica fora da area rolavel da lista (mesmo scroll de ".main"),
+            nunca sobrepoe horarios/cards/datas do mes - so ocupa a faixa fixa
+            no topo, visivel em Dia/Semana/Mes por igual. Mesma acao de sempre
+            (openNewAppointment), so a posicao/apresentacao mudou. */}
+        <div style={{ position: "sticky", top: 0, zIndex: 5, background: "var(--bg)", paddingBottom: 2 }}>
+          <h1 className="page-title">Agenda</h1>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 20 }}>
+            <p className="page-subtitle" style={{ marginBottom: 0 }}>
+              <strong style={{ color: "var(--text)", fontWeight: 600 }}>{subtitleCount} atendimento(s)</strong> {subtitleSuffix}
+            </p>
+            <button className="btn" onClick={openNewAppointment} style={{ flex: "none" }}>
+              <PlusIcon width={15} height={15} /> Nova sessão
+            </button>
+          </div>
+        </div>
 
         <div className="segmented" style={{ marginBottom: 14 }}>
           <span className={`segmented-item${view === "dia" ? " active" : ""}`} onClick={() => setView("dia")} style={{ flex: 1, textAlign: "center", cursor: "pointer" }}>
@@ -698,7 +713,7 @@ export function Agenda() {
         {error && <div className="error-text">{error}</div>}
 
         {view === "mes" ? (
-          <div className="card" style={{ padding: 12 }}>
+          <div key={contentKey} className="card" style={{ padding: 12 }}>
             {renderMonthGrid()}
           </div>
         ) : (
@@ -708,13 +723,14 @@ export function Agenda() {
           // altura estimada + "overscroll-behavior: contain" travava o gesto
           // de arrastar assim que a rolagem interna acabava, escondendo o
           // ultimo atendimento sem deixar chegar nele de jeito nenhum.
-          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          // key=contentKey: forca remontagem ao trocar de dia/semana/mes,
+          // reaproveitando a animacao de entrada que ".card" ja tem.
+          <div key={contentKey} className="card" style={{ padding: 0, overflow: "hidden" }}>
             {view === "dia" ? renderMobileAgendaList() : renderMobileWeekList()}
           </div>
         )}
 
         {renderActionSheet()}
-        <NewAppointmentFab />
       </div>
     );
   }

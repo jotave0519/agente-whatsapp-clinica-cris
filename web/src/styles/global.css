@@ -1065,6 +1065,10 @@ a {
   background: var(--border-soft);
 }
 
+.month-cell:active .month-cell-number {
+  transform: scale(0.92);
+}
+
 .month-cell.is-outside .month-cell-number {
   color: var(--text-faint);
 }
@@ -1079,6 +1083,7 @@ a {
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
+  transition: transform 120ms ease, background 150ms ease, color 150ms ease;
 }
 
 .month-cell-number.is-today {
@@ -1457,6 +1462,7 @@ a {
   border-left: 4px solid var(--accent);
   cursor: pointer;
   transition: transform 120ms ease, box-shadow 120ms ease;
+  animation: entrance-rise 220ms ease both;
 }
 
 .agenda-mobile-card:active {

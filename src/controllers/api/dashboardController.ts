@@ -63,6 +63,7 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
       monthAppointments,
       recentConversations,
       waitingConversations,
+      todayTransactions,
       monthTransactions,
       monthlySeries,
       awaitingConfirmation,
@@ -86,6 +87,7 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
       scheduleRepository.findByDateRange(monthStart, monthEnd),
       conversationRepository.listRecent(5),
       conversationRepository.countByStatus("human"),
+      transactionRepository.listByDateRange(today, today),
       transactionRepository.listByDateRange(monthStart, monthEnd),
       financeService.getMonthlyFinanceSeries(12, now),
       scheduleRepository.countByConfirmationStatus("awaiting"),
@@ -111,6 +113,13 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
     const revenueThisMonth = monthTransactions
       .filter((t) => t.type === "receita" && t.status === "pago")
       .reduce((acc, t) => acc + Number(t.amount), 0);
+
+    // Resumo financeiro do dia (Pagina Inicial): "previsto" = recebido + pendente,
+    // nunca soma duas vezes o mesmo lancamento - so leitura de transactions.
+    const todayReceitas = todayTransactions.filter((t) => t.type === "receita");
+    const todayReceived = todayReceitas.filter((t) => t.status === "pago").reduce((acc, t) => acc + Number(t.amount), 0);
+    const todayPending = todayReceitas.filter((t) => t.status === "pendente").reduce((acc, t) => acc + Number(t.amount), 0);
+    const todayRevenue = { expected: todayReceived + todayPending, received: todayReceived, pending: todayPending };
 
     const revenueChart = monthlySeries.map((m) => ({ label: m.label, value: m.in }));
     const confirmationsChart = buildConfirmationsChart(confirmationEvents, 30);
@@ -138,6 +147,7 @@ export async function getDashboard(_req: Request, res: Response): Promise<void> 
       },
       revenueChart,
       confirmationsChart,
+      todayRevenue,
       todayAppointments,
       recentConversations,
       reactivation: {

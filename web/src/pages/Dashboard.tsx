@@ -19,6 +19,7 @@ interface DashboardData {
   };
   revenueChart: { label: string; value: number }[];
   confirmationsChart: { label: string; confirmed: number; cancelled: number; rescheduled: number }[];
+  todayRevenue: { expected: number; received: number; pending: number };
   todayAppointments: { id: string; patient_name: string; procedure: string; time: string; status: string }[];
   recentConversations: { id: string; userName: string | null; userPhone: string; lastMessage: string | null; status: string }[];
   reactivation: {
@@ -67,6 +68,15 @@ function greeting(): string {
   return "Boa noite";
 }
 
+/** "em 45 min" / "em 2h15" / "agora" - usado no card de proximo atendimento. */
+function formatMinutesUntil(mins: number): string {
+  if (mins <= 1) return "agora";
+  if (mins < 60) return `em ${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `em ${h}h` : `em ${h}h${String(m).padStart(2, "0")}`;
+}
+
 export function Dashboard() {
   const { session, staff } = useAuth();
   const navigate = useNavigate();
@@ -113,10 +123,17 @@ export function Dashboard() {
   const kpiCards = [
     { label: "Pacientes ativos", value: String(data.kpis.activePatients) },
     { label: "Agendamentos (mês)", value: String(data.kpis.appointmentsThisMonth) },
-    { label: "Faturamento (mês)", value: formatMoneyShort(data.kpis.revenueThisMonth) },
-    { label: "Conversas aguardando", value: String(data.kpis.conversationsWaiting) },
-    { label: "Consultas aguardando confirmação", value: String(data.kpis.awaitingConfirmation) },
   ];
+
+  // Proximo atendimento (Resumo do Dia) - deriva de todayAppointments, que o
+  // /dashboard ja retorna; nenhuma chamada nova so pra isso. Cancelados nunca
+  // contam como "proximo", e so considera horarios que ainda nao passaram.
+  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  const nextAppointment = data.todayAppointments
+    .filter((a) => a.status !== "Cancelado")
+    .map((a) => ({ ...a, minutesFromMidnight: Number(a.time.slice(0, 2)) * 60 + Number(a.time.slice(3, 5)) }))
+    .filter((a) => a.minutesFromMidnight >= nowMinutes)
+    .sort((a, b) => a.minutesFromMidnight - b.minutesFromMidnight)[0];
 
   return (
     <div>
@@ -127,8 +144,7 @@ export function Dashboard() {
             {greeting()}, <span style={{ fontStyle: "italic" }}>{name}</span>
           </h1>
           <p style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 9 }}>
-            Você tem <strong style={{ color: "var(--text)", fontWeight: 600 }}>{data.todayAppointments.length} atendimento(s)</strong> hoje e{" "}
-            <strong style={{ color: "var(--text)", fontWeight: 600 }}>{data.kpis.conversationsWaiting} conversa(s)</strong> aguardando retorno.
+            Você tem <strong style={{ color: "var(--text)", fontWeight: 600 }}>{data.todayAppointments.length} atendimento(s)</strong> hoje.
           </p>
         </div>
       </div>
@@ -142,6 +158,55 @@ export function Dashboard() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Resumo do Dia: financeiro de hoje + proximo atendimento - as duas
+          perguntas que a doutora mais faz ao abrir a plataforma de manha. */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20, marginTop: 20 }}>
+        <div className="card">
+          <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 16 }}>Financeiro de hoje</div>
+          <div style={{ display: "flex", gap: 22 }}>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em" }}>{formatMoneyShort(data.todayRevenue.expected)}</div>
+              <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 3 }}>Previsto</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em", color: "var(--green)" }}>{formatMoneyShort(data.todayRevenue.received)}</div>
+              <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 3 }}>Recebido</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em", color: data.todayRevenue.pending > 0 ? "var(--yellow)" : "var(--text)" }}>
+                {formatMoneyShort(data.todayRevenue.pending)}
+              </div>
+              <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 3 }}>Pendente</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 16 }}>Próximo atendimento</div>
+          {nextAppointment ? (
+            <div style={{ display: "flex", gap: 13, alignItems: "center" }}>
+              <div style={{ textAlign: "right", width: 46, flex: "0 0 46px" }}>
+                <div style={{ fontSize: 15, fontWeight: 600 }}>{nextAppointment.time.slice(0, 5)}</div>
+              </div>
+              <div style={{ width: 3, alignSelf: "stretch", borderRadius: 3, background: "var(--accent)" }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {nextAppointment.patient_name}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {nextAppointment.procedure}
+                </div>
+              </div>
+              <span className="badge badge-blue" style={{ flex: "none" }}>
+                {formatMinutesUntil(nextAppointment.minutesFromMidnight - nowMinutes)}
+              </span>
+            </div>
+          ) : (
+            <div className="empty-state" style={{ padding: "10px 0" }}>Nenhum atendimento restante hoje.</div>
+          )}
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.55fr 1fr", gap: 20, marginBottom: 20 }}>

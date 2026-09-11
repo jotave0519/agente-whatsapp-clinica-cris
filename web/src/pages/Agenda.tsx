@@ -80,6 +80,10 @@ export function Agenda() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(todayLocalMidnight()));
   const [view, setView] = useState<"dia" | "semana" | "mes">("dia");
   const [selectedDay, setSelectedDay] = useState(() => todayLocalMidnight());
+  // So pra escolher a direcao da transicao do conteudo (slide sutil) -
+  // "next"/"prev" nas setas, "none" em qualquer selecao direta (Hoje, dia
+  // especifico, troca de view), onde nao faz sentido sugerir uma direcao.
+  const [navDirection, setNavDirection] = useState<"next" | "prev" | "none">("none");
   const [items, setItems] = useState<ScheduleItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ScheduleItem | null>(null);
@@ -112,6 +116,7 @@ export function Agenda() {
   }
 
   function goToToday() {
+    setNavDirection("none");
     setWeekStart(startOfWeek(todayLocalMidnight()));
     setSelectedDay(todayLocalMidnight());
   }
@@ -134,12 +139,14 @@ export function Agenda() {
   // As setas de navegacao mudam de passo conforme a visualizacao ativa -
   // um dia (Dia), uma semana (Semana) ou um mes (Mes).
   function goToPrevious() {
+    setNavDirection("prev");
     if (view === "dia") goToDay(-1);
     else if (view === "mes") goToMonth(-1);
     else goToWeek(-1);
   }
 
   function goToNext() {
+    setNavDirection("next");
     if (view === "dia") goToDay(1);
     else if (view === "mes") goToMonth(1);
     else goToWeek(1);
@@ -242,10 +249,10 @@ export function Agenda() {
   })();
 
   // Intervalo da semana visivel (usado na visualizacao "Semana"), ex:
-  // "07 - 13 de setembro". Mes de referencia e o do ultimo dia da semana.
+  // "7 – 13 de setembro". Mes de referencia e o do ultimo dia da semana.
   const weekRangeHeading = (() => {
     const monthName = weekDays[6].toLocaleDateString("pt-BR", { month: "long" });
-    return `${weekDays[0].getDate()} - ${weekDays[6].getDate()} de ${monthName}`;
+    return `${weekDays[0].getDate()} – ${weekDays[6].getDate()} de ${monthName}`;
   })();
 
   // Mes/ano da visualizacao "Mes", ex: "Setembro 2026".
@@ -254,9 +261,24 @@ export function Agenda() {
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   })();
 
+  // Rotulo da semana selecionada - relativo (Esta semana/Semana que vem/
+  // Semana passada) so pras 3 semanas mais proximas de hoje; qualquer outra
+  // mostra o intervalo de datas. weekStart e a semana-corrente (ambos
+  // ancorados na meia-noite local) sao subtraidos direto em ms: nenhum dos
+  // dois carrega hora do dia, entao a divisao por 7 dias sempre da um
+  // numero inteiro exato de semanas de diferenca.
+  const weekLabel = (() => {
+    const currentWeekStart = startOfWeek(todayLocalMidnight());
+    const weekOffset = Math.round((weekStart.getTime() - currentWeekStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    if (weekOffset === 0) return "Esta semana";
+    if (weekOffset === 1) return "Semana que vem";
+    if (weekOffset === -1) return "Semana passada";
+    return weekRangeHeading;
+  })();
+
   // Rotulo central do nav (setas < >) - muda de acordo com a visualizacao
   // ativa, pra sempre descrever o periodo que esta sendo exibido.
-  const navCenterLabel = view === "dia" ? selectedDayLabel : view === "mes" ? monthYearLabel : "Esta semana";
+  const navCenterLabel = view === "dia" ? selectedDayLabel : view === "mes" ? monthYearLabel : weekLabel;
 
   const subtitleCount = view === "dia" ? selectedDayAppts : totalAppts;
   const subtitleSuffix = view === "dia" ? "neste dia" : view === "semana" ? "nesta semana" : "neste mês";
@@ -265,6 +287,7 @@ export function Agenda() {
   // de view, navegacao de dia/semana/mes) - reaproveita a animacao de
   // entrada que ".card" ja tem no resto do app, sem CSS/JS de transicao novo.
   const contentKey = view === "mes" ? `mes-${selectedDay.getFullYear()}-${selectedDay.getMonth()}` : `${view}-${toDateStr(weekStart)}-${toDateStr(selectedDay)}`;
+  const navSlideClass = navDirection === "next" ? " slide-next" : navDirection === "prev" ? " slide-prev" : "";
 
   async function handleCancel() {
     if (!selected) return;
@@ -560,6 +583,7 @@ export function Agenda() {
                 key={dateStr}
                 className={`month-cell${isCurrentMonth ? "" : " is-outside"}`}
                 onClick={() => {
+                  setNavDirection("none");
                   setSelectedDay(d);
                   setWeekStart(startOfWeek(d));
                   setView("dia");
@@ -680,13 +704,13 @@ export function Agenda() {
         </div>
 
         <div className="segmented" style={{ marginBottom: 14 }}>
-          <span className={`segmented-item${view === "dia" ? " active" : ""}`} onClick={() => setView("dia")} style={{ flex: 1, textAlign: "center", cursor: "pointer" }}>
+          <span className={`segmented-item${view === "dia" ? " active" : ""}`} onClick={() => { setNavDirection("none"); setView("dia"); }} style={{ flex: 1, textAlign: "center", cursor: "pointer" }}>
             Dia
           </span>
-          <span className={`segmented-item${view === "semana" ? " active" : ""}`} onClick={() => setView("semana")} style={{ flex: 1, textAlign: "center", cursor: "pointer" }}>
+          <span className={`segmented-item${view === "semana" ? " active" : ""}`} onClick={() => { setNavDirection("none"); setView("semana"); }} style={{ flex: 1, textAlign: "center", cursor: "pointer" }}>
             Semana
           </span>
-          <span className={`segmented-item${view === "mes" ? " active" : ""}`} onClick={() => setView("mes")} style={{ flex: 1, textAlign: "center", cursor: "pointer" }}>
+          <span className={`segmented-item${view === "mes" ? " active" : ""}`} onClick={() => { setNavDirection("none"); setView("mes"); }} style={{ flex: 1, textAlign: "center", cursor: "pointer" }}>
             Mês
           </span>
         </div>
@@ -705,7 +729,7 @@ export function Agenda() {
 
         {view !== "mes" && (
           <>
-            <DayStrip days={weekDays} selected={selectedDay} onSelect={setSelectedDay} />
+            <DayStrip days={weekDays} selected={selectedDay} onSelect={(d) => { setNavDirection("none"); setSelectedDay(d); }} />
             <div style={{ fontSize: 14.5, fontWeight: 600, margin: "14px 0 10px" }}>{view === "dia" ? fullDayHeading : weekRangeHeading}</div>
           </>
         )}
@@ -713,7 +737,7 @@ export function Agenda() {
         {error && <div className="error-text">{error}</div>}
 
         {view === "mes" ? (
-          <div key={contentKey} className="card" style={{ padding: 12 }}>
+          <div key={contentKey} className={`card${navSlideClass}`} style={{ padding: 12 }}>
             {renderMonthGrid()}
           </div>
         ) : (
@@ -724,8 +748,9 @@ export function Agenda() {
           // de arrastar assim que a rolagem interna acabava, escondendo o
           // ultimo atendimento sem deixar chegar nele de jeito nenhum.
           // key=contentKey: forca remontagem ao trocar de dia/semana/mes,
-          // reaproveitando a animacao de entrada que ".card" ja tem.
-          <div key={contentKey} className="card" style={{ padding: 0, overflow: "hidden" }}>
+          // reaproveitando (ou direcionando, via navSlideClass) a animacao
+          // de entrada que ".card" ja tem.
+          <div key={contentKey} className={`card${navSlideClass}`} style={{ padding: 0, overflow: "hidden" }}>
             {view === "dia" ? renderMobileAgendaList() : renderMobileWeekList()}
           </div>
         )}
@@ -763,13 +788,13 @@ export function Agenda() {
             </button>
           </div>
           <div className="segmented">
-            <span className={`segmented-item${view === "dia" ? " active" : ""}`} onClick={() => setView("dia")} style={{ cursor: "pointer" }}>
+            <span className={`segmented-item${view === "dia" ? " active" : ""}`} onClick={() => { setNavDirection("none"); setView("dia"); }} style={{ cursor: "pointer" }}>
               Dia
             </span>
-            <span className={`segmented-item${view === "semana" ? " active" : ""}`} onClick={() => setView("semana")} style={{ cursor: "pointer" }}>
+            <span className={`segmented-item${view === "semana" ? " active" : ""}`} onClick={() => { setNavDirection("none"); setView("semana"); }} style={{ cursor: "pointer" }}>
               Semana
             </span>
-            <span className={`segmented-item${view === "mes" ? " active" : ""}`} onClick={() => setView("mes")} style={{ cursor: "pointer" }}>
+            <span className={`segmented-item${view === "mes" ? " active" : ""}`} onClick={() => { setNavDirection("none"); setView("mes"); }} style={{ cursor: "pointer" }}>
               Mês
             </span>
           </div>
@@ -785,11 +810,11 @@ export function Agenda() {
       {error && <div className="error-text">{error}</div>}
 
       {view === "mes" ? (
-        <div className="card" style={{ padding: 20 }}>
+        <div key={contentKey} className={`card${navSlideClass}`} style={{ padding: 20 }}>
           {renderMonthGrid()}
         </div>
       ) : (
-        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div key={contentKey} className={`card${navSlideClass}`} style={{ padding: 0, overflow: "hidden" }}>
           <div style={{ display: "flex", borderBottom: "1px solid var(--border)", background: "var(--border-soft)" }}>
             <div className="agenda-hour-col" style={{ paddingTop: 0 }} />
             {visibleDays.map((d) => {

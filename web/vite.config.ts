@@ -41,6 +41,10 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,png,svg,ico,webmanifest}"],
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//, /^\/webhook/, /^\/health/],
+        // Injeta os listeners de push/notificationclick (push-sw.js) dentro do
+        // escopo do service worker gerado pelo Workbox - o generateSW nao
+        // permite editar o sw.js final diretamente, so importar scripts extras.
+        importScripts: ["/push-sw.js"],
       },
       devOptions: {
         enabled: false,

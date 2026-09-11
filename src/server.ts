@@ -10,6 +10,7 @@ import { scheduleInactivityCron } from "./cron/inactivityCron";
 import { scheduleReactivationScanCron, scheduleReactivationSendCron } from "./cron/reactivationCron";
 import { schedulePostAttendanceScanCron, schedulePostAttendanceSendCron } from "./cron/postAttendanceCron";
 import { scheduleCommercialScanCron, scheduleCommercialSendCron } from "./cron/commercialCron";
+import { scheduleNotificationReminderCron } from "./cron/notificationReminderCron";
 
 const WEB_DIST_DIR = path.join(__dirname, "..", "web-dist");
 
@@ -37,4 +38,5 @@ app.listen(env.port, () => {
   schedulePostAttendanceSendCron();
   scheduleCommercialScanCron();
   scheduleCommercialSendCron();
+  scheduleNotificationReminderCron();
 });

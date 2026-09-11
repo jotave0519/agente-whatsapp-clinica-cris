@@ -1,5 +1,6 @@
 import * as googleCalendar from "../integrations/googleCalendarClient";
 import * as scheduleEventRepository from "../repositories/scheduleEventRepository";
+import * as scheduleReminderLogRepository from "../repositories/scheduleReminderLogRepository";
 import * as scheduleRepository from "../repositories/scheduleRepository";
 import { Schedule } from "../types";
 import { AppError } from "../utils/appError";
@@ -162,6 +163,18 @@ export async function rescheduleAppointment(
     logger.error(SCOPE, "Falha ao reagendar lembretes (remarcacao ja concluida com sucesso)", err);
   }
 
+  // Limpa o historico de lembrete-de-atendimento (push pra equipe) desse
+  // agendamento - o horario mudou, entao precisa poder lembrar de novo no
+  // horario novo (o lembrete antigo nunca chegou a "existir" salvo, ele e
+  // sempre recalculado ao vivo pelo cron - so esse log de "ja lembrei" que
+  // precisa ser zerado). Remarcar em si nunca gera notificacao - so o
+  // lembrete de "esta chegando a hora" importa pra doutora.
+  try {
+    await scheduleReminderLogRepository.clearForSchedule(scheduleId);
+  } catch (err) {
+    logger.error(SCOPE, "Falha ao limpar log de lembrete apos remarcacao", err);
+  }
+
   return updated;
 }
 
@@ -187,6 +200,10 @@ export async function cancelAppointment(scheduleId: string): Promise<Schedule> {
   } catch (err) {
     logger.error(SCOPE, "Falha ao cancelar lembretes (cancelamento ja concluido com sucesso)", err);
   }
+
+  // Cancelamento em si nunca gera notificacao de push - o atendimento sai de
+  // "Agendado", entao o cron de lembretes (que so olha status='Agendado')
+  // automaticamente para de considera-lo, sem precisar de nenhuma acao aqui.
 
   return updated;
 }

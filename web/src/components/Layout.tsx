@@ -5,6 +5,7 @@ import { useIsMobile } from "../hooks/useIsMobile";
 import { canAccessPage } from "../lib/permissions";
 import { MobileHeader } from "./MobileHeader";
 import { MobileTabBar } from "./MobileTabBar";
+import { NotificationPrompt } from "./NotificationPrompt";
 import { PageTransition } from "./PageTransition";
 import { Topbar } from "./Topbar";
 
@@ -54,6 +55,7 @@ export function Layout() {
   if (isMobile) {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100dvh", width: "100%" }}>
+        <NotificationPrompt />
         <MobileHeader />
         <main className="main">
           <PageTransition />

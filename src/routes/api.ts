@@ -23,6 +23,16 @@ import {
 import { getMe } from "../controllers/api/meController";
 import { listMessageTemplates, updateMessageTemplate } from "../controllers/api/messageTemplateController";
 import {
+  getNotificationSettings,
+  getVapidPublicKey,
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  subscribe as subscribePush,
+  unsubscribe as unsubscribePush,
+  updateNotificationSettings,
+} from "../controllers/api/notificationController";
+import {
   createPatient,
   createPatientDocument,
   createPatientGoal,
@@ -195,3 +205,12 @@ apiRouter.get("/commercial-opportunities/:id", requireAdmin, getOpportunity);
 apiRouter.patch("/commercial-opportunities/:id/stage", requireAdmin, moveStage);
 apiRouter.patch("/commercial-opportunities/:id/pause", requireAdmin, pauseResume);
 apiRouter.get("/commercial-events", requireAdmin, listCommercialEvents);
+
+apiRouter.get("/notifications/vapid-public-key", getVapidPublicKey);
+apiRouter.post("/notifications/subscribe", subscribePush);
+apiRouter.post("/notifications/unsubscribe", unsubscribePush);
+apiRouter.get("/notifications", listNotifications);
+apiRouter.patch("/notifications/:id/read", markNotificationRead);
+apiRouter.post("/notifications/read-all", markAllNotificationsRead);
+apiRouter.get("/notifications/settings", getNotificationSettings);
+apiRouter.patch("/notifications/settings", updateNotificationSettings);

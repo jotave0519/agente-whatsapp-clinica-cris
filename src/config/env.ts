@@ -30,6 +30,13 @@ export const env = {
   // conteudo integral dos arquivos credentials.json/token.json como JSON cru na env var.
   googleCredentialsJson: process.env.GOOGLE_CREDENTIALS_JSON || "",
   googleTokenJson: process.env.GOOGLE_TOKEN_JSON || "",
+
+  vapidPublicKey: process.env.VAPID_PUBLIC_KEY || "",
+  vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || "",
+  // Web Push exige um "subject" (mailto: ou https:) pro provedor poder contatar
+  // o remetente em caso de abuso - usamos a URL real da propria plataforma como
+  // fallback (sempre correta) em vez de supor um e-mail que eu nao confirmei.
+  vapidContactUrl: process.env.VAPID_CONTACT_URL || "https://clinca-cris-clinica-cris-app.uule1c.easypanel.host",
 };
 
 export { required };

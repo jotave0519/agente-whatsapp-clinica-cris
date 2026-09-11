@@ -573,3 +573,36 @@ export interface MessageTemplate {
   updated_at: string;
 }
 
+export interface PushSubscriptionRecord {
+  id: string;
+  staff_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent: string | null;
+  created_at: string;
+}
+
+export interface NotificationSettings {
+  staff_id: string;
+  reminders_enabled: boolean;
+  reminder_minutes_before: 5 | 10 | 15 | 30;
+  new_appointment_enabled: boolean;
+  changes_enabled: boolean;
+  cancellations_enabled: boolean;
+  updated_at: string;
+}
+
+export type NotificationType = "reminder";
+
+export interface NotificationRecord {
+  id: string;
+  staff_id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  schedule_id: string | null;
+  read: boolean;
+  created_at: string;
+}
+

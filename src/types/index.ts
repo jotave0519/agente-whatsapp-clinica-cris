@@ -463,6 +463,7 @@ export interface Transaction {
   status: TransactionStatus;
   patient_id: string | null;
   procedure_id: string | null;
+  schedule_id: string | null;
   occurred_on: string;
   created_by: string | null;
   created_at: string;

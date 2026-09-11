@@ -12,6 +12,7 @@ import { useToast } from "../context/ToastContext";
 
 interface ScheduleItem {
   id: string;
+  user_id: string;
   patient_name: string;
   procedure: string;
   date: string;
@@ -21,6 +22,13 @@ interface ScheduleItem {
   was_rescheduled: boolean;
   notes: string | null;
   duration_minutes: number | null;
+  amount: number | null;
+  paymentStatus: "pago" | "pendente" | null;
+  transactionId: string | null;
+}
+
+function formatMoney(v: number): string {
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 const APPT_COLORS: { bg: string; border: string }[] = [
@@ -91,6 +99,21 @@ export function Agenda() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [acting, setActing] = useState(false);
+  // Indicador/gestao de pagamento no painel de detalhes do atendimento -
+  // mesma logica (e mesma fonte de verdade, transactions) do Fechamento do
+  // Dia no Financeiro, so que a partir da Agenda.
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [valueFormOpen, setValueFormOpen] = useState(false);
+  const [newAmount, setNewAmount] = useState("");
+  const [savingValue, setSavingValue] = useState(false);
+
+  // Reseta o mini-formulario de "definir valor" sempre que o atendimento
+  // selecionado muda (abre outro card, ou fecha o painel) - evita um valor
+  // digitado pra um atendimento vazar visualmente pra outro.
+  useEffect(() => {
+    setValueFormOpen(false);
+    setNewAmount("");
+  }, [selected?.id]);
 
   const weekDays = useMemo(
     () =>
@@ -321,6 +344,51 @@ export function Agenda() {
     }
   }
 
+  /** Alterna Pago <-> Pendente do lancamento ja vinculado a este atendimento. */
+  async function togglePayment() {
+    if (!selected || !selected.transactionId) return;
+    setPayingId(selected.id);
+    try {
+      const nextStatus = selected.paymentStatus === "pago" ? "pendente" : "pago";
+      await api.patch(`/finance/transactions/${selected.transactionId}`, { status: nextStatus });
+      setSelected({ ...selected, paymentStatus: nextStatus });
+      loadSchedules();
+      showToast("✓ Status de pagamento atualizado.");
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setPayingId(null);
+    }
+  }
+
+  /** Cria o lancamento financeiro (receita) deste atendimento, quando ainda nao existe um. */
+  async function saveNewValue() {
+    if (!selected) return;
+    const amount = Number(newAmount);
+    if (!amount || amount <= 0) return;
+    setSavingValue(true);
+    try {
+      const tx = await api.post<{ id: string; status: "pago" | "pendente" }>("/finance/transactions", {
+        type: "receita",
+        description: selected.procedure,
+        amount,
+        status: "pendente",
+        schedule_id: selected.id,
+        patient_id: selected.user_id,
+        occurred_on: selected.date,
+      });
+      setSelected({ ...selected, amount, paymentStatus: tx.status, transactionId: tx.id });
+      setValueFormOpen(false);
+      setNewAmount("");
+      loadSchedules();
+      showToast("✓ Valor registrado.");
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSavingValue(false);
+    }
+  }
+
   function renderHourColumn() {
     return (
       <div className="agenda-hour-col">
@@ -479,6 +547,11 @@ export function Agenda() {
             <div className="agenda-mobile-card-name">{it.patient_name}</div>
             <div className="agenda-mobile-card-procedure">{it.procedure}</div>
           </div>
+          {it.paymentStatus && (
+            <span className={`badge ${it.paymentStatus === "pago" ? "badge-green" : "badge-yellow"}`} style={{ flex: "none" }}>
+              {it.paymentStatus === "pago" ? "Pago" : "Pendente"}
+            </span>
+          )}
           <span className="agenda-mobile-card-status" style={{ background: getDisplayStatus(it).dot || "var(--text-faint)" }} />
         </div>
       );
@@ -540,6 +613,11 @@ export function Agenda() {
               <div className="agenda-mobile-card-name">{it.patient_name}</div>
               <div className="agenda-mobile-card-procedure">{it.procedure}</div>
             </div>
+            {it.paymentStatus && (
+              <span className={`badge ${it.paymentStatus === "pago" ? "badge-green" : "badge-yellow"}`} style={{ flex: "none" }}>
+                {it.paymentStatus === "pago" ? "Pago" : "Pendente"}
+              </span>
+            )}
             <span className="agenda-mobile-card-status" style={{ background: getDisplayStatus(it).dot || "var(--text-faint)" }} />
           </div>
         );
@@ -620,6 +698,48 @@ export function Agenda() {
             {getDisplayStatus(selected).label}
           </span>
           {selected.notes && <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>Obs: {selected.notes}</div>}
+
+          {!cancelling && (
+            <div style={{ marginBottom: 14, padding: "10px 12px", background: "var(--border-soft)", borderRadius: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 8 }}>
+                Financeiro
+              </div>
+              {selected.transactionId ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>{formatMoney(selected.amount || 0)}</span>
+                  <button
+                    className={`badge ${selected.paymentStatus === "pago" ? "badge-green" : "badge-yellow"}`}
+                    style={{ border: "none", cursor: "pointer" }}
+                    disabled={payingId === selected.id}
+                    title="Toque para alternar entre Pago e Pendente"
+                    onClick={togglePayment}
+                  >
+                    {payingId === selected.id ? "..." : selected.paymentStatus === "pago" ? "Pago" : "Pendente"}
+                  </button>
+                </div>
+              ) : valueFormOpen ? (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    className="input"
+                    style={{ flex: 1 }}
+                    type="number"
+                    step="0.01"
+                    autoFocus
+                    placeholder="Valor (R$)"
+                    value={newAmount}
+                    onChange={(e) => setNewAmount(e.target.value)}
+                  />
+                  <button className="btn" style={{ padding: "8px 14px", fontSize: 13 }} disabled={savingValue} onClick={saveNewValue}>
+                    {savingValue ? "..." : "Salvar"}
+                  </button>
+                </div>
+              ) : (
+                <button className="btn btn-secondary" style={{ fontSize: 12.5, padding: "6px 12px" }} onClick={() => setValueFormOpen(true)}>
+                  Definir valor deste atendimento
+                </button>
+              )}
+            </div>
+          )}
 
           {!cancelling && selected.status === "Agendado" && new Date(`${selected.date}T${selected.time}`) < new Date() && (
             <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>

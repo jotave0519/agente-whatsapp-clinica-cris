@@ -93,14 +93,14 @@ export async function getFinanceOverview(req: Request, res: Response): Promise<v
 
 export async function createTransaction(req: Request, res: Response): Promise<void> {
   try {
-    const { type, description, category, amount, method, status, patient_id, procedure_id, occurred_on } = req.body;
+    const { type, description, category, amount, method, status, patient_id, procedure_id, schedule_id, occurred_on } = req.body;
 
     if (!type || !description || amount == null) {
       res.status(400).json({ error: "type, description e amount sao obrigatorios." });
       return;
     }
 
-    logger.info(SCOPE, "Criando transacao via CRM", { staffId: req.staff?.id, type, amount });
+    logger.info(SCOPE, "Criando transacao via CRM", { staffId: req.staff?.id, type, amount, scheduleId: schedule_id });
     const transaction = await transactionRepository.create({
       type,
       description,
@@ -110,6 +110,7 @@ export async function createTransaction(req: Request, res: Response): Promise<vo
       status,
       patientId: patient_id,
       procedureId: procedure_id,
+      scheduleId: schedule_id,
       occurredOn: occurred_on,
       createdBy: req.staff?.id,
     });
@@ -117,6 +118,60 @@ export async function createTransaction(req: Request, res: Response): Promise<vo
   } catch (err) {
     logger.error(SCOPE, "Erro ao criar transacao", err);
     res.status(500).json({ error: "Erro ao criar transacao." });
+  }
+}
+
+function todayStr(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+/**
+ * Fechamento do dia (Financeiro): totais do dia (a partir de TODAS as
+ * transacoes ocorridas naquela data, vinculadas a um atendimento ou nao) +
+ * a lista de atendimentos da Agenda naquele dia, cada um anotado com seu
+ * lancamento financeiro quando existir (schedule_id). Fonte unica: nunca
+ * recalcula/duplica valor, so cruza schedules x transactions por leitura.
+ */
+export async function getDayClosing(req: Request, res: Response): Promise<void> {
+  try {
+    const date = typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : todayStr();
+
+    const [schedules, dayTransactions] = await Promise.all([
+      scheduleRepository.findByDateRange(date, date),
+      transactionRepository.listByDateRange(date, date),
+    ]);
+
+    const txByScheduleId = new Map(dayTransactions.filter((t) => t.schedule_id).map((t) => [t.schedule_id as string, t]));
+    const appointments = schedules.map((s) => {
+      const tx = txByScheduleId.get(s.id);
+      return {
+        id: s.id,
+        patientName: s.patient_name,
+        procedure: s.procedure,
+        time: s.time,
+        status: s.status,
+        patientId: s.user_id,
+        amount: tx ? Number(tx.amount) : null,
+        paymentStatus: tx ? tx.status : null,
+        transactionId: tx ? tx.id : null,
+      };
+    });
+
+    const receitasDia = dayTransactions.filter((t) => t.type === "receita");
+    const received = sum(receitasDia.filter((t) => t.status === "pago"));
+    const pending = sum(receitasDia.filter((t) => t.status === "pendente"));
+
+    res.json({
+      date,
+      appointmentCount: schedules.length,
+      invoiced: received + pending,
+      received,
+      pending,
+      appointments,
+    });
+  } catch (err) {
+    logger.error(SCOPE, "Erro ao montar fechamento do dia", err);
+    res.status(500).json({ error: "Erro ao carregar fechamento do dia." });
   }
 }
 

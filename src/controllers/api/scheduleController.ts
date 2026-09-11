@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as scheduleEventRepository from "../../repositories/scheduleEventRepository";
 import * as scheduleRepository from "../../repositories/scheduleRepository";
+import * as transactionRepository from "../../repositories/transactionRepository";
 import * as userRepository from "../../repositories/userRepository";
 import * as clinicCancellationService from "../../services/clinicCancellationService";
 import * as postAttendanceEngine from "../../services/postAttendanceEngine";
@@ -21,7 +22,18 @@ export async function listSchedules(req: Request, res: Response): Promise<void> 
     }
 
     const schedules = await scheduleRepository.findByDateRange(from, to);
-    res.json({ items: schedules });
+
+    // Indicador de pagamento (Pago/Pendente) no card do atendimento: leitura
+    // adicional do lancamento vinculado (transactions.schedule_id), quando
+    // existir - nunca cria/duplica valor, so anexa o que ja existe.
+    const transactions = await transactionRepository.findByScheduleIds(schedules.map((s) => s.id));
+    const txByScheduleId = new Map(transactions.map((t) => [t.schedule_id as string, t]));
+    const items = schedules.map((s) => {
+      const tx = txByScheduleId.get(s.id);
+      return { ...s, amount: tx ? Number(tx.amount) : null, paymentStatus: tx ? tx.status : null, transactionId: tx ? tx.id : null };
+    });
+
+    res.json({ items });
   } catch (err) {
     logger.error(SCOPE, "Erro ao listar agendamentos", err);
     res.status(500).json({ error: "Erro ao listar agendamentos." });

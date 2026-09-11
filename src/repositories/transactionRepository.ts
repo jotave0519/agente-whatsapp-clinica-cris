@@ -13,6 +13,14 @@ export async function listByDateRange(startDate: string, endDate: string): Promi
   return data || [];
 }
 
+/** Usado pelo fechamento do dia (Financeiro) e pelo indicador de pagamento na Agenda. */
+export async function findByScheduleIds(scheduleIds: string[]): Promise<Transaction[]> {
+  if (scheduleIds.length === 0) return [];
+  const { data, error } = await getSupabaseClient().from("transactions").select("*").in("schedule_id", scheduleIds);
+  if (error) throw error;
+  return data || [];
+}
+
 /** Usado pelo resumo financeiro da Ficha do Paciente. */
 export async function findByUserId(patientId: string): Promise<Transaction[]> {
   const { data, error } = await getSupabaseClient()
@@ -47,6 +55,7 @@ export async function create(params: {
   status?: TransactionStatus;
   patientId?: string | null;
   procedureId?: string | null;
+  scheduleId?: string | null;
   occurredOn?: string;
   createdBy?: string | null;
 }): Promise<Transaction> {
@@ -61,6 +70,7 @@ export async function create(params: {
       status: params.status ?? "pago",
       patient_id: params.patientId ?? null,
       procedure_id: params.procedureId ?? null,
+      schedule_id: params.scheduleId ?? null,
       occurred_on: params.occurredOn ?? new Date().toISOString().slice(0, 10),
       created_by: params.createdBy ?? null,
     })

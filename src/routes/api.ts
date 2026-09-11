@@ -11,7 +11,7 @@ import {
 import { getConversation, listConversations, sendMessage, updatePriority, updateStatus } from "../controllers/api/conversationController";
 import { getDashboard } from "../controllers/api/dashboardController";
 import { createFaq, deleteFaq, listFaq, updateFaq } from "../controllers/api/faqController";
-import { createTransaction, deleteTransaction, getFinanceOverview, updateTransaction } from "../controllers/api/financeController";
+import { createTransaction, deleteTransaction, getDayClosing, getFinanceOverview, updateTransaction } from "../controllers/api/financeController";
 import {
   createItem,
   createMovement,
@@ -135,6 +135,7 @@ apiRouter.patch("/procedures/:id", requireAdmin, updateProcedure);
 apiRouter.delete("/procedures/:id", requireAdmin, deleteProcedure);
 
 apiRouter.get("/finance", requireAdmin, getFinanceOverview);
+apiRouter.get("/finance/day-closing", requireAdmin, getDayClosing);
 apiRouter.post("/finance/transactions", requireAdmin, createTransaction);
 apiRouter.patch("/finance/transactions/:id", requireAdmin, updateTransaction);
 apiRouter.delete("/finance/transactions/:id", requireAdmin, deleteTransaction);

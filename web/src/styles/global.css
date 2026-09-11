@@ -377,6 +377,13 @@ a {
   }
 }
 
+/* Entrada suave via "animation" (toca sozinha ao montar, sem depender de
+   nenhum JS/observer) - usada onde um bloco de conteudo e remontado por
+   troca de "key" (ex: fechamento do dia trocando de data). */
+.finance-fade-in {
+  animation: entrance-rise 220ms ease both;
+}
+
 /* Slide sutil na direcao da navegacao (setas da Agenda) - so um indicio de
    direcao, nao um "swipe" completo. .slide-next/.slide-prev tem mais
    especificidade que ".card" sozinho, entao substituem o entrance-rise

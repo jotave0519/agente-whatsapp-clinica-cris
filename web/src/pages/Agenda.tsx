@@ -161,6 +161,13 @@ export function Agenda() {
     }
   }
 
+  // Cabecalho de data completo mostrado no celular, abaixo da faixa de dias
+  // (ex: "Quinta-feira, 10 de setembro") - so formatacao, mesma selectedDay.
+  const fullDayHeading = (() => {
+    const raw = selectedDay.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  })();
+
   async function handleCancel() {
     if (!selected) return;
     setActing(true);
@@ -453,11 +460,11 @@ export function Agenda() {
           <strong style={{ color: "var(--text)", fontWeight: 600 }}>{selectedDayAppts} atendimento(s)</strong> neste dia
         </p>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
           <button style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => goToWeek(-1)}>
             <ChevronLeftIcon color="var(--text-muted)" />
           </button>
-          <button style={{ flex: 1, fontSize: 12.5, fontWeight: 500, color: "var(--accent)", textAlign: "center" }} onClick={goToToday}>
+          <button style={{ flex: 1, fontSize: 15, fontWeight: 600, color: "var(--text)", textAlign: "center" }} onClick={goToToday}>
             {selectedDayLabel}
           </button>
           <button style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => goToWeek(1)}>
@@ -465,6 +472,7 @@ export function Agenda() {
           </button>
         </div>
         <DayStrip days={weekDays} selected={selectedDay} onSelect={setSelectedDay} />
+        <div style={{ fontSize: 14.5, fontWeight: 600, margin: "14px 0 10px" }}>{fullDayHeading}</div>
 
         {error && <div className="error-text">{error}</div>}
 

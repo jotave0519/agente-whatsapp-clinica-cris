@@ -22,10 +22,8 @@ export function DayStrip({ days, selected, onSelect }: Props) {
         const isSelected = dateStr === selectedStr;
         return (
           <button key={dateStr} className={`day-strip-chip${isSelected ? " active" : ""}`} onClick={() => onSelect(d)}>
-            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".03em", textTransform: "uppercase", color: isSelected ? "inherit" : isToday ? "var(--accent)" : "var(--text-faint)" }}>
-              {WEEKDAY_LABELS[(d.getDay() + 6) % 7]}
-            </div>
-            <div style={{ fontSize: 15, fontWeight: 600, marginTop: 2 }}>{d.getDate()}</div>
+            <span className={`day-strip-weekday${isToday ? " is-today" : ""}`}>{WEEKDAY_LABELS[(d.getDay() + 6) % 7]}</span>
+            <span className={`day-strip-number${isToday ? " is-today" : ""}`}>{d.getDate()}</span>
           </button>
         );
       })}

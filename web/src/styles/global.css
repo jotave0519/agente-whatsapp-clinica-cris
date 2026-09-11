@@ -966,32 +966,62 @@ a {
   transform: scale(0.97);
 }
 
+/* Cada dia divide igualmente a largura disponivel (flex:1) - garante que os
+   7 dias sempre cabem na tela, sem scroll horizontal nem corte lateral,
+   independente da largura do celular. */
 .day-strip {
   display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 2px 2px 12px;
-  -webkit-overflow-scrolling: touch;
+  gap: 2px;
+  padding: 4px 0 2px;
 }
 
 .day-strip-chip {
-  flex: 0 0 auto;
-  width: 46px;
-  padding: 8px 0;
-  border-radius: 12px;
-  text-align: center;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  transition: transform 120ms ease, background 150ms ease, border-color 150ms ease, color 150ms ease;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+  border: none;
+  background: none;
 }
 
-.day-strip-chip:active {
-  transform: scale(0.97);
+.day-strip-weekday {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-faint);
 }
 
-.day-strip-chip.active {
+.day-strip-weekday.is-today {
+  color: var(--accent);
+}
+
+.day-strip-number {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  transition: transform 120ms ease, background 150ms ease, color 150ms ease;
+}
+
+.day-strip-number.is-today {
+  color: var(--accent);
+}
+
+.day-strip-chip:active .day-strip-number {
+  transform: scale(0.92);
+}
+
+.day-strip-chip.active .day-strip-number {
   background: var(--text);
-  border-color: var(--text);
   color: var(--bg);
 }
 

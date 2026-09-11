@@ -109,6 +109,14 @@ button {
   border: none;
   background: none;
   color: inherit;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+/* Feedback de toque padrao pra QUALQUER botao da plataforma, mesmo sem
+   classe especifica - regras mais especificas (.btn:active, .fab:active
+   etc.) continuam valendo por cima dessa, pela especificidade do seletor. */
+button:not(:disabled):active {
+  transform: scale(0.96);
 }
 
 input,
@@ -519,6 +527,7 @@ a {
   font-weight: 600;
   border-radius: 20px;
   padding: 3px 10px;
+  transition: background-color 200ms ease, color 200ms ease;
 }
 
 .badge-green {

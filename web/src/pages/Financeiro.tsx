@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { AnimatedNumber } from "../components/AnimatedNumber";
 import { FormSheet } from "../components/FormSheet";
 import { PatientPicker } from "../components/PatientPicker";
 import { Skeleton, SkeletonKpiGrid } from "../components/Skeleton";
@@ -7,6 +8,26 @@ import { useToast } from "../context/ToastContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 import { ChevronLeftIcon, ChevronRightIcon } from "../components/icons";
+
+/** Barra que cresce suavemente ate a altura final (do 0%, ou da altura anterior quando o valor muda) - nunca aparece "pronta" de repente. */
+function ChartBar({ percent, color }: { percent: number; color: string }) {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setHeight(percent));
+    return () => cancelAnimationFrame(raf);
+  }, [percent]);
+  return (
+    <div
+      style={{
+        width: "38%",
+        height: `${height}%`,
+        background: color,
+        borderRadius: "4px 4px 0 0",
+        transition: "height 500ms cubic-bezier(0.22, 1, 0.36, 1)",
+      }}
+    />
+  );
+}
 
 interface Transaction {
   id: string;
@@ -398,19 +419,19 @@ export function Financeiro() {
       <div className="kpi-grid">
         <div className="card">
           <div className="kpi-label">Receita (mês)</div>
-          <div className="kpi-value">{formatMoney(data.kpis.receita)}</div>
+          <div className="kpi-value"><AnimatedNumber value={data.kpis.receita} format={formatMoney} /></div>
         </div>
         <div className="card">
           <div className="kpi-label">Despesa (mês)</div>
-          <div className="kpi-value">{formatMoney(data.kpis.despesa)}</div>
+          <div className="kpi-value"><AnimatedNumber value={data.kpis.despesa} format={formatMoney} /></div>
         </div>
         <div className="card">
           <div className="kpi-label">Lucro (mês)</div>
-          <div className="kpi-value">{formatMoney(data.kpis.lucro)}</div>
+          <div className="kpi-value"><AnimatedNumber value={data.kpis.lucro} format={formatMoney} /></div>
         </div>
         <div className="card">
           <div className="kpi-label">Pendente a receber</div>
-          <div className="kpi-value">{formatMoney(data.kpis.pendentes)}</div>
+          <div className="kpi-value"><AnimatedNumber value={data.kpis.pendentes} format={formatMoney} /></div>
         </div>
       </div>
 
@@ -446,20 +467,26 @@ export function Financeiro() {
 
             <div style={{ display: "flex", gap: 22, flexWrap: "wrap", marginBottom: 18 }}>
               <div>
-                <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em" }}>{closing.appointmentCount}</div>
+                <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em" }}>
+                  <AnimatedNumber value={closing.appointmentCount} duration={400} />
+                </div>
                 <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 3 }}>Atendimentos</div>
               </div>
               <div>
-                <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em" }}>{formatMoney(closing.invoiced)}</div>
+                <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em" }}>
+                  <AnimatedNumber value={closing.invoiced} format={formatMoney} />
+                </div>
                 <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 3 }}>Faturado</div>
               </div>
               <div>
-                <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em", color: "var(--green)" }}>{formatMoney(closing.received)}</div>
+                <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em", color: "var(--green)" }}>
+                  <AnimatedNumber value={closing.received} format={formatMoney} />
+                </div>
                 <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 3 }}>Recebido</div>
               </div>
               <div>
                 <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em", color: closing.pending > 0 ? "var(--yellow)" : "var(--text)" }}>
-                  {formatMoney(closing.pending)}
+                  <AnimatedNumber value={closing.pending} format={formatMoney} />
                 </div>
                 <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 3 }}>Pendente</div>
               </div>
@@ -531,7 +558,7 @@ export function Financeiro() {
                   Comparar com outro dia
                 </button>
               ) : (
-                <div>
+                <div className="finance-fade-in">
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                     <div style={{ fontWeight: 600, fontSize: 13.5 }}>Comparar dias</div>
                     <button
@@ -612,8 +639,8 @@ export function Financeiro() {
           {data.chart.map((b) => (
             <div key={b.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
               <div style={{ width: "100%", display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 4, height: 100 }}>
-                <div style={{ width: "38%", height: `${(b.in / maxBar) * 100}%`, background: "var(--green)", borderRadius: "4px 4px 0 0" }} />
-                <div style={{ width: "38%", height: `${(b.out / maxBar) * 100}%`, background: "var(--red)", borderRadius: "4px 4px 0 0" }} />
+                <ChartBar percent={(b.in / maxBar) * 100} color="var(--green)" />
+                <ChartBar percent={(b.out / maxBar) * 100} color="var(--red)" />
               </div>
               <span style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{b.label}</span>
             </div>

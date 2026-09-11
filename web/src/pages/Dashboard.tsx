@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { api } from "../lib/api";
 import { ArrowRightIcon, TrendingUpIcon } from "../components/icons";
+import { AnimatedNumber } from "../components/AnimatedNumber";
 import { ConfirmationsChart } from "../components/ConfirmationsChart";
 import { NewAppointmentFab } from "../components/NewAppointmentFab";
 import { RevenueChart } from "../components/RevenueChart";
@@ -121,8 +122,8 @@ export function Dashboard() {
   const chartData = isMobile ? data.revenueChart.slice(-6) : data.revenueChart;
 
   const kpiCards = [
-    { label: "Pacientes ativos", value: String(data.kpis.activePatients) },
-    { label: "Agendamentos (mês)", value: String(data.kpis.appointmentsThisMonth) },
+    { label: "Pacientes ativos", value: data.kpis.activePatients },
+    { label: "Agendamentos (mês)", value: data.kpis.appointmentsThisMonth },
   ];
 
   // Proximo atendimento (Resumo do Dia) - deriva de todayAppointments, que o
@@ -144,7 +145,7 @@ export function Dashboard() {
             {greeting()}, <span style={{ fontStyle: "italic" }}>{name}</span>
           </h1>
           <p style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 9 }}>
-            Você tem <strong style={{ color: "var(--text)", fontWeight: 600 }}>{data.todayAppointments.length} atendimento(s)</strong> hoje.
+            Você tem <strong style={{ color: "var(--text)", fontWeight: 600 }}><AnimatedNumber value={data.todayAppointments.length} duration={400} /> atendimento(s)</strong> hoje.
           </p>
         </div>
       </div>
@@ -152,7 +153,9 @@ export function Dashboard() {
       <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
         {kpiCards.map((k) => (
           <div key={k.label} className="card">
-            <div className="kpi-value">{k.value}</div>
+            <div className="kpi-value">
+              <AnimatedNumber value={k.value} />
+            </div>
             <div className="kpi-label" style={{ marginTop: 6, marginBottom: 0 }}>
               {k.label}
             </div>
@@ -167,16 +170,20 @@ export function Dashboard() {
           <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 16 }}>Financeiro de hoje</div>
           <div style={{ display: "flex", gap: 22 }}>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em" }}>{formatMoneyShort(data.todayRevenue.expected)}</div>
+              <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em" }}>
+                <AnimatedNumber value={data.todayRevenue.expected} format={formatMoneyShort} />
+              </div>
               <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 3 }}>Previsto</div>
             </div>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em", color: "var(--green)" }}>{formatMoneyShort(data.todayRevenue.received)}</div>
+              <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em", color: "var(--green)" }}>
+                <AnimatedNumber value={data.todayRevenue.received} format={formatMoneyShort} />
+              </div>
               <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 3 }}>Recebido</div>
             </div>
             <div>
               <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em", color: data.todayRevenue.pending > 0 ? "var(--yellow)" : "var(--text)" }}>
-                {formatMoneyShort(data.todayRevenue.pending)}
+                <AnimatedNumber value={data.todayRevenue.pending} format={formatMoneyShort} />
               </div>
               <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 3 }}>Pendente</div>
             </div>
@@ -218,7 +225,9 @@ export function Dashboard() {
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10, margin: "10px 0 16px" }}>
-            <div style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-.02em" }}>{formatMoney(data.kpis.revenueThisMonth)}</div>
+            <div style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-.02em" }}>
+              <AnimatedNumber value={data.kpis.revenueThisMonth} format={formatMoney} />
+            </div>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12.5, fontWeight: 600, color: "var(--green)" }}>
               <TrendingUpIcon width={13} height={13} />
               este mês
@@ -272,19 +281,27 @@ export function Dashboard() {
         </div>
         <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
           <div className="card">
-            <div className="kpi-value">{data.reactivation.eligible}</div>
+            <div className="kpi-value">
+              <AnimatedNumber value={data.reactivation.eligible} />
+            </div>
             <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Pacientes a recuperar</div>
           </div>
           <div className="card">
-            <div className="kpi-value">{data.postAttendance.patientsFollowedToday}</div>
+            <div className="kpi-value">
+              <AnimatedNumber value={data.postAttendance.patientsFollowedToday} />
+            </div>
             <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Acompanhados hoje</div>
           </div>
           <div className="card">
-            <div className="kpi-value">{data.commercial.openOpportunities}</div>
+            <div className="kpi-value">
+              <AnimatedNumber value={data.commercial.openOpportunities} />
+            </div>
             <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Oportunidades abertas</div>
           </div>
           <div className="card">
-            <div className="kpi-value">{formatMoneyShort(data.reactivation.recoveredRevenue + data.commercial.recoveredRevenue)}</div>
+            <div className="kpi-value">
+              <AnimatedNumber value={data.reactivation.recoveredRevenue + data.commercial.recoveredRevenue} format={formatMoneyShort} />
+            </div>
             <div className="kpi-label" style={{ marginTop: 4, marginBottom: 0 }}>Receita recuperada (estimativa)</div>
           </div>
         </div>

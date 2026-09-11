@@ -50,7 +50,18 @@ export function ConfirmationsChart({ data }: Props) {
         <Tooltip content={<CustomTooltip />} cursor={{ stroke: "var(--border)", strokeWidth: 1 }} />
         <Legend wrapperStyle={{ fontSize: 12 }} />
         {SERIES.map((s) => (
-          <Line key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={s.color} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+          <Line
+            key={s.key}
+            type="monotone"
+            dataKey={s.key}
+            name={s.name}
+            stroke={s.color}
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4 }}
+            isAnimationActive
+            animationDuration={700}
+          />
         ))}
       </LineChart>
     </ResponsiveContainer>

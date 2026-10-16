@@ -3,6 +3,7 @@ import path from "path";
 import { env } from "./config/env";
 import { handleWhatsAppWebhook } from "./controllers/webhookController";
 import { handleHealthCheck } from "./controllers/healthController";
+import { apiCors, apiRequestLog } from "./middleware/apiAccess";
 import { apiRouter } from "./routes/api";
 import { publicRouter } from "./routes/publicRoutes";
 import { scheduleReminderEngineCron } from "./cron/reminderEngineCron";
@@ -19,6 +20,7 @@ app.use(express.json());
 
 app.post("/webhook", handleWhatsAppWebhook);
 app.get("/health", handleHealthCheck);
+app.use("/api/v1", apiRequestLog, apiCors);
 app.use("/api/v1/public", publicRouter);
 app.use("/api/v1", apiRouter);
 

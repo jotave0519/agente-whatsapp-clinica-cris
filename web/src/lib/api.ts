@@ -23,6 +23,44 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, message: string)
   });
 }
 
+// Endereco reserva do mesmo servidor (mesmo backend, mesmo banco). Algumas redes
+// moveis/Wi-Fi ou DNS privado no Android bloqueiam o dominio *.easypanel.host;
+// se uma leitura falhar por rede, tentamos por aqui e passamos a usar esse
+// endereco ate o app ser fechado. Enquanto o dominio nao existir, a tentativa
+// so falha e o erro original aparece - sem efeito colateral.
+const FALLBACK_BASE = (import.meta.env.VITE_API_FALLBACK_URL || "https://zangelmi.nortic.digital").replace(/\/$/, "");
+let apiBase = "";
+
+class NetworkError extends Error {
+  constructor(public readonly timedOut: boolean) {
+    super(
+      timedOut
+        ? "O servidor demorou para responder. Verifique a internet e tente novamente."
+        : "Sem conexao com o servidor. Verifique a internet e tente novamente."
+    );
+  }
+}
+
+async function send(base: string, path: string, options: RequestInit, token: string | undefined, isRead: boolean): Promise<Response> {
+  const controller = isRead ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), READ_TIMEOUT_MS) : null;
+  try {
+    return await fetch(`${base}/api/v1${path}`, {
+      ...options,
+      signal: controller?.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+  } catch {
+    throw new NetworkError(!!controller?.signal.aborted);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const { data } = await withTimeout(
     supabase.auth.getSession(),
@@ -32,27 +70,22 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = data.session?.access_token;
 
   const isRead = !options.method || options.method === "GET";
-  const controller = isRead ? new AbortController() : null;
-  const timer = controller ? setTimeout(() => controller.abort(), READ_TIMEOUT_MS) : null;
 
   let response: Response;
   try {
-    response = await fetch(`/api/v1${path}`, {
-      ...options,
-      signal: controller?.signal,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(options.headers || {}),
-      },
-    });
+    response = await send(apiBase, path, options, token, isRead);
   } catch (err) {
-    if (controller?.signal.aborted) {
-      throw new Error("O servidor demorou para responder. Verifique a internet e tente novamente.");
+    // So leituras tentam o reserva automaticamente (repetir uma escrita
+    // poderia duplicar registro). Depois que o reserva funciona, as escritas
+    // ja vao direto por ele, porque apiBase muda.
+    const canFallback = isRead && apiBase === "" && FALLBACK_BASE !== window.location.origin;
+    if (!(err instanceof NetworkError) || !canFallback) throw err;
+    try {
+      response = await send(FALLBACK_BASE, path, options, token, isRead);
+      apiBase = FALLBACK_BASE;
+    } catch {
+      throw err;
     }
-    throw new Error("Sem conexao com o servidor. Verifique a internet e tente novamente.");
-  } finally {
-    if (timer) clearTimeout(timer);
   }
 
   if (!response.ok) {

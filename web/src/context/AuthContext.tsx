@@ -1,7 +1,9 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { Session } from "@supabase/supabase-js";
-import { api } from "../lib/api";
+import { api, withTimeout } from "../lib/api";
 import { supabase } from "../lib/supabaseClient";
+
+const SESSION_TIMEOUT_MS = 8_000;
 
 export type StaffRole = "admin" | "recepcionista" | "profissional";
 
@@ -28,10 +30,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
+    // Sem timeout/catch aqui, uma falha ao ler/renovar a sessao deixava o app
+    // em "Carregando..." para sempre. Se nao resolver a tempo, libera a tela
+    // (vai para o login); se a sessao chegar depois, onAuthStateChange atualiza.
+    withTimeout(supabase.auth.getSession(), SESSION_TIMEOUT_MS, "getSession timeout")
+      .then(({ data }) => setSession(data.session))
+      .catch(() => setSession(null))
+      .finally(() => setLoading(false));
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
@@ -55,10 +60,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session]);
 
   async function signOut() {
-    await supabase.auth.signOut();
+    try {
+      await withTimeout(supabase.auth.signOut(), SESSION_TIMEOUT_MS, "signOut timeout");
+    } catch {
+      // Sem resposta do servidor: ao menos desloga este aparelho.
+      clearLocalSession();
+      setSession(null);
+    }
   }
 
   return <AuthContext.Provider value={{ session, staff, loading, signOut }}>{children}</AuthContext.Provider>;
+}
+
+/**
+ * Apaga so a sessao salva neste aparelho (chaves "sb-*" do Supabase no
+ * localStorage). Nao toca em nenhum dado da clinica - so obriga a logar de novo.
+ */
+export function clearLocalSession(): void {
+  try {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith("sb-"))
+      .forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // localStorage indisponivel (modo privado etc.) - nada a limpar.
+  }
 }
 
 export function useAuth(): AuthContextValue {

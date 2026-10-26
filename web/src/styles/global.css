@@ -1592,3 +1592,29 @@ a {
   }
 }
 
+
+/* Cabecalho da Agenda mobile (titulo + "Nova sessao") grudado no topo. */
+.agenda-mobile-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+  padding-bottom: 2px;
+}
+
+/* Android (classe posta no index.html): o Chrome Android de alguns aparelhos
+   desenhava a Agenda corrompida - faixa do topo em branco (sumindo o botao
+   "Nova sessao"), letras picotadas/espelhadas - pela combinacao de cabecalho
+   sticky + cartoes com animacao de entrada (opacity/transform) dentro do
+   scroll de ".main". Nesses aparelhos: sem sticky e sem animacoes de entrada.
+   iPhone/desktop continuam iguais. */
+html.is-android .agenda-mobile-header {
+  position: static;
+}
+html.is-android .card,
+html.is-android .card.slide-next,
+html.is-android .card.slide-prev,
+html.is-android .page-transition,
+html.is-android .finance-fade-in {
+  animation: none;
+}

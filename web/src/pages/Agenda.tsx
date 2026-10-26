@@ -811,7 +811,7 @@ export function Agenda() {
             nunca sobrepoe horarios/cards/datas do mes - so ocupa a faixa fixa
             no topo, visivel em Dia/Semana/Mes por igual. Mesma acao de sempre
             (openNewAppointment), so a posicao/apresentacao mudou. */}
-        <div style={{ position: "sticky", top: 0, zIndex: 5, background: "var(--bg)", paddingBottom: 2 }}>
+        <div className="agenda-mobile-header">
           <h1 className="page-title">Agenda</h1>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 20 }}>
             <p className="page-subtitle" style={{ marginBottom: 0 }}>

@@ -15,6 +15,11 @@
           }
           document.documentElement.setAttribute("data-theme", t);
         } catch (e) {}
+        // Marca Android antes do primeiro paint: global.css desliga ai os
+        // efeitos (sticky + animacoes) que o Chrome Android desenha corrompido.
+        if (/Android/i.test(navigator.userAgent)) {
+          document.documentElement.classList.add("is-android");
+        }
       })();
     </script>
 

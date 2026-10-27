@@ -6,9 +6,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      // "prompt" (nao "autoUpdate"): nunca troca a versao debaixo do usuario
-      // sem avisar - o UpdatePrompt.tsx mostra o aviso discreto e so atualiza
-      // quando ele clicar "Atualizar agora".
+      // "prompt" (nao "autoUpdate"): nunca troca a versao no meio do uso -
+      // o UpdatePrompt.tsx aplica sozinho so ao abrir/voltar pro app (sem modal
+      // aberto/campo em foco); fora disso mostra "Atualizar agora".
       registerType: "prompt",
       // null: o registro do service worker e feito manualmente pelo hook
       // useRegisterSW (UpdatePrompt.tsx), que controla o aviso de atualizacao -

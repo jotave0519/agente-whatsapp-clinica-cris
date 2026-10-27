@@ -1615,8 +1615,31 @@ html.is-android .card,
 html.is-android .card.slide-next,
 html.is-android .card.slide-prev,
 html.is-android .page-transition,
-html.is-android .finance-fade-in {
+html.is-android .finance-fade-in,
+html.is-android .mobile-list-item,
+html.is-android .agenda-mobile-card {
   animation: none;
+}
+
+/* Android (3a rodada - auditoria preventiva, mesmo video ainda sem resposta
+   da clinica confirmando se a 2a rodada resolveu): ".agenda-mobile-card" (os
+   proprios cartoes de atendimento, exatamente o que aparece fantasmado no
+   video) e ".mobile-list-item" tinham a mesma animacao de entrada que .card,
+   mas ficaram de fora da 1a leva por engano - essa era a lacuna mais provavel
+   pra ghosting persistir mesmo com a correcao anterior. Tambem desliga as
+   transicoes de "transform" do toque (tap feedback): "transition: transform"
+   promove/rebaixa camada de composicao a cada toque, outro gatilho conhecido
+   desse bug no Chrome Android - sem perda real de UX, so o "encolher ao
+   tocar" que some nesses aparelhos. */
+html.is-android .agenda-mobile-card,
+html.is-android .day-strip-number {
+  transition: none;
+}
+html.is-android .agenda-mobile-card:active {
+  transform: none;
+}
+html.is-android .day-strip-chip:active .day-strip-number {
+  transform: none;
 }
 
 /* Android (2a rodada, video do Galaxy Z Flip da clinica): ao rolar, partes ja

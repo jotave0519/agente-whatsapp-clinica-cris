@@ -1618,3 +1618,20 @@ html.is-android .page-transition,
 html.is-android .finance-fade-in {
   animation: none;
 }
+
+/* Android (2a rodada, video do Galaxy Z Flip da clinica): ao rolar, partes ja
+   roladas continuavam pintadas na tela (faixa de dias e data repetidas 2-3x,
+   texto embaralhado). Sintoma de rolagem nao-composta: ".main" e o container
+   que rola e tinha fundo transparente, o que impede o Chrome de compor a
+   rolagem na GPU e o faz repintar "na mao" - e alguns aparelhos falham nisso.
+   Fundo opaco + will-change: scroll-position deixa a rolagem composta.
+   Nada de will-change: transform/contain aqui: criariam containing block e
+   quebrariam os modais position:fixed (ex.: "Novo agendamento"). */
+html.is-android .app-shell,
+html.is-android .main-column,
+html.is-android .main {
+  background: var(--bg);
+}
+html.is-android .main {
+  will-change: scroll-position;
+}
